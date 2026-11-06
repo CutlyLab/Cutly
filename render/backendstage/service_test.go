@@ -125,7 +125,8 @@ func TestServiceRejectsInvalidConfigurationAndLiveBackend(t *testing.T) {
 	rejectedFixture := newServiceFixture(t, rejected)
 	job = rejectedFixture.job("job-preflight", "preflight.mp4")
 	plan = mustPlan(t, rejectedFixture.service, job)
-	if _, err := rejectedFixture.service.ResolveExecutor(context.Background(), job, plan); !errors.Is(err, ErrBackend) ||
+	executor := mustExecutor(t, rejectedFixture.service, job, plan)
+	if _, err := executor.Execute(context.Background(), plan.Tasks[0], nil); !errors.Is(err, ErrBackend) ||
 		!strings.Contains(err.Error(), "TEST.REJECTED") || strings.Contains(err.Error(), "TEST.WARNING") {
 		t.Fatalf("preflight rejection error = %v", err)
 	}
@@ -179,6 +180,37 @@ func TestServiceRecoversPublicationBeforeCheckpointAndThenCacheHits(t *testing.T
 		// First manual execution and recovery engine each open one snapshot after
 		// an inspection. A checkpoint hit must not invoke the executor again.
 		t.Fatalf("open calls after checkpoint hit = %d", fixture.backend.openCalls.Load())
+	}
+}
+
+func TestServiceRecoveryDoesNotRequireSourceTouchingPreflight(t *testing.T) {
+	fixture := newServiceFixture(t, nil)
+	job := fixture.job("job-offline-recovery", "offline-recovery.mp4")
+	plan := mustPlan(t, fixture.service, job)
+	first := mustExecutor(t, fixture.service, job, plan)
+	firstOutput, err := first.Execute(context.Background(), plan.Tasks[0], nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fixture.backend.preflightCalls.Load() != 1 || fixture.backend.renderCalls.Load() != 1 {
+		t.Fatalf("first execution preflight/render = %d/%d",
+			fixture.backend.preflightCalls.Load(), fixture.backend.renderCalls.Load())
+	}
+	fixture.backend.preflightDiagnostics = []videoedit.Diagnostic{{
+		Code: "TEST.SOURCE_OFFLINE", Severity: videoedit.SeverityError,
+		Path: "/resources/0/locator", Message: "source is offline",
+	}}
+	recovered := mustExecutor(t, fixture.service, job, plan)
+	secondOutput, err := recovered.Execute(context.Background(), plan.Tasks[0], nil)
+	if err != nil {
+		t.Fatalf("published recovery touched offline source preflight: %v", err)
+	}
+	if !reflect.DeepEqual(firstOutput, secondOutput) {
+		t.Fatalf("recovered output=%+v want=%+v", secondOutput, firstOutput)
+	}
+	if fixture.backend.preflightCalls.Load() != 1 || fixture.backend.renderCalls.Load() != 1 {
+		t.Fatalf("recovery preflight/render = %d/%d",
+			fixture.backend.preflightCalls.Load(), fixture.backend.renderCalls.Load())
 	}
 }
 
@@ -570,11 +602,12 @@ type fakeBackend struct {
 	capabilities videoedit.BackendCapabilities
 	media        []byte
 
-	mu           sync.Mutex
-	publications map[string]fakePublication
-	renderCalls  atomic.Int32
-	inspectCalls atomic.Int32
-	openCalls    atomic.Int32
+	mu             sync.Mutex
+	publications   map[string]fakePublication
+	renderCalls    atomic.Int32
+	preflightCalls atomic.Int32
+	inspectCalls   atomic.Int32
+	openCalls      atomic.Int32
 
 	blockRender          bool
 	renderStarted        chan struct{}
@@ -604,6 +637,7 @@ func (backend *fakeBackend) Capabilities(context.Context) (videoedit.BackendCapa
 }
 
 func (backend *fakeBackend) Preflight(_ context.Context, _ videoedit.RenderPlan, manifest renderapi.ExecutionManifest) []videoedit.Diagnostic {
+	backend.preflightCalls.Add(1)
 	if backend.mutatePreflight && len(manifest.Backend.TrackKinds) > 0 {
 		manifest.Backend.TrackKinds[0] = videoedit.TrackKindAudio
 	}

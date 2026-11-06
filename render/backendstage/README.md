@@ -19,6 +19,12 @@ This ordering closes the useful crash windows:
 - checkpoint before scheduler completion: the engine loads it and the artifact
   resolver repeats both integrity checks.
 
+Backend identity and capabilities are checked whenever an executor is created.
+The full source-touching preflight runs only after publication inspection proves
+that no recoverable output exists. A job that already crossed the publication
+boundary can therefore finish CAS/checkpoint recovery even when its source files
+are temporarily offline; a job that must encode still fails closed on preflight.
+
 ## Resource admission
 
 `Config.MemoryBytes` and `Config.DiskBytes` are explicit per-job estimates and

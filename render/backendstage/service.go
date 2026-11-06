@@ -106,7 +106,7 @@ func (service *Service) ResolveExecutor(ctx context.Context, job renderapi.Rende
 	if err != nil {
 		return nil, err
 	}
-	backend, err := service.resolveBackend(ctx, environment, true)
+	backend, err := service.resolveBackend(ctx, environment)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +148,7 @@ func (service *Service) ResolveArtifact(ctx context.Context, job renderapi.Rende
 	if err := service.verifyCAS(ctx, plan.Tasks[0], checkpoint); err != nil {
 		return renderapi.RenderArtifact{}, err
 	}
-	backend, err := service.resolveBackend(ctx, environment, false)
+	backend, err := service.resolveBackend(ctx, environment)
 	if err != nil {
 		return renderapi.RenderArtifact{}, err
 	}
@@ -295,7 +295,7 @@ func freezeEnvironment(environment prepared.Environment) (prepared.Environment, 
 	return prepared.Environment{Plan: plan, Manifest: manifest}, nil
 }
 
-func (service *Service) resolveBackend(ctx context.Context, environment prepared.Environment, preflight bool) (Backend, error) {
+func (service *Service) resolveBackend(ctx context.Context, environment prepared.Environment) (Backend, error) {
 	if nilLike(service.backends) {
 		return nil, ErrConfiguration
 	}
@@ -323,23 +323,6 @@ func (service *Service) resolveBackend(ctx context.Context, environment prepared
 		videoedit.CanonicalBackendCapabilities(environment.Manifest.Backend),
 	) {
 		return nil, fmt.Errorf("%w: live identity does not match the frozen manifest", ErrBackend)
-	}
-	if preflight {
-		preflightEnvironment, err := freezeEnvironment(environment)
-		if err != nil {
-			return nil, err
-		}
-		diagnostics, err := safePreflight(ctx, backend, preflightEnvironment.Plan, preflightEnvironment.Manifest)
-		if err != nil {
-			return nil, wrapError(ErrBackend, "preflight", err)
-		}
-		if videoedit.HasErrorDiagnostics(diagnostics) {
-			for _, diagnostic := range diagnostics {
-				if diagnostic.Severity == videoedit.SeverityError {
-					return nil, fmt.Errorf("%w: preflight rejected code=%q path=%q", ErrBackend, diagnostic.Code, diagnostic.Path)
-				}
-			}
-		}
 	}
 	return backend, nil
 }
@@ -449,6 +432,9 @@ func (executor *executor) execute(ctx context.Context, task stagedag.Task) (outp
 	}
 	var rendered renderapi.RenderArtifact
 	if !found {
+		if err := preflightForRender(ctx, executor.backend, executor.request); err != nil {
+			return stagedag.StageOutput{}, err
+		}
 		rendered, err = safeRender(ctx, executor.backend, executor.request, executor.service.progress)
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return stagedag.StageOutput{}, ctxErr
@@ -506,6 +492,23 @@ func (executor *executor) execute(ctx context.Context, task stagedag.Task) (outp
 		return stagedag.StageOutput{}, err
 	}
 	return stagedag.StageOutput{ContentHash: artifact.ContentHash, SizeBytes: artifact.SizeBytes, Receipt: receipt}, nil
+}
+
+func preflightForRender(ctx context.Context, backend Backend, request renderapi.RenderRequest) error {
+	owned, err := cloneRequest(request)
+	if err != nil {
+		return err
+	}
+	diagnostics, err := safePreflight(ctx, backend, owned.Plan, owned.Manifest)
+	if err != nil {
+		return wrapError(ErrBackend, "preflight", err)
+	}
+	for _, diagnostic := range diagnostics {
+		if diagnostic.Severity == videoedit.SeverityError {
+			return fmt.Errorf("%w: preflight rejected code=%q path=%q", ErrBackend, diagnostic.Code, diagnostic.Path)
+		}
+	}
+	return nil
 }
 
 func nilLike(value any) bool {
