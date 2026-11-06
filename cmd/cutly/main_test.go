@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -17,6 +19,77 @@ func TestCanonicalizeCommand(t *testing.T) {
 	code := run(context.Background(), []string{"canonicalize"}, strings.NewReader(` {"z":-0,"a":1} `), &stdout, &stderr, nil)
 	if code != 0 || stdout.String() != "{\"a\":1,\"z\":0}\n" || stderr.Len() != 0 {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+}
+
+func TestInitCommandCreatesAndReplaysLocalProject(t *testing.T) {
+	document := cliProjectDocument()
+	raw, err := videoedit.CanonicalJSON(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	projectDir := filepath.Join(root, "project")
+	args := []string{"init", "--project-dir", projectDir, "--document", "-"}
+	var firstOut, firstErr bytes.Buffer
+	code := run(context.Background(), args, bytes.NewReader(raw), &firstOut, &firstErr, nil)
+	if code != 0 || firstErr.Len() != 0 {
+		t.Fatalf("first init code=%d stdout=%q stderr=%q", code, firstOut.String(), firstErr.String())
+	}
+	if !strings.Contains(firstOut.String(), `"profile":"cutly.cli-project-init.v1"`) {
+		t.Fatalf("init receipt = %q", firstOut.String())
+	}
+	opened, err := cutly.OpenLocalProjectV1(projectDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := opened.Inspect(context.Background())
+	if err != nil || snapshot.Document.ID != document.ID {
+		t.Fatalf("snapshot=%+v error=%v", snapshot, err)
+	}
+
+	var replayOut, replayErr bytes.Buffer
+	code = run(context.Background(), args, bytes.NewReader(raw), &replayOut, &replayErr, nil)
+	if code != 0 || replayErr.Len() != 0 || replayOut.String() != firstOut.String() {
+		t.Fatalf("replay code=%d stdout=%q stderr=%q", code, replayOut.String(), replayErr.String())
+	}
+
+	different := document
+	different.Revision++
+	differentRaw, err := videoedit.CanonicalJSON(different)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rejectedOut, rejectedErr bytes.Buffer
+	code = run(context.Background(), args, bytes.NewReader(differentRaw), &rejectedOut, &rejectedErr, nil)
+	if code != exitFailure || !strings.Contains(rejectedErr.String(), "project already exists") || rejectedOut.Len() != 0 {
+		t.Fatalf("different init code=%d stdout=%q stderr=%q", code, rejectedOut.String(), rejectedErr.String())
+	}
+
+	documentPath := filepath.Join(root, "document.json")
+	if err := os.WriteFile(documentPath, raw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	fileProjectDir := filepath.Join(root, "file-project")
+	var fileOut, fileErr bytes.Buffer
+	code = run(context.Background(), []string{
+		"init", "--project-dir", fileProjectDir, "--document", documentPath,
+	}, strings.NewReader("unused"), &fileOut, &fileErr, nil)
+	if code != 0 || fileErr.Len() != 0 {
+		t.Fatalf("file init code=%d stdout=%q stderr=%q", code, fileOut.String(), fileErr.String())
+	}
+}
+
+func TestReadInputEnforcesStdinAndFileBounds(t *testing.T) {
+	if _, err := readInput("-", strings.NewReader("12345"), 4); err == nil || !strings.Contains(err.Error(), "exceeds 4 bytes") {
+		t.Fatalf("stdin bound error = %v", err)
+	}
+	path := filepath.Join(t.TempDir(), "oversized.json")
+	if err := os.WriteFile(path, []byte("12345"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := readInput(path, strings.NewReader("unused"), 4); err == nil || !strings.Contains(err.Error(), "exceeds 4 bytes") {
+		t.Fatalf("file bound error = %v", err)
 	}
 }
 
@@ -115,5 +188,23 @@ func validCLIResult(requestID string) agentprotocol.Result {
 		ProjectID:       "p",
 		Diagnostics:     []videoedit.Diagnostic{},
 		NextActions:     []agentprotocol.NextAction{},
+	}
+}
+
+func cliProjectDocument() videoedit.Document {
+	duration := videoedit.RationalTime{Value: 1, Rate: 1}
+	return videoedit.Document{
+		SchemaVersion: videoedit.SchemaVersion, ID: "project-document", Revision: 1,
+		Assets: []videoedit.Asset{{
+			ID: "video", Kind: videoedit.AssetKindVideo, URI: "video.mp4",
+			ContentHash: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Duration: &duration,
+		}},
+		Timelines: []videoedit.Timeline{{ID: "timeline", Tracks: []videoedit.Track{{
+			ID: "video-track", Kind: videoedit.TrackKindVideo, Clips: []videoedit.Clip{{
+				ID: "video-clip", AssetID: "video",
+				TimelineRange: videoedit.TimeRange{Start: videoedit.RationalTime{Value: 0, Rate: 1}, Duration: duration},
+				SourceRange:   videoedit.TimeRange{Start: videoedit.RationalTime{Value: 0, Rate: 1}, Duration: duration},
+			}},
+		}}}},
 	}
 }

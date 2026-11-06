@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -44,6 +45,8 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 		return 0
 	case "canonicalize":
 		return runCanonicalize(args[1:], stdin, stdout, stderr)
+	case "init":
+		return runInit(ctx, args[1:], stdin, stdout, stderr)
 	case "call":
 		return runCall(ctx, args[1:], stdin, stdout, stderr, factory)
 	case "doctor":
@@ -64,6 +67,72 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 		writeUsage(stderr)
 		return exitUsage
 	}
+}
+
+type initReceipt struct {
+	Profile      string `json:"profile"`
+	ProjectDir   string `json:"project_dir"`
+	DocumentHash string `json:"document_hash"`
+}
+
+func runInit(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	flags := flag.NewFlagSet("init", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	projectDir := flags.String("project-dir", "", "local Cutly project directory")
+	documentPath := flags.String("document", "-", "Document v1 JSON file, or - for stdin")
+	if err := flags.Parse(args); err != nil || flags.NArg() != 0 || strings.TrimSpace(*projectDir) == "" {
+		return exitUsage
+	}
+	if ctx == nil {
+		_, _ = io.WriteString(stderr, "cutly: initialize project: context is required\n")
+		return exitFailure
+	}
+	if err := ctx.Err(); err != nil {
+		_, _ = fmt.Fprintf(stderr, "cutly: initialize project: %v\n", err)
+		return exitFailure
+	}
+	raw, err := readInput(*documentPath, stdin, cutly.MaxDocumentBytes)
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "cutly: read project document: %v\n", err)
+		return exitFailure
+	}
+	document, err := cutly.DecodeDocumentV1(raw)
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "cutly: invalid project document: %v\n", err)
+		return exitFailure
+	}
+	absolute, err := filepath.Abs(*projectDir)
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "cutly: resolve project directory: %v\n", err)
+		return exitFailure
+	}
+	absolute = filepath.Clean(absolute)
+	if err := os.MkdirAll(absolute, 0o700); err != nil {
+		_, _ = fmt.Fprintf(stderr, "cutly: create project directory: %v\n", err)
+		return exitFailure
+	}
+	project, err := cutly.CreateLocalProjectV1(ctx, absolute, document)
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "cutly: initialize project: %v\n", err)
+		return exitFailure
+	}
+	snapshot, err := project.Inspect(ctx)
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "cutly: inspect initialized project: %v\n", err)
+		return exitFailure
+	}
+	receipt, err := canonicaljson.Marshal(initReceipt{
+		Profile: "cutly.cli-project-init.v1", ProjectDir: absolute, DocumentHash: snapshot.DocumentHash,
+	})
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "cutly: encode init receipt: %v\n", err)
+		return exitFailure
+	}
+	if _, err := stdout.Write(append(receipt, '\n')); err != nil {
+		_, _ = fmt.Fprintf(stderr, "cutly: write init receipt: %v\n", err)
+		return exitFailure
+	}
+	return 0
 }
 
 func runCanonicalize(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
@@ -240,6 +309,7 @@ func newRequestID() (string, error) {
 func writeUsage(writer io.Writer) {
 	_, _ = io.WriteString(writer, `Usage:
   cutly version
+  cutly init --project-dir DIR [--document FILE|-]
   cutly canonicalize [--input FILE|-]
   cutly call --request FILE|- [--endpoint URL]
   cutly doctor [--endpoint URL] [--request-id ID]
