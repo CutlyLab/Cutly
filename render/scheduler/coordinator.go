@@ -29,6 +29,7 @@ type Coordinator struct {
 	mu             sync.RWMutex
 	store          Store
 	jobs           map[string]JobSnapshot
+	stateJobs      map[renderapi.JobState]*jobIDHeap
 	idempotencyJob map[string]string
 	recoveryNeeded bool
 }
@@ -64,6 +65,7 @@ func openWithReplayLimit(ctx context.Context, store Store, maxReplayEvents int) 
 			return nil, fmt.Errorf("%w: replay event %d: %w", ErrStore, index, err)
 		}
 	}
+	result.rebuildStateIndex()
 	return result, nil
 }
 
@@ -128,6 +130,7 @@ func (value *Coordinator) Submit(ctx context.Context, job renderapi.RenderJob) (
 	snapshot := snapshotFromSubmission(verified)
 	value.jobs[verified.ID] = snapshot
 	value.idempotencyJob[verified.IdempotencyKey] = verified.ID
+	value.indexSnapshotLocked(snapshot)
 	return cloneSnapshot(snapshot), true, nil
 }
 
@@ -149,22 +152,17 @@ func (value *Coordinator) StartNext(ctx context.Context) (JobSnapshot, bool, err
 	if err := value.readyLocked(); err != nil {
 		return JobSnapshot{}, false, err
 	}
-	jobID := ""
-	for candidate, snapshot := range value.jobs {
-		if snapshot.State == renderapi.JobQueued && (jobID == "" || candidate < jobID) {
-			jobID = candidate
-		}
-	}
-	if jobID == "" {
+	snapshot, found := value.firstSnapshotLocked(renderapi.JobQueued, nil)
+	if !found {
 		return JobSnapshot{}, false, nil
 	}
-	snapshot := value.jobs[jobID]
 	event := nextEvent(snapshot, EventStarted)
 	if err := value.appendLocked(ctx, event); err != nil {
 		return JobSnapshot{}, false, err
 	}
 	snapshot = applyEvent(snapshot, event)
-	value.jobs[jobID] = snapshot
+	value.jobs[snapshot.Job.ID] = snapshot
+	value.indexSnapshotLocked(snapshot)
 	return cloneSnapshot(snapshot), true, nil
 }
 
@@ -195,6 +193,7 @@ func (value *Coordinator) RequestCancel(ctx context.Context, jobID string) (JobS
 	}
 	snapshot = applyEvent(snapshot, event)
 	value.jobs[jobID] = snapshot
+	value.indexSnapshotLocked(snapshot)
 	return cloneSnapshot(snapshot), true, nil
 }
 
@@ -242,7 +241,14 @@ func (value *Coordinator) Snapshots(states ...renderapi.JobState) ([]JobSnapshot
 	if err := value.readyLocked(); err != nil {
 		return nil, err
 	}
-	result := make([]JobSnapshot, 0, len(value.jobs))
+	capacity := len(value.jobs)
+	if len(filter) != 0 {
+		// A filtered query must allocate in proportion to its matches, not to
+		// every queued job. This keeps an empty running/canceling query bounded
+		// even when the durable queue is near MaxReplayEvents.
+		capacity = 0
+	}
+	result := make([]JobSnapshot, 0, capacity)
 	for _, snapshot := range value.jobs {
 		if len(filter) != 0 {
 			if _, included := filter[snapshot.State]; !included {
@@ -253,6 +259,33 @@ func (value *Coordinator) Snapshots(states ...renderapi.JobState) ([]JobSnapshot
 	}
 	sort.Slice(result, func(left, right int) bool { return result[left].Job.ID < result[right].Job.ID })
 	return result, nil
+}
+
+// FirstSnapshot returns the lexicographically first job in state whose ID is
+// not excluded. It uses a replay-rebuilt state heap without cloning or sorting
+// every match, so local runtimes can resume work with bounded result memory.
+// Exclusions are bounded because callers normally pass only their active jobs.
+func (value *Coordinator) FirstSnapshot(state renderapi.JobState, excludedIDs ...string) (JobSnapshot, bool, error) {
+	if !validJobState(state) || len(excludedIDs) > MaxSnapshotExclusions {
+		return JobSnapshot{}, false, fmt.Errorf("%w: invalid first-snapshot query", ErrProtocolInvalid)
+	}
+	excluded := make(map[string]struct{}, len(excludedIDs))
+	for _, jobID := range excludedIDs {
+		if !validBoundedString(jobID, MaxJobIDBytes) || stringsTrimmedEmpty(jobID) {
+			return JobSnapshot{}, false, fmt.Errorf("%w: invalid excluded job ID", ErrProtocolInvalid)
+		}
+		excluded[jobID] = struct{}{}
+	}
+	value.mu.Lock()
+	defer value.mu.Unlock()
+	if err := value.readyLocked(); err != nil {
+		return JobSnapshot{}, false, err
+	}
+	selected, found := value.firstSnapshotLocked(state, excluded)
+	if !found {
+		return JobSnapshot{}, false, nil
+	}
+	return cloneSnapshot(selected), true, nil
 }
 
 func (value *Coordinator) transition(ctx context.Context, jobID string, kind JobEventKind,
@@ -293,6 +326,7 @@ func (value *Coordinator) transition(ctx context.Context, jobID string, kind Job
 	}
 	snapshot = applyEvent(snapshot, event)
 	value.jobs[jobID] = snapshot
+	value.indexSnapshotLocked(snapshot)
 	return cloneSnapshot(snapshot), nil
 }
 

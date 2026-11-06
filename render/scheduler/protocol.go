@@ -29,7 +29,8 @@ const (
 
 	// MaxReplayEvents is the v1 Coordinator admission ceiling. Stores may
 	// enforce a tighter limit but Open never materializes more scheduler state.
-	MaxReplayEvents = 1 << 20
+	MaxReplayEvents       = 1 << 20
+	MaxSnapshotExclusions = 1 << 12
 )
 
 var (

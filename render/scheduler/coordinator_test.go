@@ -124,6 +124,68 @@ func TestCoordinatorStartNextClaimsQueuedJobsOnceInDeterministicOrder(t *testing
 	}
 }
 
+func TestCoordinatorFirstSnapshotFiltersAndExcludesDeterministically(t *testing.T) {
+	store := &memoryStore{}
+	coordinator, err := Open(context.Background(), store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"job-c", "job-a", "job-b"} {
+		if _, _, err := coordinator.Submit(context.Background(), schedulerTestJob(id, "key-"+id)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	first, found, err := coordinator.FirstSnapshot(renderapi.JobQueued)
+	if err != nil || !found || first.Job.ID != "job-a" {
+		t.Fatalf("first queued found=%v snapshot=%+v err=%v", found, first, err)
+	}
+	second, found, err := coordinator.FirstSnapshot(renderapi.JobQueued, "job-a")
+	if err != nil || !found || second.Job.ID != "job-b" {
+		t.Fatalf("excluded queued found=%v snapshot=%+v err=%v", found, second, err)
+	}
+	if _, found, err := coordinator.FirstSnapshot(renderapi.JobRunning); err != nil || found {
+		t.Fatalf("empty running found=%v err=%v", found, err)
+	}
+	if snapshot, changed, err := coordinator.RequestCancel(context.Background(), "job-b"); err != nil || !changed || snapshot.State != renderapi.JobCanceling {
+		t.Fatalf("cancel changed=%v snapshot=%+v err=%v", changed, snapshot, err)
+	}
+	canceling, found, err := coordinator.FirstSnapshot(renderapi.JobCanceling)
+	if err != nil || !found || canceling.Job.ID != "job-b" {
+		t.Fatalf("first canceling found=%v snapshot=%+v err=%v", found, canceling, err)
+	}
+	started, found, err := coordinator.StartNext(context.Background())
+	if err != nil || !found || started.Job.ID != "job-a" {
+		t.Fatalf("start found=%v snapshot=%+v err=%v", found, started, err)
+	}
+	running, found, err := coordinator.FirstSnapshot(renderapi.JobRunning)
+	if err != nil || !found || running.Job.ID != "job-a" {
+		t.Fatalf("first running found=%v snapshot=%+v err=%v", found, running, err)
+	}
+	queued, found, err := coordinator.FirstSnapshot(renderapi.JobQueued)
+	if err != nil || !found || queued.Job.ID != "job-c" {
+		t.Fatalf("remaining queued found=%v snapshot=%+v err=%v", found, queued, err)
+	}
+	reopened, err := Open(context.Background(), store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for state, want := range map[renderapi.JobState]string{
+		renderapi.JobQueued: "job-c", renderapi.JobRunning: "job-a", renderapi.JobCanceling: "job-b",
+	} {
+		snapshot, found, err := reopened.FirstSnapshot(state)
+		if err != nil || !found || snapshot.Job.ID != want {
+			t.Fatalf("replayed %s found=%v snapshot=%+v err=%v", state, found, snapshot, err)
+		}
+	}
+	if _, _, err := coordinator.FirstSnapshot(renderapi.JobState("unknown")); !errors.Is(err, ErrProtocolInvalid) {
+		t.Fatalf("invalid state = %v", err)
+	}
+	tooMany := make([]string, MaxSnapshotExclusions+1)
+	if _, _, err := coordinator.FirstSnapshot(renderapi.JobQueued, tooMany...); !errors.Is(err, ErrProtocolInvalid) {
+		t.Fatalf("exclusion bound = %v", err)
+	}
+}
+
 func TestCoordinatorConcurrentStartNextNeverDoubleClaimsAndReplays(t *testing.T) {
 	store := &memoryStore{}
 	coordinator, err := Open(context.Background(), store)
@@ -376,16 +438,16 @@ func TestCoordinatorStoreFailureIsAtomic(t *testing.T) {
 		t.Fatal(err)
 	}
 	store.appendErr = errors.New("injected append failure")
-	if _, err := coordinator.Start(context.Background(), job.ID); !errors.Is(err, ErrStore) {
-		t.Fatalf("start error = %v", err)
+	if _, found, err := coordinator.StartNext(context.Background()); !errors.Is(err, ErrStore) || found {
+		t.Fatalf("start-next found=%v error=%v", found, err)
 	}
 	snapshot, err := coordinator.Snapshot(job.ID)
 	if err != nil || snapshot.State != renderapi.JobQueued || snapshot.LastSequence != 1 {
 		t.Fatalf("snapshot after failed append = %+v err=%v", snapshot, err)
 	}
 	store.appendErr = nil
-	if snapshot, err = coordinator.Start(context.Background(), job.ID); err != nil || snapshot.LastSequence != 2 {
-		t.Fatalf("retry = %+v err=%v", snapshot, err)
+	if snapshot, found, err := coordinator.StartNext(context.Background()); err != nil || !found || snapshot.LastSequence != 2 {
+		t.Fatalf("retry found=%v snapshot=%+v err=%v", found, snapshot, err)
 	}
 }
 
@@ -422,6 +484,10 @@ func TestCoordinatorCommitUnknownRequiresReopen(t *testing.T) {
 	if err != nil || snapshot.State != renderapi.JobQueued || snapshot.LastSequence != 1 {
 		t.Fatalf("reopened snapshot = %+v err=%v", snapshot, err)
 	}
+	indexed, found, err := reopened.FirstSnapshot(renderapi.JobQueued)
+	if err != nil || !found || indexed.Job.ID != job.ID {
+		t.Fatalf("reopened queued index found=%v snapshot=%+v err=%v", found, indexed, err)
+	}
 	if _, created, err := reopened.Submit(context.Background(), job); err != nil || created {
 		t.Fatalf("reopened duplicate created=%v err=%v", created, err)
 	}
@@ -455,6 +521,10 @@ func TestCoordinatorCommitUnknownTransitionNeverRewritesSequence(t *testing.T) {
 	snapshot, err := reopened.Snapshot(job.ID)
 	if err != nil || snapshot.State != renderapi.JobRunning || snapshot.LastSequence != 2 {
 		t.Fatalf("reopened transition = %+v err=%v", snapshot, err)
+	}
+	indexed, found, err := reopened.FirstSnapshot(renderapi.JobRunning)
+	if err != nil || !found || indexed.Job.ID != job.ID {
+		t.Fatalf("reopened running index found=%v snapshot=%+v err=%v", found, indexed, err)
 	}
 }
 
