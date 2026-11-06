@@ -1,0 +1,125 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import test from "node:test";
+
+import {
+  AGENT_MEDIA_TYPE,
+  AgentProtocolError,
+  CutlyClient,
+  HTTPAgentTransport,
+  createAgentRequest,
+  decodeCanonicalJSON,
+  encodeCanonicalValue,
+} from "../src/index.js";
+
+function resultFor(request, overrides = {}) {
+  return {
+    protocol_version: 1n,
+    ok: true,
+    request_id: request.request_id,
+    tool: request.tool,
+    action: request.action,
+    state: "current",
+    ...(request.project_id === undefined ? {} : { project_id: request.project_id }),
+    changed: false,
+    replayed: false,
+    render_required: false,
+    diagnostics: [],
+    next_actions: [],
+    ...overrides,
+  };
+}
+
+test("Agent client validates, correlates and preserves business rejection", async () => {
+  const request = createAgentRequest({
+    requestId: "request-1", tool: "cutly_edit", action: "apply", projectId: "project-1",
+    payload: { transaction_id: "tx-1" },
+  });
+  const client = new CutlyClient(async (raw) => {
+    const decoded = decodeCanonicalJSON(raw);
+    return encodeCanonicalValue(resultFor(decoded, {
+      ok: false,
+      state: "rejected",
+      diagnostics: [{ code: "TX.REJECTED", severity: "error", message: "rejected" }],
+    }));
+  });
+  const result = await client.call(request);
+  assert.equal(result.ok, false);
+  assert.equal(result.diagnostics[0].code, "TX.REJECTED");
+
+  const mismatch = new CutlyClient(async (raw) => {
+    const decoded = decodeCanonicalJSON(raw);
+    return encodeCanonicalValue(resultFor(decoded, { request_id: "other" }));
+  });
+  await assert.rejects(() => mismatch.call(request), (error) => error instanceof AgentProtocolError && error.code === "AGENT.CORRELATION");
+});
+
+test("Agent request rejects invalid pairs, missing projects and fractional payloads", () => {
+  assert.throws(() => createAgentRequest({ requestId: "r", tool: "cutly_edit", action: "inspect", projectId: "p" }), /TOOL_ACTION_INVALID/);
+  assert.throws(() => createAgentRequest({ requestId: "r", tool: "cutly_edit", action: "plan" }), /REQUEST_INVALID/);
+  assert.throws(() => createAgentRequest({ requestId: "r", tool: "cutly_edit", action: "plan", projectId: "p", payload: { value: 1.5 } }), /REQUEST_INVALID/);
+});
+
+test("HTTP Agent transport is bounded, canonical and redirect-safe", async () => {
+  let observed;
+  const request = createAgentRequest({ requestId: "r", tool: "cutly_project", action: "inspect", projectId: "p" });
+  const fetch = async (endpoint, options) => {
+    observed = { endpoint, options };
+    const decoded = decodeCanonicalJSON(options.body);
+    return new Response(encodeCanonicalValue(resultFor(decoded)), {
+      status: 200,
+      headers: { "Content-Type": AGENT_MEDIA_TYPE },
+    });
+  };
+  const transport = new HTTPAgentTransport("http://127.0.0.1:9817/v1/agent", { fetch, maxResponseBytes: 4096 });
+  const client = new CutlyClient(transport);
+  const result = await client.call(request);
+  assert.equal(result.ok, true);
+  assert.equal(observed.options.method, "POST");
+  assert.equal(observed.options.redirect, "error");
+  assert.equal(observed.options.credentials, "omit");
+
+  const oversized = new HTTPAgentTransport("https://example.invalid/v1/agent", {
+    maxResponseBytes: 8,
+    fetch: async () => new Response("123456789", { status: 200, headers: { "Content-Type": "application/json" } }),
+  });
+  await assert.rejects(() => oversized.roundTrip(new Uint8Array()), /RESPONSE_LIMIT/);
+  assert.throws(() => new HTTPAgentTransport("file:///tmp/cutly.sock", { fetch }), /ENDPOINT_INVALID/);
+  assert.throws(() => new HTTPAgentTransport("https://user@example.invalid/", { fetch }), /ENDPOINT_INVALID/);
+});
+
+test("Agent result rejects ok/error contradictions and unknown fields", async () => {
+  const request = createAgentRequest({ requestId: "r", tool: "cutly_project", action: "capabilities" });
+  const invalid = new CutlyClient(async (raw) => {
+    const decoded = decodeCanonicalJSON(raw);
+    return encodeCanonicalValue(resultFor(decoded, {
+      diagnostics: [{ code: "E", severity: "error", message: "bad" }],
+    }));
+  });
+  await assert.rejects(() => invalid.call(request), /RESULT_INVALID/);
+
+  const unknown = new CutlyClient(async (raw) => {
+    const decoded = decodeCanonicalJSON(raw);
+    return encodeCanonicalValue({ ...resultFor(decoded), surprise: true });
+  });
+  await assert.rejects(() => unknown.call(request), /unsupported member surprise/);
+});
+
+test("Agent envelopes round-trip the Go canonical fixtures", async () => {
+  for (const name of ["agent-request-v1.canonical.json", "agent-result-v1.canonical.json"]) {
+    const raw = (await readFile(new URL(`../../../agent/protocol/testdata/${name}`, import.meta.url), "utf8")).trim();
+    const decoded = decodeCanonicalJSON(raw);
+    assert.equal(new TextDecoder().decode(encodeCanonicalValue(decoded)), raw, name);
+  }
+});
+
+test("Agent request validation does not invoke accessors", async () => {
+  let invoked = false;
+  const request = Object.defineProperty({}, "request_id", {
+    enumerable: true,
+    get() { invoked = true; return "r"; },
+  });
+  const client = new CutlyClient(async () => { throw new Error("must not run"); });
+  await assert.rejects(() => client.call(request), /REQUEST_INVALID/);
+  assert.equal(invoked, false);
+});

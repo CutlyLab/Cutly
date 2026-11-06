@@ -1,0 +1,25 @@
+{
+  "name": "@cutly/sdk",
+  "version": "0.1.0-dev",
+  "description": "Typed protocol and headless client bindings for Cutly",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.js"
+    }
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "pack:check": "npm pack --dry-run"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}
