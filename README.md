@@ -18,6 +18,7 @@ Document v1 → durable local project → RenderPlan → host-owned prepare
 - Commands: `cutly` and `cutlyd`
 - Runnable flows: [`examples/`](examples/)
 - Exact supported boundary: [`KNOWN_LIMITATIONS.md`](KNOWN_LIMITATIONS.md)
+- M4 acceptance evidence: [`docs/M4_RELEASE_READINESS.md`](docs/M4_RELEASE_READINESS.md)
 - Security reporting: [`SECURITY.md`](SECURITY.md)
 
 The source is currently developed in the `Manyfy/cutly` incubation directory,
