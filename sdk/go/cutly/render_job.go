@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 
 	"github.com/CutlyLab/Cutly/core/videoedit"
 	"github.com/CutlyLab/Cutly/protocol/canonicaljson"
@@ -97,4 +98,50 @@ func DecodeRenderJobSnapshotReceipt(raw json.RawMessage) (RenderJobSnapshotV1, e
 		return RenderJobSnapshotV1{}, fmt.Errorf("%w: scheduler receipt: %v", ErrReceiptInvalid, err)
 	}
 	return snapshot, nil
+}
+
+// ValidateRenderJobSnapshotReceipt binds a decoded scheduler receipt to the
+// exact job submitted by the caller. DecodeRenderJobSnapshotReceipt remains a
+// useful low-level shape boundary; callers that act on a status or terminal
+// artifact must additionally use this helper so a valid receipt for another
+// job cannot be accepted through a correlated Agent response.
+func ValidateRenderJobSnapshotReceipt(snapshot RenderJobSnapshotV1, expected RenderJobV1) error {
+	expectedRaw, err := canonicaljson.Marshal(expected)
+	if err != nil {
+		return fmt.Errorf("%w: encode expected render job: %v", ErrReceiptInvalid, err)
+	}
+	verifiedExpected, err := renderapi.DecodeRenderJob(expectedRaw)
+	if err != nil || !reflect.DeepEqual(verifiedExpected, expected) {
+		return fmt.Errorf("%w: expected render job: %v", ErrReceiptInvalid, err)
+	}
+
+	snapshotRaw, err := canonicaljson.Marshal(snapshot)
+	if err != nil {
+		return fmt.Errorf("%w: encode scheduler receipt: %v", ErrReceiptInvalid, err)
+	}
+	verifiedSnapshot, err := scheduler.DecodeJobSnapshot(snapshotRaw)
+	if err != nil || !reflect.DeepEqual(verifiedSnapshot, snapshot) {
+		return fmt.Errorf("%w: scheduler receipt: %v", ErrReceiptInvalid, err)
+	}
+	if !reflect.DeepEqual(verifiedSnapshot.Job, verifiedExpected) {
+		return fmt.Errorf("%w: scheduler receipt job does not match the submitted job", ErrReceiptInvalid)
+	}
+
+	if verifiedSnapshot.State == renderapi.JobComplete {
+		artifact := verifiedSnapshot.Artifact
+		if artifact == nil {
+			return fmt.Errorf("%w: complete scheduler receipt has no artifact", ErrReceiptInvalid)
+		}
+		evidenceURI, evidenceErr := renderapi.EvidenceSidecarURI(verifiedExpected.ArtifactURI)
+		durationComparison, durationErr := artifact.Duration.Compare(verifiedExpected.TimelineRange.Duration)
+		if evidenceErr != nil || durationErr != nil || durationComparison != 0 ||
+			artifact.URI != verifiedExpected.ArtifactURI ||
+			artifact.ExecutionManifestFingerprint != verifiedExpected.ExecutionManifestFingerprint ||
+			artifact.EvidenceURI != evidenceURI ||
+			artifact.FrameCount != verifiedExpected.FrameRange.Count ||
+			artifact.SampleCount != verifiedExpected.SampleRange.Count {
+			return fmt.Errorf("%w: terminal artifact does not match the submitted job", ErrReceiptInvalid)
+		}
+	}
+	return nil
 }

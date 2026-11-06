@@ -142,6 +142,9 @@ func TestPublicGoSDKHTTPRenderEndToEnd(t *testing.T) {
 	if err != nil || queuedSnapshot.Job.ID != job.ID {
 		t.Fatalf("decode queued snapshot: snapshot=%+v error=%v", queuedSnapshot, err)
 	}
+	if err := cutly.ValidateRenderJobSnapshotReceipt(queuedSnapshot, job); err != nil {
+		t.Fatalf("validate queued snapshot: %v", err)
+	}
 
 	var complete cutly.RenderJobSnapshotV1
 	for attempt := 0; ; attempt++ {
@@ -150,6 +153,9 @@ func TestPublicGoSDKHTTPRenderEndToEnd(t *testing.T) {
 		snapshot, decodeErr := cutly.DecodeRenderJobSnapshotReceipt(status.Receipt)
 		if decodeErr != nil {
 			t.Fatalf("decode public status receipt: %v", decodeErr)
+		}
+		if validateErr := cutly.ValidateRenderJobSnapshotReceipt(snapshot, job); validateErr != nil {
+			t.Fatalf("validate public status receipt: %v", validateErr)
 		}
 		switch string(snapshot.State) {
 		case "complete":

@@ -496,15 +496,31 @@ func DecodeRenderFrameReceipt(raw json.RawMessage) (RenderFrameReceiptV1, error)
 
 func ValidateRenderFrameReceipt(
 	receipt RenderFrameReceiptV1,
+	expected ExactFrameRequestV1,
 	plan RenderPlanV3,
 	manifest ExecutionManifestV1,
 ) error {
 	if receipt.Profile != "cutly.agent-render-frame.v1" {
 		return fmt.Errorf("%w: frame receipt profile", ErrReceiptInvalid)
 	}
-	if err := renderapi.ValidateExactFrameArtifact(receipt.Artifact, renderapi.ExactFrameRenderRequest{
-		Frame: receipt.Request, Plan: plan, Manifest: manifest,
-	}); err != nil {
+	expectedRequest := renderapi.ExactFrameRenderRequest{
+		Frame: expected, Plan: plan, Manifest: manifest,
+	}
+	if err := renderapi.ValidateExactFrameRenderRequest(expectedRequest); err != nil {
+		return fmt.Errorf("%w: expected frame request: %v", ErrReceiptInvalid, err)
+	}
+	receiptRequest, err := canonicaljson.Marshal(receipt.Request)
+	if err != nil {
+		return fmt.Errorf("%w: frame receipt request encode: %v", ErrReceiptInvalid, err)
+	}
+	expectedRequestRaw, err := canonicaljson.Marshal(expected)
+	if err != nil {
+		return fmt.Errorf("%w: expected frame request encode: %v", ErrReceiptInvalid, err)
+	}
+	if !bytes.Equal(receiptRequest, expectedRequestRaw) {
+		return fmt.Errorf("%w: frame receipt request does not match the submitted request", ErrReceiptInvalid)
+	}
+	if err := renderapi.ValidateExactFrameArtifact(receipt.Artifact, expectedRequest); err != nil {
 		return fmt.Errorf("%w: frame artifact: %v", ErrReceiptInvalid, err)
 	}
 	return nil

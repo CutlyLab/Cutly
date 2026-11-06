@@ -61,6 +61,7 @@ job, err := cutly.BuildRenderJobV1(
 queued, err := client.SubmitRender(ctx, "submit-42", "demo", job)
 if err != nil || !queued.OK { /* handle transport error or diagnostics */ }
 status, err := cutly.DecodeRenderJobSnapshotReceipt(queued.Receipt)
+err = cutly.ValidateRenderJobSnapshotReceipt(status, job)
 ```
 
 The same client exposes typed inspect/status/history, discard/revert,
@@ -68,6 +69,14 @@ plan/prepare/preflight/frame/render/status/cancel calls. Receipt decoders
 require the exact canonical wire profile and reject unknown fields; validation
 helpers bind receipts back to the caller's frozen inputs. A complete runnable
 flow is in [`examples/go-render-agent`](../../examples/go-render-agent).
+
+Exact-frame callers likewise pass the request they actually submitted; a
+self-consistent receipt for a different frame is rejected:
+
+```go
+frameReceipt, err := cutly.DecodeRenderFrameReceipt(result.Receipt)
+err = cutly.ValidateRenderFrameReceipt(frameReceipt, frameRequest, plan, manifest)
+```
 
 Request IDs are caller-owned. `ok:false` is a valid business result; transport,
 decode and correlation failures are Go errors. V1 transactions are not applied

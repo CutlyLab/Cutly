@@ -99,3 +99,71 @@ func TestDecodeRenderJobSnapshotReceipt(t *testing.T) {
 		t.Fatalf("unknown-field snapshot error = %v", err)
 	}
 }
+
+func TestValidateRenderJobSnapshotReceiptBindsSubmittedJobAndArtifact(t *testing.T) {
+	plan, manifest, _ := renderPrepareSDKFixture(t)
+	job, err := BuildRenderJobV1("job-status", "job-status-once", plan, manifest, "file:///tmp/cutly-status.mp4")
+	if err != nil {
+		t.Fatal(err)
+	}
+	queued := scheduler.JobSnapshot{
+		SchemaVersion: scheduler.JobSnapshotSchemaVersion,
+		Job:           job,
+		State:         renderapi.JobQueued,
+		LastSequence:  1,
+	}
+	if err := ValidateRenderJobSnapshotReceipt(queued, job); err != nil {
+		t.Fatalf("valid queued receipt rejected: %v", err)
+	}
+
+	otherJob := job
+	otherJob.ID = "other-job"
+	if err := ValidateRenderJobSnapshotReceipt(queued, otherJob); !errors.Is(err, ErrReceiptInvalid) {
+		t.Fatalf("receipt for another job accepted: %v", err)
+	}
+
+	evidenceURI, err := renderapi.EvidenceSidecarURI(job.ArtifactURI)
+	if err != nil {
+		t.Fatal(err)
+	}
+	complete := scheduler.JobSnapshot{
+		SchemaVersion: scheduler.JobSnapshotSchemaVersion,
+		Job:           job,
+		State:         renderapi.JobComplete,
+		LastSequence:  3,
+		Artifact: &renderapi.RenderArtifact{
+			URI: job.ArtifactURI, ContentHash: digestString('a'), SizeBytes: 1024,
+			ExecutionManifestFingerprint: job.ExecutionManifestFingerprint,
+			EvidenceURI:                  evidenceURI,
+			EvidenceFingerprint:          digestString('b'),
+			Duration:                     job.TimelineRange.Duration,
+			FrameCount:                   job.FrameRange.Count,
+			SampleCount:                  job.SampleRange.Count,
+		},
+	}
+	if err := ValidateRenderJobSnapshotReceipt(complete, job); err != nil {
+		t.Fatalf("valid complete receipt rejected: %v", err)
+	}
+
+	for name, mutate := range map[string]func(*renderapi.RenderArtifact){
+		"manifest": func(artifact *renderapi.RenderArtifact) {
+			artifact.ExecutionManifestFingerprint = digestString('c')
+		},
+		"evidence URI": func(artifact *renderapi.RenderArtifact) {
+			artifact.EvidenceURI = "file:///tmp/other.evidence.json"
+		},
+		"frame range": func(artifact *renderapi.RenderArtifact) {
+			artifact.FrameCount++
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			changed := complete
+			artifact := *complete.Artifact
+			changed.Artifact = &artifact
+			mutate(changed.Artifact)
+			if err := ValidateRenderJobSnapshotReceipt(changed, job); !errors.Is(err, ErrReceiptInvalid) {
+				t.Fatalf("invalid terminal artifact accepted: %v", err)
+			}
+		})
+	}
+}

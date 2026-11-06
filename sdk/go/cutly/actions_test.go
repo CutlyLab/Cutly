@@ -266,6 +266,59 @@ func TestRenderReceiptDecoders(t *testing.T) {
 	}
 }
 
+func TestValidateRenderFrameReceiptBindsSubmittedRequest(t *testing.T) {
+	plan, manifest, _ := renderPrepareSDKFixture(t)
+	expected := ExactFrameRequestV1{
+		SchemaVersion: renderapi.ExactFrameRequestSchemaVersion,
+		ID:            "frame", IdempotencyKey: "frame-once",
+		PlanFingerprint: plan.Fingerprint, ExecutionManifestFingerprint: manifest.Fingerprint,
+		CompositionFrameIndex: plan.FrameRange.First,
+		ArtifactURI:           "file:///controlled/frame.png",
+	}
+	evaluation, err := videoedit.EvaluateFrame(plan, expected.CompositionFrameIndex)
+	if err != nil {
+		t.Fatal(err)
+	}
+	evaluationFingerprint, err := renderapi.FrameEvaluationFingerprint(evaluation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	receipt := RenderFrameReceiptV1{
+		Profile: "cutly.agent-render-frame.v1",
+		Request: expected,
+		Artifact: ExactFrameArtifactV1{
+			URI: expected.ArtifactURI, ContentHash: digestString('1'), SizeBytes: 1024,
+			DecodedContentHash: digestString('2'), PlanFingerprint: plan.Fingerprint,
+			ExecutionManifestFingerprint: manifest.Fingerprint,
+			BackendID:                    manifest.Backend.BackendID,
+			BackendBuildFingerprint:      manifest.Backend.BuildFingerprint,
+			ReferenceProfile:             manifest.Output.ReferenceProfile,
+			PNGEncodingProfile:           renderapi.ExactFramePNGProfileV1,
+			DecodedVideoProfile:          manifest.Output.DecodedVideoProfile,
+			Width:                        manifest.Output.Width,
+			Height:                       manifest.Output.Height,
+			CompositionFrameIndex:        expected.CompositionFrameIndex,
+			TimelineTime:                 evaluation.TimelineTime,
+			EvaluationFingerprint:        evaluationFingerprint,
+			Evaluation:                   evaluation,
+		},
+	}
+	if err := ValidateRenderFrameReceipt(receipt, expected, plan, manifest); err != nil {
+		t.Fatalf("valid frame receipt rejected: %v", err)
+	}
+
+	otherRequest := expected
+	otherRequest.ID = "other-frame"
+	if err := ValidateRenderFrameReceipt(receipt, otherRequest, plan, manifest); !errors.Is(err, ErrReceiptInvalid) {
+		t.Fatalf("receipt for another request accepted: %v", err)
+	}
+	tamperedReceipt := receipt
+	tamperedReceipt.Request.IdempotencyKey = "other-once"
+	if err := ValidateRenderFrameReceipt(tamperedReceipt, expected, plan, manifest); !errors.Is(err, ErrReceiptInvalid) {
+		t.Fatalf("tampered receipt request accepted: %v", err)
+	}
+}
+
 func TestPrepareRenderOmitsAbsentSeedAndOwnsEmptyResources(t *testing.T) {
 	var captured agentprotocol.Request
 	client, err := NewClient(TransportFunc(func(_ context.Context, raw []byte) ([]byte, error) {

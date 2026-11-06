@@ -209,6 +209,9 @@ func render(ctx context.Context, configuration options) error {
 	if err != nil {
 		return err
 	}
+	if err := cutly.ValidateRenderJobSnapshotReceipt(snapshot, job); err != nil {
+		return err
+	}
 
 	for snapshot.State != "complete" {
 		if snapshot.State == "failed" || snapshot.State == "canceled" {
@@ -229,6 +232,9 @@ func render(ctx context.Context, configuration options) error {
 		}
 		snapshot, err = cutly.DecodeRenderJobSnapshotReceipt(status.Receipt)
 		if err != nil {
+			return err
+		}
+		if err := cutly.ValidateRenderJobSnapshotReceipt(snapshot, job); err != nil {
 			return err
 		}
 	}
