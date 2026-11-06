@@ -108,6 +108,17 @@ func (backend *Backend) authorizeInput(value string) (authorizedInput, error) {
 	return authorizedInput{}, fmt.Errorf("%w: input %q is outside configured roots", ErrContent, value)
 }
 
+// ValidateInputLocator applies the backend's configured input-root confinement
+// policy without opening or rendering the resource. Host-side manifest
+// resolvers use this before handing a file locator to their trusted probe
+// adapter. Callers must not treat a successful check as a retained file handle;
+// Probe and Render still verify the immutable content hash when they open the
+// resource.
+func (backend *Backend) ValidateInputLocator(value string) error {
+	_, err := backend.authorizeInput(value)
+	return err
+}
+
 func (backend *Backend) createOutputTemp(prefix, suffix string) (*os.File, string, error) {
 	if backend == nil || backend.outputHandle == nil {
 		return nil, "", fmt.Errorf("%w: output root is closed", ErrConfiguration)
