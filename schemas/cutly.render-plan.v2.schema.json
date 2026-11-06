@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.cutly.dev/render-plan/v2",
+  "title": "Cutly RenderPlan v2 (incubation)",
+  "description": "Internal compatibility schema. The public SDK will replace this backend-bound plan with RenderPlan v3.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "document_id", "revision", "document_hash", "timeline_id", "range", "target", "capabilities", "fingerprint"],
+  "properties": {
+    "schema_version": {"const": 2},
+    "document_id": {"$ref": "#/$defs/id"},
+    "revision": {"type": "integer", "minimum": 0, "maximum": 18446744073709551615},
+    "document_hash": {"type": "string", "minLength": 1},
+    "timeline_id": {"$ref": "#/$defs/id"},
+    "range": {"$ref": "#/$defs/positiveTimeRange"},
+    "target": {"$ref": "#/$defs/renderTarget"},
+    "capabilities": {"$ref": "#/$defs/backendCapabilities"},
+    "video": {"type": "array", "items": {"$ref": "#/$defs/plannedClip"}},
+    "audio": {"type": "array", "items": {"$ref": "#/$defs/plannedClip"}},
+    "resources": {"type": "array", "items": {"$ref": "#/$defs/resourceRef"}},
+    "fingerprint": {"type": "string", "minLength": 1}
+  },
+  "$defs": {
+    "id": {"type": "string", "minLength": 1},
+    "rationalTime": {
+      "$ref": "https://schemas.cutly.dev/document/v1#/$defs/rationalTime"
+    },
+    "positiveTimeRange": {
+      "$ref": "https://schemas.cutly.dev/document/v1#/$defs/positiveTimeRange"
+    },
+    "extensions": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "renderTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "height", "frame_rate", "sample_rate", "channels"],
+      "properties": {
+        "timeline_id": {"$ref": "#/$defs/id"},
+        "width": {"type": "integer", "minimum": 1, "maximum": 2147483647},
+        "height": {"type": "integer", "minimum": 1, "maximum": 2147483647},
+        "frame_rate": {"$ref": "#/$defs/rationalTime"},
+        "sample_rate": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807},
+        "channels": {"type": "integer", "minimum": 1, "maximum": 2147483647},
+        "pixel_format": {"type": "string"},
+        "color_space": {"type": "string"}
+      }
+    },
+    "backendCapabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["backend_id"],
+      "properties": {
+        "backend_id": {"type": "string"},
+        "track_kinds": {"type": "array", "items": {"enum": ["video", "audio"]}, "uniqueItems": true},
+        "asset_kinds": {"type": "array", "items": {"enum": ["video", "audio", "image", "font", "data"]}, "uniqueItems": true},
+        "features": {"type": "array", "items": {"enum": ["video.linear_retime.v1", "audio.linear_retime.v1"]}, "uniqueItems": true},
+        "max_width": {"type": "integer", "minimum": 0, "maximum": 2147483647},
+        "max_height": {"type": "integer", "minimum": 0, "maximum": 2147483647}
+      }
+    },
+    "plannedClip": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["track_id", "clip_id", "asset_id", "track_index", "clip_index", "timeline_range", "source_range", "visible_timeline_range", "visible_source_range"],
+      "properties": {
+        "track_id": {"$ref": "#/$defs/id"},
+        "clip_id": {"$ref": "#/$defs/id"},
+        "asset_id": {"$ref": "#/$defs/id"},
+        "track_index": {"type": "integer", "minimum": 0, "maximum": 2147483647},
+        "clip_index": {"type": "integer", "minimum": 0, "maximum": 2147483647},
+        "timeline_range": {"$ref": "#/$defs/positiveTimeRange"},
+        "source_range": {"$ref": "#/$defs/positiveTimeRange"},
+        "visible_timeline_range": {"$ref": "#/$defs/positiveTimeRange"},
+        "visible_source_range": {"$ref": "#/$defs/positiveTimeRange"},
+        "properties": {"$ref": "#/$defs/extensions"}
+      }
+    },
+    "resourceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["asset_id", "kind"],
+      "properties": {
+        "asset_id": {"$ref": "#/$defs/id"},
+        "kind": {"enum": ["video", "audio", "image", "font", "data"]},
+        "uri": {"type": "string", "minLength": 1},
+        "content_hash": {"type": "string", "minLength": 1}
+      },
+      "anyOf": [
+        {"required": ["uri"]},
+        {"required": ["content_hash"]}
+      ]
+    }
+  }
+}

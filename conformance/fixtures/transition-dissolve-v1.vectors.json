@@ -1,0 +1,13 @@
+{
+  "profile": "cutly.transition.dissolve.v1",
+  "cut": {"value": 5, "rate": 1},
+  "pre_duration": {"value": 2, "rate": 1},
+  "post_duration": {"value": 1, "rate": 1},
+  "samples": [
+    {"at": {"value": 2, "rate": 1}, "phase": "outgoing_only"},
+    {"at": {"value": 3, "rate": 1}, "phase": "transition", "progress": {"numerator": 0, "denominator": 1}},
+    {"at": {"value": 5, "rate": 1}, "phase": "transition", "progress": {"numerator": 2, "denominator": 3}},
+    {"at": {"value": 11, "rate": 2}, "phase": "transition", "progress": {"numerator": 5, "denominator": 6}},
+    {"at": {"value": 6, "rate": 1}, "phase": "incoming_only"}
+  ]
+}

@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.cutly.dev/transaction/v1",
+  "title": "Cutly Transaction v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "idempotency_key", "expected_revision", "operations"],
+  "properties": {
+    "id": {"type": "string", "minLength": 1},
+    "idempotency_key": {"type": "string", "minLength": 1},
+    "expected_revision": {"type": "integer", "minimum": 0, "maximum": 18446744073709551615},
+    "operations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/operation"}
+    }
+  },
+  "$defs": {
+    "id": {"type": "string", "minLength": 1},
+    "rationalTime": {
+      "$ref": "https://schemas.cutly.dev/document/v1#/$defs/rationalTime"
+    },
+    "timeRange": {
+      "$ref": "https://schemas.cutly.dev/document/v1#/$defs/positiveTimeRange"
+    },
+    "clip": {
+      "$ref": "https://schemas.cutly.dev/document/v1#/$defs/clip"
+    },
+    "operation": {
+      "oneOf": [
+        {"$ref": "#/$defs/insert"},
+        {"$ref": "#/$defs/move"},
+        {"$ref": "#/$defs/trim"},
+        {"$ref": "#/$defs/split"},
+        {"$ref": "#/$defs/delete"},
+        {"$ref": "#/$defs/retrack"},
+        {"$ref": "#/$defs/setProperty"}
+      ]
+    },
+    "insert": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "op", "track_id", "clip"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "op": {"const": "insert"},
+        "track_id": {"$ref": "#/$defs/id"},
+        "clip": {"$ref": "#/$defs/clip"}
+      }
+    },
+    "move": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "op", "clip_id", "at"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "op": {"const": "move"},
+        "clip_id": {"$ref": "#/$defs/id"},
+        "at": {"$ref": "#/$defs/rationalTime"}
+      }
+    },
+    "trim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "op", "clip_id", "source_range"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "op": {"const": "trim"},
+        "clip_id": {"$ref": "#/$defs/id"},
+        "source_range": {"$ref": "#/$defs/timeRange"},
+        "timeline_range": {"$ref": "#/$defs/timeRange"},
+        "ripple": {"type": "boolean"}
+      }
+    },
+    "split": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "op", "clip_id", "new_clip_id", "at"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "op": {"const": "split"},
+        "clip_id": {"$ref": "#/$defs/id"},
+        "new_clip_id": {"$ref": "#/$defs/id"},
+        "at": {"$ref": "#/$defs/rationalTime"}
+      }
+    },
+    "delete": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "op", "clip_id"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "op": {"const": "delete"},
+        "clip_id": {"$ref": "#/$defs/id"},
+        "ripple": {"type": "boolean"}
+      }
+    },
+    "retrack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "op", "clip_id", "target_track_id"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "op": {"const": "retrack"},
+        "clip_id": {"$ref": "#/$defs/id"},
+        "target_track_id": {"$ref": "#/$defs/id"}
+      }
+    },
+    "setProperty": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "op", "clip_id", "property"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "op": {"const": "set_property"},
+        "clip_id": {"$ref": "#/$defs/id"},
+        "property": {"type": "string", "minLength": 1},
+        "value": true
+      }
+    }
+  }
+}

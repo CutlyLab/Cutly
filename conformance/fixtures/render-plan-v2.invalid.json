@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "document_id": "fixture-document",
+  "revision": 7,
+  "document_hash": "sha256:document",
+  "timeline_id": "timeline-main",
+  "range": {
+    "start": {"value": 0, "rate": 1},
+    "duration": {"value": 2, "rate": 1}
+  },
+  "target": {
+    "timeline_id": "timeline-main",
+    "width": 1920,
+    "height": 1080,
+    "frame_rate": {"value": 30000, "rate": 1001},
+    "sample_rate": 48000,
+    "channels": 2
+  },
+  "capabilities": {"backend_id": "reference-cpu-v1"},
+  "fingerprint": "sha256:unsupported-plan"
+}

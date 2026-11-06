@@ -1,0 +1,26 @@
+{
+  "schema_version": 2,
+  "id": "invalid-vector-viewport-document",
+  "revision": 0,
+  "assets": [{
+    "id": "vector-viewport",
+    "kind": "vector",
+    "vector": {
+      "profile": "cutly.vector.path-viewport-px.v2",
+      "view_box": {
+        "x": {"numerator": 0, "denominator": 1},
+        "y": {"numerator": 0, "denominator": 1},
+        "width": {"numerator": 100, "denominator": 1},
+        "height": {"numerator": 100, "denominator": 1}
+      },
+      "paths": [{
+        "id": "path",
+        "commands": [
+          {"op": "move_to", "points": [{"x": {"numerator": 0, "denominator": 1}, "y": {"numerator": 0, "denominator": 1}}]}
+        ],
+        "fill_rule": "nonzero",
+        "fill": {"r": 65535, "g": 0, "b": 0, "a": 65535}
+      }]
+    }
+  }]
+}

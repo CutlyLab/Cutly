@@ -1,0 +1,66 @@
+{
+  "schema_version": 3,
+  "semantic_profile": "cutly.semantic.v1",
+  "document_id": "fixture-document",
+  "revision": 7,
+  "document_hash": "sha256:0a20184868587d99371ebfbecca1d386774a7a624d615885da66fc24dd78e64e",
+  "timeline_id": "timeline-main",
+  "requested_range": {
+    "start": {"value": 0, "rate": 1},
+    "duration": {"value": 2, "rate": 1}
+  },
+  "target": {
+    "timeline_id": "timeline-main",
+    "width": 1920,
+    "height": 1080,
+    "frame_clock": {
+      "origin": {"value": 0, "rate": 1},
+      "frames_per_second": {"value": 30000, "rate": 1001}
+    },
+    "sample_clock": {
+      "origin": {"value": 0, "rate": 1},
+      "samples_per_second": 48000
+    },
+    "channels": 2,
+    "pixel_format": "rgba",
+    "color_space": "bt709"
+  },
+  "frame_range": {"first": 0, "count": 60},
+  "sample_range": {"first": 0, "count": 96000},
+  "required_capabilities": {
+    "track_kinds": ["audio", "video"],
+    "asset_kinds": ["audio", "video"]
+  },
+  "video": [
+    {
+      "track_id": "track-video",
+      "clip_id": "clip-video",
+      "asset_id": "asset-video",
+      "track_index": 0,
+      "clip_index": 0,
+      "timeline_range": {"start": {"value": 0, "rate": 1}, "duration": {"value": 6, "rate": 1}},
+      "source_range": {"start": {"value": 1, "rate": 1}, "duration": {"value": 6, "rate": 1}},
+      "visible_timeline_range": {"start": {"value": 0, "rate": 1}, "duration": {"value": 2, "rate": 1}},
+      "visible_source_range": {"start": {"value": 1, "rate": 1}, "duration": {"value": 2, "rate": 1}},
+      "properties": {"cutly.opacity.v1": 1}
+    }
+  ],
+  "audio": [
+    {
+      "track_id": "track-audio",
+      "clip_id": "clip-audio",
+      "asset_id": "asset-audio",
+      "track_index": 1,
+      "clip_index": 0,
+      "timeline_range": {"start": {"value": 0, "rate": 1}, "duration": {"value": 6, "rate": 1}},
+      "source_range": {"start": {"value": 0, "rate": 1}, "duration": {"value": 6, "rate": 1}},
+      "visible_timeline_range": {"start": {"value": 0, "rate": 1}, "duration": {"value": 2, "rate": 1}},
+      "visible_source_range": {"start": {"value": 0, "rate": 1}, "duration": {"value": 2, "rate": 1}}
+    }
+  ],
+  "resources": [
+    {"asset_id": "asset-audio", "kind": "audio", "content_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
+    {"asset_id": "asset-video", "kind": "video", "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+  ],
+  "fingerprint": "sha256:34384100c28da27fb0c3f471602ef7af073de32dc3a3657d0c03385ad5393790"
+}
