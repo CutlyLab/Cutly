@@ -1,7 +1,15 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { CutlyClient, HTTPAgentTransport, createRenderJob } from "@cutly/sdk";
+import {
+  CutlyClient,
+  HTTPAgentTransport,
+  createRenderJob,
+  decodeRenderJobSnapshotReceipt,
+  decodeRenderPlanReceipt,
+  decodeRenderPreflightReceipt,
+  decodeRenderPrepareReceipt,
+} from "@cutly/sdk";
 
 let timeout;
 
@@ -32,45 +40,44 @@ try {
     color_space: "bt709",
   };
 
-  const planned = requireOK("plan", await client.planRender({
-    requestId: `${configuration.job}-plan`, projectId: configuration.project, range, target,
-  }, options));
-  const planReceipt = requireReceipt(planned, "cutly.agent-render-plan.v1");
-  const plan = requireObject(planReceipt.plan, "plan receipt plan");
-  requireDigest(plan.fingerprint, "plan fingerprint");
+  const planRequestId = `${configuration.job}-plan`;
+  const planned = await client.planRender({
+    requestId: planRequestId, projectId: configuration.project, range, target,
+  }, options);
+  const planReceipt = await decodeRenderPlanReceipt(planned, {
+    requestId: planRequestId, projectId: configuration.project, range, target,
+  });
+  const plan = planReceipt.plan;
 
   const locators = new Map([
     [configuration.videoAsset, resolve(configuration.video)],
     [configuration.audioAsset, resolve(configuration.audio)],
   ]);
-  if (!Array.isArray(plan.resources)) throw new Error("plan receipt has no resources array");
-  const resources = plan.resources.map((resource, index) => {
-    requireObject(resource, `plan resource ${index}`);
+  const resources = (plan.resources ?? []).map((resource) => {
     const locator = locators.get(resource.asset_id);
     if (locator === undefined) throw new Error(`plan requires unmapped asset ${JSON.stringify(resource.asset_id)}`);
     return { assetId: resource.asset_id, locator };
   });
 
-  const prepared = requireOK("prepare", await client.prepareRender({
-    requestId: `${configuration.job}-prepare`, projectId: configuration.project,
+  const prepareRequestId = `${configuration.job}-prepare`;
+  const prepared = await client.prepareRender({
+    requestId: prepareRequestId, projectId: configuration.project,
     plan, resources, deterministicSeed: configuration.seed,
-  }, options));
-  const prepareReceipt = requireReceipt(prepared, "cutly.agent-render-prepare.v1");
-  const executionManifest = requireObject(prepareReceipt.execution_manifest, "prepare execution manifest");
-  requireDigest(executionManifest.fingerprint, "execution manifest fingerprint");
-  if (executionManifest.plan_fingerprint !== plan.fingerprint || executionManifest.deterministic_seed !== configuration.seed) {
-    throw new Error("prepare receipt is not bound to the requested plan and seed");
-  }
+  }, options);
+  const prepareReceipt = await decodeRenderPrepareReceipt(prepared, {
+    requestId: prepareRequestId, projectId: configuration.project,
+    plan, resources, deterministicSeed: configuration.seed,
+  });
+  const executionManifest = prepareReceipt.execution_manifest;
 
-  const ready = requireOK("preflight", await client.preflightRender({
-    requestId: `${configuration.job}-preflight`, projectId: configuration.project,
+  const preflightRequestId = `${configuration.job}-preflight`;
+  const ready = await client.preflightRender({
+    requestId: preflightRequestId, projectId: configuration.project,
     plan, executionManifest,
-  }, options));
-  const preflightReceipt = requireReceipt(ready, "cutly.agent-render-preflight.v1");
-  if (preflightReceipt.plan_fingerprint !== plan.fingerprint ||
-      preflightReceipt.execution_manifest_fingerprint !== executionManifest.fingerprint) {
-    throw new Error("preflight receipt is not bound to plan and execution manifest");
-  }
+  }, options);
+  await decodeRenderPreflightReceipt(ready, {
+    requestId: preflightRequestId, projectId: configuration.project, plan, executionManifest,
+  });
 
   const job = createRenderJob({
     jobId: configuration.job,
@@ -79,24 +86,29 @@ try {
     executionManifest,
     artifactUri: pathToFileURL(resolve(configuration.output)).href,
   });
-  const submitted = requireOK("submit", await client.submitRender({
-    requestId: `${configuration.job}-submit`, projectId: configuration.project, job,
-  }, options));
-  let snapshot = requireSnapshot(submitted, job);
+  const submitRequestId = `${configuration.job}-submit`;
+  const submitted = await client.submitRender({
+    requestId: submitRequestId, projectId: configuration.project, job,
+  }, options);
+  let snapshot = decodeRenderJobSnapshotReceipt(submitted, {
+    requestId: submitRequestId, projectId: configuration.project, action: "render", job,
+  });
 
   while (snapshot.state !== "complete") {
     if (snapshot.state === "failed" || snapshot.state === "canceled") {
       throw new Error(`render ${snapshot.state}: ${snapshot.failure_class ?? ""} ${snapshot.failure_message ?? ""}`.trim());
     }
     await wait(configuration.pollMs, abort.signal);
-    const status = requireOK("status", await client.renderStatus({
-      requestId: `${configuration.job}-status-${snapshot.last_sequence}`,
+    const statusRequestId = `${configuration.job}-status-${snapshot.last_sequence}`;
+    const status = await client.renderStatus({
+      requestId: statusRequestId,
       projectId: configuration.project,
       jobId: configuration.job,
-    }, options));
-    snapshot = requireSnapshot(status, job);
+    }, options);
+    snapshot = decodeRenderJobSnapshotReceipt(status, {
+      requestId: statusRequestId, projectId: configuration.project, action: "status", job,
+    });
   }
-  requireObject(snapshot.artifact, "complete render artifact");
   console.log(JSON.stringify(snapshot.artifact, bigintJSON, 2));
 } catch (error) {
   console.error(`cutly TypeScript render example: ${error instanceof Error ? error.message : String(error)}`);
@@ -167,55 +179,6 @@ function readOptions() {
     timeoutMs: number("timeout-ms", "CUTLY_TIMEOUT_MS", "300000"),
     pollMs: number("poll-ms", "CUTLY_POLL_MS", "250"),
   });
-}
-
-function requireOK(action, result) {
-  requireObject(result, `${action} result`);
-  if (result.ok === true) return result;
-  const diagnostics = Array.isArray(result.diagnostics)
-    ? result.diagnostics.map((entry) => `${entry.code ?? "UNKNOWN"} at ${entry.path ?? ""}: ${entry.message ?? ""}`).join("; ")
-    : "missing diagnostics";
-  throw new Error(`${action} rejected in state ${JSON.stringify(result.state)}: ${diagnostics}`);
-}
-
-function requireReceipt(result, profile) {
-  const receipt = requireObject(result.receipt, `${profile} receipt`);
-  if (receipt.profile !== profile) throw new Error(`receipt profile ${JSON.stringify(receipt.profile)}, want ${profile}`);
-  return receipt;
-}
-
-function requireSnapshot(result, job) {
-  const snapshot = requireObject(result.receipt, "render job snapshot");
-  const snapshotJob = requireObject(snapshot.job, "snapshot job");
-  const states = new Set(["queued", "running", "canceling", "canceled", "failed", "complete"]);
-  if (snapshot.schema_version !== 1n || snapshotJob.id !== job.id ||
-      snapshotJob.plan_fingerprint !== job.plan_fingerprint ||
-      snapshotJob.execution_manifest_fingerprint !== job.execution_manifest_fingerprint ||
-      snapshotJob.artifact_uri !== job.artifact_uri || !states.has(snapshot.state) ||
-      typeof snapshot.last_sequence !== "bigint" || snapshot.last_sequence <= 0n) {
-    throw new Error("render job snapshot has invalid identity or shape");
-  }
-  if (snapshot.state === "complete") {
-    const artifact = requireObject(snapshot.artifact, "complete render artifact");
-    requireDigest(artifact.content_hash, "artifact content hash");
-    requireDigest(artifact.evidence_fingerprint, "artifact evidence fingerprint");
-    if (artifact.uri !== job.artifact_uri ||
-        artifact.execution_manifest_fingerprint !== job.execution_manifest_fingerprint ||
-        artifact.evidence_uri !== `${job.artifact_uri}.evidence.json` ||
-        artifact.frame_count !== job.frame_range.count || artifact.sample_count !== job.sample_range.count) {
-      throw new Error("complete artifact is not bound to the submitted job");
-    }
-  }
-  return snapshot;
-}
-
-function requireObject(value, name) {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) throw new Error(`${name} must be an object`);
-  return value;
-}
-
-function requireDigest(value, name) {
-  if (typeof value !== "string" || !/^sha256:[0-9a-f]{64}$/.test(value)) throw new Error(`${name} is invalid`);
 }
 
 function wait(milliseconds, signal) {

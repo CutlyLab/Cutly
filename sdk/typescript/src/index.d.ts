@@ -469,10 +469,161 @@ export interface AgentJobAction extends AgentActionIdentity {
   jobId: string;
 }
 
+export type WireRationalTimeV1 = Readonly<Record<string, CanonicalJSONValue>> & {
+  readonly value: bigint;
+  readonly rate: bigint;
+}
+
+export type WireTimeRangeV1 = Readonly<Record<string, CanonicalJSONValue>> & {
+  readonly start: WireRationalTimeV1;
+  readonly duration: WireRationalTimeV1;
+}
+
+export type WireTickRangeV1 = Readonly<Record<string, CanonicalJSONValue>> & {
+  readonly first: bigint;
+  readonly count: bigint;
+}
+
+export type RenderTargetV3Value = Readonly<Record<string, CanonicalJSONValue>> & {
+  readonly timeline_id: string;
+  readonly width: bigint;
+  readonly height: bigint;
+  readonly frame_clock: Readonly<{
+    origin: WireRationalTimeV1;
+    frames_per_second: WireRationalTimeV1;
+  }>;
+  readonly sample_clock: Readonly<{
+    origin: WireRationalTimeV1;
+    samples_per_second: bigint;
+  }>;
+  readonly channels: bigint;
+  readonly pixel_format: string;
+  readonly color_space: string;
+}
+
+export type RenderPlanResourceV3Value = Readonly<Record<string, CanonicalJSONValue>> & {
+  readonly asset_id: string;
+  readonly kind: "video" | "audio" | "image" | "font" | "data";
+  readonly content_hash?: string;
+}
+
+export type RenderPlanV3Value = Readonly<Record<string, CanonicalJSONValue>> & {
+  readonly schema_version: 3n;
+  readonly semantic_profile: "cutly.semantic.v1";
+  readonly document_id: string;
+  readonly revision: bigint;
+  readonly document_hash: string;
+  readonly timeline_id: string;
+  readonly requested_range: WireTimeRangeV1;
+  readonly target: RenderTargetV3Value;
+  readonly frame_range: WireTickRangeV1;
+  readonly sample_range: WireTickRangeV1;
+  readonly required_capabilities: Readonly<Record<string, CanonicalJSONValue>>;
+  readonly video?: readonly Readonly<Record<string, CanonicalJSONValue>>[];
+  readonly audio?: readonly Readonly<Record<string, CanonicalJSONValue>>[];
+  readonly resources?: readonly RenderPlanResourceV3Value[];
+  readonly fingerprint: string;
+}
+
 export interface RenderPlanReceiptV1 {
   readonly profile: "cutly.agent-render-plan.v1";
-  readonly plan: Readonly<Record<string, CanonicalJSONValue>>;
+  readonly plan: RenderPlanV3Value;
 }
+
+export type MaterializedResourceV1Value = Readonly<Record<string, CanonicalJSONValue>> & {
+  readonly asset_id: string;
+  readonly kind: "video" | "audio" | "image" | "font" | "data";
+  readonly content_hash: string;
+  readonly size_bytes: bigint;
+  readonly locator_scheme: "cas" | "file";
+  readonly locator: string;
+  readonly probe_fingerprint: string;
+}
+
+export type ExecutionManifestV1Value = Readonly<Record<string, CanonicalJSONValue>> & {
+  readonly schema_version: 1n;
+  readonly plan_fingerprint: string;
+  readonly semantic_profile: "cutly.semantic.v1";
+  readonly compiler_build: string;
+  readonly evaluator_build: string;
+  readonly resources?: readonly MaterializedResourceV1Value[];
+  readonly fonts?: readonly Readonly<Record<string, CanonicalJSONValue>>[];
+  readonly plugins?: readonly Readonly<Record<string, CanonicalJSONValue>>[];
+  readonly backend: Readonly<Record<string, CanonicalJSONValue>> & {
+    readonly backend_id: string;
+    readonly build_fingerprint: string;
+  };
+  readonly media_runtime: Readonly<Record<string, CanonicalJSONValue>>;
+  readonly output: Readonly<Record<string, CanonicalJSONValue>>;
+  readonly deterministic_seed: bigint;
+  readonly browser_fingerprint?: string;
+  readonly fingerprint: string;
+}
+
+export interface RenderPrepareReceiptV1 {
+  readonly profile: "cutly.agent-render-prepare.v1";
+  readonly execution_manifest: ExecutionManifestV1Value;
+}
+
+export interface RenderPreflightReceiptV1 {
+  readonly profile: "cutly.agent-render-preflight.v1";
+  readonly plan_fingerprint: string;
+  readonly execution_manifest_fingerprint: string;
+  readonly backend_id: string;
+  readonly backend_build_fingerprint: string;
+}
+
+export type AgentReceiptErrorCode =
+  | "RECEIPT.INPUT_INVALID"
+  | "RECEIPT.RESULT_INVALID"
+  | "RECEIPT.CORRELATION_INVALID"
+  | "RECEIPT.RENDER_REJECTED"
+  | "RECEIPT.PROFILE_INVALID"
+  | "RECEIPT.INVALID"
+  | "RECEIPT.BINDING_INVALID"
+  | "RECEIPT.FINGERPRINT_INVALID";
+
+export declare class AgentReceiptError extends Error {
+  readonly code: AgentReceiptErrorCode;
+  constructor(code: AgentReceiptErrorCode, detail: string, cause?: unknown);
+}
+
+export interface RenderPlanReceiptBinding {
+  requestId: string;
+  projectId: string;
+  range: Readonly<Record<string, CanonicalJSONInput>>;
+  target: Readonly<Record<string, CanonicalJSONInput>>;
+}
+
+export interface RenderPrepareReceiptBinding {
+  requestId: string;
+  projectId: string;
+  plan: Readonly<Record<string, CanonicalJSONInput>>;
+  resources: readonly RenderPrepareResource[];
+  deterministicSeed?: number | bigint;
+}
+
+export interface RenderPreflightReceiptBinding {
+  requestId: string;
+  projectId: string;
+  plan: Readonly<Record<string, CanonicalJSONInput>>;
+  executionManifest: Readonly<Record<string, CanonicalJSONInput>>;
+}
+
+export declare function decodeRenderPlanReceipt(
+  result: AgentResult,
+  expected: RenderPlanReceiptBinding,
+): Promise<RenderPlanReceiptV1>;
+
+export declare function decodeRenderPrepareReceipt(
+  result: AgentResult,
+  expected: RenderPrepareReceiptBinding,
+): Promise<RenderPrepareReceiptV1>;
+
+export declare function decodeRenderPreflightReceipt(
+  result: AgentResult,
+  expected: RenderPreflightReceiptBinding,
+): Promise<RenderPreflightReceiptV1>;
 
 export interface RenderPrepareResource {
   assetId: string;
@@ -485,9 +636,9 @@ export interface RenderJobV1 {
   readonly idempotency_key: string;
   readonly plan_fingerprint: string;
   readonly execution_manifest_fingerprint: string;
-  readonly timeline_range: Readonly<Record<string, CanonicalJSONValue>>;
-  readonly frame_range: Readonly<Record<string, CanonicalJSONValue>>;
-  readonly sample_range: Readonly<Record<string, CanonicalJSONValue>>;
+  readonly timeline_range: WireTimeRangeV1;
+  readonly frame_range: WireTickRangeV1;
+  readonly sample_range: WireTickRangeV1;
   readonly artifact_uri: string;
 }
 
@@ -500,7 +651,7 @@ export interface RenderArtifactV1 {
   readonly execution_manifest_fingerprint: string;
   readonly evidence_uri: string;
   readonly evidence_fingerprint: string;
-  readonly duration: Readonly<Record<string, CanonicalJSONValue>>;
+  readonly duration: WireRationalTimeV1;
   readonly frame_count: bigint;
   readonly sample_count: bigint;
 }
@@ -514,6 +665,18 @@ export interface RenderJobSnapshotV1 {
   readonly failure_message?: string;
   readonly artifact?: RenderArtifactV1;
 }
+
+export interface RenderJobSnapshotReceiptBinding {
+  requestId: string;
+  projectId: string;
+  action: "render" | "status" | "cancel";
+  job: RenderJobV1;
+}
+
+export declare function decodeRenderJobSnapshotReceipt(
+  result: AgentResult,
+  expected: RenderJobSnapshotReceiptBinding,
+): RenderJobSnapshotV1;
 
 export declare function createRenderJob(input: {
   jobId: string;
@@ -554,7 +717,7 @@ export declare class CutlyClient {
   prepareRender(input: AgentActionIdentity & {
     plan: Readonly<Record<string, CanonicalJSONInput>>;
     resources: readonly RenderPrepareResource[];
-    deterministicSeed?: IntegerLike;
+    deterministicSeed?: number | bigint;
   }, options?: { signal?: AbortSignal }): Promise<AgentResult>;
   preflightRender(input: AgentActionIdentity & {
     plan: Readonly<Record<string, CanonicalJSONInput>>;

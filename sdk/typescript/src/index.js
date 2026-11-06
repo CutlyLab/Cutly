@@ -54,6 +54,14 @@ export {
 export { createRenderJob } from "./render-job.js";
 
 export {
+  AgentReceiptError,
+  decodeRenderJobSnapshotReceipt,
+  decodeRenderPlanReceipt,
+  decodeRenderPreflightReceipt,
+  decodeRenderPrepareReceipt,
+} from "./receipts.js";
+
+export {
   AgentPreviewAdapter,
   PreviewFrameError,
   createExactFrameRequest,
