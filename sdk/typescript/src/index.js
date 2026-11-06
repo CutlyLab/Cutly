@@ -52,3 +52,9 @@ export {
 } from "./client.js";
 
 export { createRenderJob } from "./render-job.js";
+
+export {
+  AgentPreviewAdapter,
+  PreviewFrameError,
+  createExactFrameRequest,
+} from "./preview.js";

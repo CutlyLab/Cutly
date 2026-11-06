@@ -572,6 +572,105 @@ export declare class CutlyClient {
   cancelRender(input: AgentJobAction, options?: { signal?: AbortSignal }): Promise<AgentResult>;
 }
 
+export type PreviewFrameErrorCode =
+  | "PREVIEW.REQUEST_INVALID"
+  | "PREVIEW.VALUE_INVALID"
+  | "PREVIEW.PLAYER_TOKEN_INVALID"
+  | "PREVIEW.RESULT_INVALID"
+  | "PREVIEW.RENDER_REJECTED"
+  | "PREVIEW.RECEIPT_INVALID";
+
+export declare class PreviewFrameError extends Error {
+  readonly code: PreviewFrameErrorCode;
+  constructor(code: PreviewFrameErrorCode, detail: string, cause?: unknown);
+}
+
+export interface PreviewPlanInput extends Readonly<Record<string, CanonicalJSONInput>> {
+  readonly fingerprint: string;
+  readonly frame_range: Readonly<{ first: IntegerLike; count: IntegerLike }>;
+}
+
+export interface PreviewExecutionManifestInput extends Readonly<Record<string, CanonicalJSONInput>> {
+  readonly fingerprint: string;
+  readonly plan_fingerprint: string;
+  readonly backend: Readonly<{
+    backend_id: string;
+    build_fingerprint: string;
+    readonly [name: string]: CanonicalJSONInput;
+  }>;
+  readonly output: Readonly<{
+    reference_profile: string;
+    decoded_video_profile: string;
+    width: IntegerLike;
+    height: IntegerLike;
+    readonly [name: string]: CanonicalJSONInput;
+  }>;
+}
+
+export interface ExactFrameRequestV1 {
+  readonly schema_version: 1n;
+  readonly id: string;
+  readonly idempotency_key: string;
+  readonly plan_fingerprint: string;
+  readonly execution_manifest_fingerprint: string;
+  readonly composition_frame_index: bigint;
+  readonly artifact_uri: string;
+}
+
+export interface PreviewFrameArtifactV1 extends Readonly<Record<string, CanonicalJSONValue>> {
+  readonly uri: string;
+  readonly content_hash: string;
+  readonly size_bytes: bigint;
+  readonly decoded_content_hash: string;
+  readonly plan_fingerprint: string;
+  readonly execution_manifest_fingerprint: string;
+  readonly backend_id: string;
+  readonly backend_build_fingerprint: string;
+  readonly reference_profile: string;
+  readonly png_encoding_profile: "cutly.png.rgba8.ffmpeg.single-frame.v1";
+  readonly decoded_video_profile: string;
+  readonly width: bigint;
+  readonly height: bigint;
+  readonly composition_frame_index: bigint;
+  readonly timeline_time: Readonly<Record<string, CanonicalJSONValue>>;
+  readonly evaluation_fingerprint: string;
+  readonly evaluation: Readonly<Record<string, CanonicalJSONValue>>;
+}
+
+export interface PreviewFrameResult {
+  readonly result: AgentResult;
+  readonly request: ExactFrameRequestV1;
+  readonly artifact: PreviewFrameArtifactV1;
+  readonly token: FrameRequestToken;
+  readonly presented: boolean;
+}
+
+export declare function createExactFrameRequest(input: {
+  id: string;
+  idempotencyKey: string;
+  plan: PreviewPlanInput;
+  executionManifest: PreviewExecutionManifestInput;
+  compositionFrameIndex: IntegerLike;
+  artifactUri: string;
+}): ExactFrameRequestV1;
+
+export interface AgentPreviewAdapterConfig {
+  client: Pick<CutlyClient, "renderFrame">;
+  projectId: string;
+  plan: PreviewPlanInput;
+  executionManifest: PreviewExecutionManifestInput;
+  requestIDForFrame(token: FrameRequestToken): string;
+  artifactURIForFrame(token: FrameRequestToken): string;
+}
+
+export declare class AgentPreviewAdapter {
+  constructor(config: AgentPreviewAdapterConfig);
+  renderCurrentFrame(
+    player: Pick<HeadlessPlayer, "requestFrame" | "acceptFrame">,
+    options?: { signal?: AbortSignal },
+  ): Promise<PreviewFrameResult>;
+}
+
 export interface HTTPAgentTransportOptions {
   fetch?: typeof globalThis.fetch;
   headers?: HeadersInit;
