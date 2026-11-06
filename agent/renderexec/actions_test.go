@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	agentprotocol "github.com/CutlyLab/Cutly/agent/protocol"
 	"github.com/CutlyLab/Cutly/agent/router"
@@ -93,6 +94,99 @@ func TestPreflightPreservesBackendDiagnostics(t *testing.T) {
 	}
 }
 
+func TestSuccessfulPreflightRecordsPreparedEnvironmentBeforeReady(t *testing.T) {
+	plan, manifest := testEnvironment(t)
+	backend := &testBackend{capabilities: manifest.Backend}
+	calls := 0
+	recorder := RecorderFunc(func(_ context.Context, projectID string, gotPlan videoedit.RenderPlan, gotManifest renderapi.ExecutionManifest) error {
+		calls++
+		if projectID != "project" || gotPlan.Fingerprint != plan.Fingerprint || gotManifest.Fingerprint != manifest.Fingerprint {
+			t.Fatalf("recorded project=%q plan=%q manifest=%q", projectID, gotPlan.Fingerprint, gotManifest.Fingerprint)
+		}
+		return nil
+	})
+	result := handle(t, testRouterWithRecorder(t, backend, recorder), "preflight", struct {
+		Plan              videoedit.RenderPlan        `json:"plan"`
+		ExecutionManifest renderapi.ExecutionManifest `json:"execution_manifest"`
+	}{Plan: plan, ExecutionManifest: manifest})
+	if !result.OK || result.State != "ready" || calls != 1 {
+		t.Fatalf("recorded preflight result=%+v calls=%d", result, calls)
+	}
+
+	backend.diagnostics = []videoedit.Diagnostic{{
+		Code: "BACKEND.REJECTED", Severity: videoedit.SeverityError, Path: "/resources/0", Message: "rejected",
+	}}
+	result = handle(t, testRouterWithRecorder(t, backend, recorder), "preflight", struct {
+		Plan              videoedit.RenderPlan        `json:"plan"`
+		ExecutionManifest renderapi.ExecutionManifest `json:"execution_manifest"`
+	}{Plan: plan, ExecutionManifest: manifest})
+	if result.OK || calls != 1 {
+		t.Fatalf("rejected preflight was recorded result=%+v calls=%d", result, calls)
+	}
+
+	backend.diagnostics = nil
+	backend.capabilities.BuildFingerprint = digest('9')
+	result = handle(t, testRouterWithRecorder(t, backend, recorder), "preflight", struct {
+		Plan              videoedit.RenderPlan        `json:"plan"`
+		ExecutionManifest renderapi.ExecutionManifest `json:"execution_manifest"`
+	}{Plan: plan, ExecutionManifest: manifest})
+	if result.OK || calls != 1 {
+		t.Fatalf("identity-mismatched backend was recorded result=%+v calls=%d", result, calls)
+	}
+}
+
+func TestCanceledPreflightDoesNotRecordPreparedEnvironment(t *testing.T) {
+	plan, manifest := testEnvironment(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	backend := &testBackend{capabilities: manifest.Backend, preflightHook: cancel}
+	calls := 0
+	recorder := RecorderFunc(func(context.Context, string, videoedit.RenderPlan, renderapi.ExecutionManifest) error {
+		calls++
+		return nil
+	})
+	actionRouter := testRouterWithRecorder(t, backend, recorder)
+	payload := canonicalPayload(t, struct {
+		Plan              videoedit.RenderPlan        `json:"plan"`
+		ExecutionManifest renderapi.ExecutionManifest `json:"execution_manifest"`
+	}{Plan: plan, ExecutionManifest: manifest})
+	if result, err := actionRouter.HandleAgent(ctx, testRequest("preflight", payload)); !errors.Is(err, context.Canceled) || result.OK {
+		t.Fatalf("canceled preflight result=%+v err=%v", result, err)
+	}
+	if calls != 0 {
+		t.Fatalf("canceled preflight recorder calls=%d", calls)
+	}
+}
+
+func TestPreflightNeverReturnsReadyWhenPreparedRecordingFails(t *testing.T) {
+	plan, manifest := testEnvironment(t)
+	backend := &testBackend{capabilities: manifest.Backend}
+	want := errors.New("prepared store unavailable")
+	for name, recorder := range map[string]Recorder{
+		"error": RecorderFunc(func(context.Context, string, videoedit.RenderPlan, renderapi.ExecutionManifest) error { return want }),
+		"panic": RecorderFunc(func(context.Context, string, videoedit.RenderPlan, renderapi.ExecutionManifest) error {
+			panic("recorder panic")
+		}),
+	} {
+		t.Run(name, func(t *testing.T) {
+			actionRouter := testRouterWithRecorder(t, backend, recorder)
+			payload := canonicalPayload(t, struct {
+				Plan              videoedit.RenderPlan        `json:"plan"`
+				ExecutionManifest renderapi.ExecutionManifest `json:"execution_manifest"`
+			}{Plan: plan, ExecutionManifest: manifest})
+			if result, err := actionRouter.HandleAgent(context.Background(), testRequest("preflight", payload)); err == nil || result.OK {
+				t.Fatalf("recording failure returned result=%+v err=%v", result, err)
+			} else if name == "error" && !errors.Is(err, want) {
+				t.Fatalf("recording error = %v", err)
+			}
+		})
+	}
+	if _, err := NewWithRecorder(ResolverFunc(func(context.Context, string, renderapi.ExecutionManifest) (renderapi.RenderBackend, error) {
+		return backend, nil
+	}), nil); err == nil {
+		t.Fatal("nil recorder accepted")
+	}
+}
+
 func TestFrameFailsClosedForUnsupportedOrInvalidBackendResult(t *testing.T) {
 	plan, manifest := testEnvironment(t)
 	frame := renderapi.ExactFrameRequest{
@@ -142,9 +236,23 @@ func TestBackendUnavailableIsBusinessRejectionAndUnexpectedResolverFailureIsTran
 	}
 }
 
+func TestBoundedMessageTrimsBeforeUTF8SafeTruncation(t *testing.T) {
+	if got := boundedMessage(errors.New(strings.Repeat(" ", maxDiagnosticMessageBytes+10) + "\xff故障")); got != "�故障" {
+		t.Fatalf("long whitespace prefix = %q", got)
+	}
+	if got := boundedMessage(errors.New(" \t\n ")); got != "render action failed" {
+		t.Fatalf("blank message = %q", got)
+	}
+	got := boundedMessage(errors.New(strings.Repeat("界", maxDiagnosticMessageBytes)))
+	if got == "" || len(got) > maxDiagnosticMessageBytes || !utf8.ValidString(got) || !strings.HasSuffix(got, "...") {
+		t.Fatalf("truncated message bytes=%d valid=%v suffix=%v", len(got), utf8.ValidString(got), strings.HasSuffix(got, "..."))
+	}
+}
+
 type testBackend struct {
 	capabilities    videoedit.BackendCapabilities
 	diagnostics     []videoedit.Diagnostic
+	preflightHook   func()
 	corruptArtifact bool
 	preflightCalls  int
 	frameCalls      int
@@ -158,6 +266,9 @@ func (backend *testBackend) Capabilities(context.Context) (videoedit.BackendCapa
 
 func (backend *testBackend) Preflight(context.Context, videoedit.RenderPlan, renderapi.ExecutionManifest) []videoedit.Diagnostic {
 	backend.preflightCalls++
+	if backend.preflightHook != nil {
+		backend.preflightHook()
+	}
 	return append([]videoedit.Diagnostic(nil), backend.diagnostics...)
 }
 
@@ -222,6 +333,24 @@ func testRouter(t *testing.T, backend renderapi.RenderBackend) *router.Router {
 func testRouterWithResolver(t *testing.T, resolver Resolver) *router.Router {
 	t.Helper()
 	service, err := New(resolver)
+	if err != nil {
+		t.Fatal(err)
+	}
+	value, err := router.New(service.Routes()...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return value
+}
+
+func testRouterWithRecorder(t *testing.T, backend renderapi.RenderBackend, recorder Recorder) *router.Router {
+	t.Helper()
+	service, err := NewWithRecorder(ResolverFunc(func(_ context.Context, projectID string, _ renderapi.ExecutionManifest) (renderapi.RenderBackend, error) {
+		if projectID != "project" {
+			t.Fatalf("project ID = %q", projectID)
+		}
+		return backend, nil
+	}), recorder)
 	if err != nil {
 		t.Fatal(err)
 	}

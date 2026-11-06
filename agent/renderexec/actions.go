@@ -45,15 +45,40 @@ func (function ResolverFunc) ResolveBackend(ctx context.Context, projectID strin
 	return function(ctx, projectID, manifest)
 }
 
+// Recorder durably registers an exact preflight environment for later queued
+// execution. Implementations must be idempotent for the same plan/manifest
+// fingerprints and fail closed on collisions or uncertain durability.
+type Recorder interface {
+	RecordPrepared(context.Context, string, videoedit.RenderPlan, renderapi.ExecutionManifest) error
+}
+
+type RecorderFunc func(context.Context, string, videoedit.RenderPlan, renderapi.ExecutionManifest) error
+
+func (function RecorderFunc) RecordPrepared(ctx context.Context, projectID string, plan videoedit.RenderPlan, manifest renderapi.ExecutionManifest) error {
+	return function(ctx, projectID, plan, manifest)
+}
+
 type Service struct {
 	resolver Resolver
+	recorder Recorder
 }
 
 func New(resolver Resolver) (*Service, error) {
+	return newService(resolver, nil)
+}
+
+func NewWithRecorder(resolver Resolver, recorder Recorder) (*Service, error) {
+	if recorder == nil {
+		return nil, errors.New("renderexec: prepared recorder is required")
+	}
+	return newService(resolver, recorder)
+}
+
+func newService(resolver Resolver, recorder Recorder) (*Service, error) {
 	if resolver == nil {
 		return nil, errors.New("renderexec: backend resolver is required")
 	}
-	return &Service{resolver: resolver}, nil
+	return &Service{resolver: resolver, recorder: recorder}, nil
 }
 
 func (service *Service) Routes() []router.Route {
@@ -105,6 +130,15 @@ func (service *Service) preflight(ctx context.Context, request agentprotocol.Req
 		return reject(CodePreflightRejected, "/backend", boundedMessage(err)), nil
 	}
 	diagnostics = nonNilDiagnostics(diagnostics)
+	ready := !videoedit.HasErrorDiagnostics(diagnostics)
+	if ready && service.recorder != nil {
+		if err := ctx.Err(); err != nil {
+			return router.Outcome{}, err
+		}
+		if err := safeRecord(ctx, service.recorder, request.ProjectID, prepared.plan, prepared.manifest); err != nil {
+			return router.Outcome{}, err
+		}
+	}
 	receipt, err := encodeReceipt(preflightReceipt{
 		Profile: "cutly.agent-render-preflight.v1", PlanFingerprint: prepared.plan.Fingerprint,
 		ExecutionManifestFingerprint: prepared.manifest.Fingerprint,
@@ -114,7 +148,6 @@ func (service *Service) preflight(ctx context.Context, request agentprotocol.Req
 	if err != nil {
 		return router.Outcome{}, err
 	}
-	ready := !videoedit.HasErrorDiagnostics(diagnostics)
 	state := "ready"
 	next := []agentprotocol.NextAction{{Tool: agentprotocol.ToolRender, Action: "frame", ProjectID: request.ProjectID}}
 	if !ready {
@@ -313,16 +346,25 @@ func nonNilDiagnostics(values []videoedit.Diagnostic) []videoedit.Diagnostic {
 }
 
 func boundedMessage(err error) string {
-	message := "render action failed"
-	if err != nil && strings.TrimSpace(err.Error()) != "" {
-		message = strings.ToValidUTF8(err.Error(), "\uFFFD")
+	const fallback = "render action failed"
+	if err == nil {
+		return fallback
 	}
+	trimmed := strings.TrimSpace(err.Error())
+	if trimmed == "" {
+		return fallback
+	}
+	message := strings.ToValidUTF8(trimmed, "\uFFFD")
 	if len(message) <= maxDiagnosticMessageBytes {
 		return message
 	}
-	message = message[:maxDiagnosticMessageBytes]
+	message = message[:maxDiagnosticMessageBytes-len("...")]
 	for !utf8.ValidString(message) {
 		message = message[:len(message)-1]
+	}
+	message = strings.TrimSpace(message)
+	if message == "" {
+		return fallback
 	}
 	return message + "..."
 }
@@ -361,4 +403,13 @@ func safeRenderFrame(ctx context.Context, backend renderapi.ExactFrameBackend, r
 		}
 	}()
 	return backend.RenderFrame(ctx, request, nil)
+}
+
+func safeRecord(ctx context.Context, recorder Recorder, projectID string, plan videoedit.RenderPlan, manifest renderapi.ExecutionManifest) (returnErr error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			returnErr = fmt.Errorf("renderexec: prepared recorder panic: %v", recovered)
+		}
+	}()
+	return recorder.RecordPrepared(ctx, projectID, plan, manifest)
 }
