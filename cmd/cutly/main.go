@@ -319,7 +319,7 @@ func writeUsage(writer io.Writer) {
 
 Project actions: inspect, status, history, capabilities
 Edit actions:    plan, apply, discard, revert
-Render actions:  prepare, preflight, frame, render, status, cancel
+Render actions:  plan, prepare, preflight, frame, render, status, cancel
 
 Exit codes: 0 success, 1 transport/input failure, 2 usage, 3 business rejection.
 `)

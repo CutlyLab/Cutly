@@ -34,6 +34,17 @@ func TestTypedAgentActionsBuildExactPayloads(t *testing.T) {
 		ID: "tx", IdempotencyKey: "key", ExpectedRevision: 7,
 		Operations: []OperationV1{{ID: "delete", Kind: OperationDeleteV1, ClipID: "clip"}},
 	}
+	renderRange := TimeRange{
+		Start: RationalTime{Value: 0, Rate: 1}, Duration: RationalTime{Value: 1, Rate: 1},
+	}
+	renderTarget := RenderTargetV3{
+		TimelineID: "timeline", Width: 64, Height: 64,
+		FrameClock: FrameClock{
+			Origin: RationalTime{Value: 0, Rate: 1}, FramesPerSecond: RationalTime{Value: 30, Rate: 1},
+		},
+		SampleClock: SampleClock{Origin: RationalTime{Value: 0, Rate: 1}, SamplesPerSecond: 48_000},
+		Channels:    2, PixelFormat: "yuv420p", ColorSpace: "bt709",
+	}
 	calls := []func() (Result, error){
 		func() (Result, error) { return client.InspectProject(context.Background(), "r1", "project") },
 		func() (Result, error) { return client.ProjectStatus(context.Background(), "r2", "project") },
@@ -43,22 +54,25 @@ func TestTypedAgentActionsBuildExactPayloads(t *testing.T) {
 		func() (Result, error) { return client.DiscardEditV1(context.Background(), "r6", "project", "tx") },
 		func() (Result, error) { return client.RevertEditV1(context.Background(), "r7", "project", "tx", 8) },
 		func() (Result, error) {
+			return client.RenderPlan(context.Background(), "r8", "project", renderRange, renderTarget)
+		},
+		func() (Result, error) {
 			seed := int64(42)
-			return client.PrepareRender(context.Background(), "r8", "project", RenderPlanV3{}, []RenderPrepareResourceV1{{
+			return client.PrepareRender(context.Background(), "r9", "project", RenderPlanV3{}, []RenderPrepareResourceV1{{
 				AssetID: "asset", Locator: "/media/asset.mov",
 			}}, &seed)
 		},
 		func() (Result, error) {
-			return client.PreflightRender(context.Background(), "r9", "project", RenderPlanV3{}, ExecutionManifestV1{})
+			return client.PreflightRender(context.Background(), "r10", "project", RenderPlanV3{}, ExecutionManifestV1{})
 		},
 		func() (Result, error) {
-			return client.RenderFrame(context.Background(), "r10", "project", RenderPlanV3{}, ExecutionManifestV1{}, ExactFrameRequestV1{})
+			return client.RenderFrame(context.Background(), "r11", "project", RenderPlanV3{}, ExecutionManifestV1{}, ExactFrameRequestV1{})
 		},
 		func() (Result, error) {
-			return client.SubmitRender(context.Background(), "r11", "project", RenderJobV1{})
+			return client.SubmitRender(context.Background(), "r12", "project", RenderJobV1{})
 		},
-		func() (Result, error) { return client.RenderStatus(context.Background(), "r12", "project", "job") },
-		func() (Result, error) { return client.CancelRender(context.Background(), "r13", "project", "job") },
+		func() (Result, error) { return client.RenderStatus(context.Background(), "r13", "project", "job") },
+		func() (Result, error) { return client.CancelRender(context.Background(), "r14", "project", "job") },
 	}
 	for index, call := range calls {
 		if _, err := call(); err != nil {
@@ -74,6 +88,13 @@ func TestTypedAgentActionsBuildExactPayloads(t *testing.T) {
 	if got := string(requests[4].Payload); got != `{"expected_revision":7,"transaction_id":"tx"}` {
 		t.Fatalf("apply payload = %s", got)
 	}
+	wantPlan, err := canonicaljson.Marshal(renderPlanPayload{Range: renderRange, Target: renderTarget})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(requests[7].Payload); got != string(wantPlan) {
+		t.Fatalf("render plan payload = %s, want %s", got, wantPlan)
+	}
 	wantPrepare, err := canonicaljson.Marshal(renderPreparePayload{
 		Plan: RenderPlanV3{}, Resources: []RenderPrepareResourceV1{{AssetID: "asset", Locator: "/media/asset.mov"}},
 		DeterministicSeed: func() *int64 { value := int64(42); return &value }(),
@@ -81,28 +102,28 @@ func TestTypedAgentActionsBuildExactPayloads(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := string(requests[7].Payload); got != string(wantPrepare) {
+	if got := string(requests[8].Payload); got != string(wantPrepare) {
 		t.Fatalf("prepare payload = %s, want %s", got, wantPrepare)
 	}
 	wantPreflight, err := canonicaljson.Marshal(renderPreflightPayload{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := string(requests[8].Payload); got != string(wantPreflight) {
+	if got := string(requests[9].Payload); got != string(wantPreflight) {
 		t.Fatalf("preflight payload = %s, want %s", got, wantPreflight)
 	}
 	wantFrame, err := canonicaljson.Marshal(renderFramePayload{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := string(requests[9].Payload); got != string(wantFrame) {
+	if got := string(requests[10].Payload); got != string(wantFrame) {
 		t.Fatalf("frame payload = %s, want %s", got, wantFrame)
 	}
 	wantRender, err := canonicaljson.Marshal(renderPayload{Job: RenderJobV1{}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := string(requests[10].Payload); got != string(wantRender) {
+	if got := string(requests[11].Payload); got != string(wantRender) {
 		t.Fatalf("render payload = %s, want %s", got, wantRender)
 	}
 }
@@ -156,6 +177,37 @@ func TestProjectReceiptDecoders(t *testing.T) {
 
 func TestRenderReceiptDecoders(t *testing.T) {
 	plan, manifest, resources := renderPrepareSDKFixture(t)
+	planRaw, err := canonicaljson.Marshal(RenderPlanReceiptV1{
+		Profile: RenderPlanReceiptProfileV1, Plan: plan,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	planned, err := DecodeRenderPlanReceipt(planRaw)
+	if err != nil || planned.Plan.Fingerprint != plan.Fingerprint ||
+		ValidateRenderPlanReceipt(planned, plan.RequestedRange, plan.Target) != nil {
+		t.Fatalf("plan = %+v, decode=%v validate=%v", planned, err, ValidateRenderPlanReceipt(planned, plan.RequestedRange, plan.Target))
+	}
+	autoTarget := plan.Target
+	autoTarget.TimelineID = ""
+	if err := ValidateRenderPlanReceipt(planned, plan.RequestedRange, autoTarget); err != nil {
+		t.Fatalf("plan rejected host-selected timeline: %v", err)
+	}
+	wrongTarget := plan.Target
+	wrongTarget.Width++
+	if err := ValidateRenderPlanReceipt(planned, plan.RequestedRange, wrongTarget); !errors.Is(err, ErrReceiptInvalid) {
+		t.Fatalf("plan accepted wrong target: %v", err)
+	}
+	badPlan := planned
+	badPlan.Plan.Fingerprint = digestString('0')
+	badPlanRaw, err := canonicaljson.Marshal(badPlan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := DecodeRenderPlanReceipt(badPlanRaw); !errors.Is(err, ErrReceiptInvalid) {
+		t.Fatalf("plan accepted invalid fingerprint: %v", err)
+	}
+
 	prepareRaw, err := canonicaljson.Marshal(RenderPrepareReceiptV1{
 		Profile: RenderPrepareReceiptProfileV1, ExecutionManifest: manifest,
 	})

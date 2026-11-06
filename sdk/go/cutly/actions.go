@@ -116,6 +116,11 @@ type renderPayload struct {
 	Job RenderJobV1 `json:"job"`
 }
 
+type renderPlanPayload struct {
+	Range  TimeRange      `json:"range"`
+	Target RenderTargetV3 `json:"target"`
+}
+
 // RenderPrepareResourceV1 binds one immutable plan resource to a host-local
 // file. Backend, runtime and output choices are deliberately absent: cutlyd
 // observes and freezes those trusted values.
@@ -143,6 +148,13 @@ type renderFramePayload struct {
 
 type jobPayload struct {
 	JobID string `json:"job_id"`
+}
+
+const RenderPlanReceiptProfileV1 = "cutly.agent-render-plan.v1"
+
+type RenderPlanReceiptV1 struct {
+	Profile string       `json:"profile"`
+	Plan    RenderPlanV3 `json:"plan"`
 }
 
 const RenderPrepareReceiptProfileV1 = "cutly.agent-render-prepare.v1"
@@ -203,6 +215,19 @@ func (client *Client) RevertEditV1(
 ) (Result, error) {
 	return client.Invoke(ctx, requestID, ToolEdit, "revert", projectID, revisionPayload{
 		TransactionID: transactionID, ExpectedRevision: expectedRevision,
+	})
+}
+
+// RenderPlan compiles the current durable project snapshot into the frozen,
+// backend-neutral plan consumed by prepare, preview, and export.
+func (client *Client) RenderPlan(
+	ctx context.Context,
+	requestID, projectID string,
+	renderRange TimeRange,
+	target RenderTargetV3,
+) (Result, error) {
+	return client.Invoke(ctx, requestID, ToolRender, "plan", projectID, renderPlanPayload{
+		Range: renderRange, Target: target,
 	})
 }
 
@@ -298,6 +323,51 @@ func DecodeProjectMutationReceipt(raw json.RawMessage) (ProjectMutationReceiptV1
 		return ProjectMutationReceiptV1{}, err
 	}
 	return receipt, nil
+}
+
+func DecodeRenderPlanReceipt(raw json.RawMessage) (RenderPlanReceiptV1, error) {
+	var receipt RenderPlanReceiptV1
+	if err := decodeReceipt(raw, RenderPlanReceiptProfileV1, &receipt, func() string { return receipt.Profile }); err != nil {
+		return RenderPlanReceiptV1{}, err
+	}
+	encoded, err := canonicaljson.Marshal(receipt.Plan)
+	if err != nil {
+		return RenderPlanReceiptV1{}, fmt.Errorf("%w: render plan encode: %v", ErrReceiptInvalid, err)
+	}
+	verified, err := videoedit.DecodeRenderPlan(encoded)
+	if err != nil {
+		return RenderPlanReceiptV1{}, fmt.Errorf("%w: render plan: %v", ErrReceiptInvalid, err)
+	}
+	receipt.Plan = verified
+	return receipt, nil
+}
+
+func ValidateRenderPlanReceipt(
+	receipt RenderPlanReceiptV1,
+	renderRange TimeRange,
+	target RenderTargetV3,
+) error {
+	if receipt.Profile != RenderPlanReceiptProfileV1 || receipt.Plan.RequestedRange != renderRange {
+		return fmt.Errorf("%w: render plan receipt binding", ErrReceiptInvalid)
+	}
+	wantedTarget := target
+	// An empty timeline identity asks the host to select the document's sole
+	// timeline. Resolve freezes that selected identity into the returned plan.
+	if wantedTarget.TimelineID == "" {
+		wantedTarget.TimelineID = receipt.Plan.Target.TimelineID
+	}
+	if receipt.Plan.Target != wantedTarget {
+		return fmt.Errorf("%w: render plan target binding", ErrReceiptInvalid)
+	}
+	encoded, err := canonicaljson.Marshal(receipt.Plan)
+	if err != nil {
+		return fmt.Errorf("%w: render plan encode: %v", ErrReceiptInvalid, err)
+	}
+	verified, err := videoedit.DecodeRenderPlan(encoded)
+	if err != nil || !reflect.DeepEqual(verified, receipt.Plan) {
+		return fmt.Errorf("%w: render plan is not frozen: %v", ErrReceiptInvalid, err)
+	}
+	return nil
 }
 
 func DecodeRenderPrepareReceipt(raw json.RawMessage) (RenderPrepareReceiptV1, error) {

@@ -352,7 +352,7 @@ export declare function selectionPrimitive(input?: {
 export type AgentTool = "cutly_project" | "cutly_edit" | "cutly_render";
 export type ProjectAction = "inspect" | "status" | "history" | "capabilities";
 export type EditAction = "plan" | "apply" | "discard" | "revert";
-export type RenderAction = "prepare" | "preflight" | "frame" | "render" | "status" | "cancel";
+export type RenderAction = "plan" | "prepare" | "preflight" | "frame" | "render" | "status" | "cancel";
 export type AgentAction = ProjectAction | EditAction | RenderAction;
 
 export interface AgentRequestInput {
@@ -469,6 +469,11 @@ export interface AgentJobAction extends AgentActionIdentity {
   jobId: string;
 }
 
+export interface RenderPlanReceiptV1 {
+  readonly profile: "cutly.agent-render-plan.v1";
+  readonly plan: Readonly<Record<string, CanonicalJSONValue>>;
+}
+
 export interface RenderPrepareResource {
   assetId: string;
   locator: string;
@@ -542,6 +547,10 @@ export declare class CutlyClient {
   applyEdit(input: AgentRevisionAction, options?: { signal?: AbortSignal }): Promise<AgentResult>;
   discardEdit(input: AgentTransactionAction, options?: { signal?: AbortSignal }): Promise<AgentResult>;
   revertEdit(input: AgentRevisionAction, options?: { signal?: AbortSignal }): Promise<AgentResult>;
+  planRender(input: AgentActionIdentity & {
+    range: Readonly<Record<string, CanonicalJSONInput>>;
+    target: Readonly<Record<string, CanonicalJSONInput>>;
+  }, options?: { signal?: AbortSignal }): Promise<AgentResult>;
   prepareRender(input: AgentActionIdentity & {
     plan: Readonly<Record<string, CanonicalJSONInput>>;
     resources: readonly RenderPrepareResource[];
