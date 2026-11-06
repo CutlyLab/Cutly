@@ -70,6 +70,10 @@ test("typed client actions build exact project, edit and render payloads", async
   await client.applyEdit({ requestId: "apply", projectId: "project", transactionId: "tx", expectedRevision: 7n });
   await client.discardEdit({ requestId: "discard", projectId: "project", transactionId: "tx" });
   await client.revertEdit({ requestId: "revert", projectId: "project", transactionId: "tx", expectedRevision: 8n });
+  await client.prepareRender({
+    requestId: "prepare", projectId: "project", plan: { fingerprint: "plan" },
+    resources: [{ assetId: "video", locator: "/media/video.mp4" }], deterministicSeed: 73n,
+  });
   await client.preflightRender({
     requestId: "preflight", projectId: "project",
     plan: { fingerprint: "plan" }, executionManifest: { fingerprint: "manifest" },
@@ -84,14 +88,30 @@ test("typed client actions build exact project, edit and render payloads", async
   await client.cancelRender({ requestId: "cancel", projectId: "project", jobId: "job" });
 
   assert.deepEqual(observed.map((request) => request.action), [
-    "inspect", "history", "plan", "apply", "discard", "revert", "preflight", "frame", "render", "status", "cancel",
+    "inspect", "history", "plan", "apply", "discard", "revert", "prepare", "preflight", "frame", "render", "status", "cancel",
   ]);
   assert.deepEqual(observed[1].payload, Object.assign(Object.create(null), { after_sequence: 4n, limit: 10n }));
   assert.equal(observed[3].payload.expected_revision, 7n);
-  assert.equal(observed[6].payload.execution_manifest.fingerprint, "manifest");
-  assert.equal(observed[7].payload.frame.id, "frame-1");
-  assert.equal(observed[8].payload.job.id, "job");
-  assert.equal(observed[10].payload.job_id, "job");
+  assert.equal(observed[6].payload.resources[0].asset_id, "video");
+  assert.equal(observed[6].payload.resources[0].locator, "/media/video.mp4");
+  assert.equal(observed[6].payload.deterministic_seed, 73n);
+  assert.equal(observed[7].payload.execution_manifest.fingerprint, "manifest");
+  assert.equal(observed[8].payload.frame.id, "frame-1");
+  assert.equal(observed[9].payload.job.id, "job");
+  assert.equal(observed[11].payload.job_id, "job");
+});
+
+test("prepareRender omits an absent deterministic seed", async () => {
+  let observed;
+  const client = new CutlyClient(async (raw) => {
+    observed = decodeCanonicalJSON(raw);
+    return encodeCanonicalValue(resultFor(observed));
+  });
+  await client.prepareRender({
+    requestId: "prepare-default", projectId: "project", plan: { fingerprint: "plan" }, resources: [],
+  });
+  assert.equal(Object.hasOwn(observed.payload, "deterministic_seed"), false);
+  assert.deepEqual(observed.payload.resources, []);
 });
 
 test("Agent request rejects invalid pairs, missing projects and fractional payloads", () => {

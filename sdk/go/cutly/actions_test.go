@@ -10,6 +10,7 @@ import (
 	agentprotocol "github.com/CutlyLab/Cutly/agent/protocol"
 	"github.com/CutlyLab/Cutly/core/videoedit"
 	"github.com/CutlyLab/Cutly/protocol/canonicaljson"
+	renderapi "github.com/CutlyLab/Cutly/render/api"
 )
 
 func TestTypedAgentActionsBuildExactPayloads(t *testing.T) {
@@ -42,16 +43,22 @@ func TestTypedAgentActionsBuildExactPayloads(t *testing.T) {
 		func() (Result, error) { return client.DiscardEditV1(context.Background(), "r6", "project", "tx") },
 		func() (Result, error) { return client.RevertEditV1(context.Background(), "r7", "project", "tx", 8) },
 		func() (Result, error) {
-			return client.PreflightRender(context.Background(), "r8", "project", RenderPlanV3{}, ExecutionManifestV1{})
+			seed := int64(42)
+			return client.PrepareRender(context.Background(), "r8", "project", RenderPlanV3{}, []RenderPrepareResourceV1{{
+				AssetID: "asset", Locator: "/media/asset.mov",
+			}}, &seed)
 		},
 		func() (Result, error) {
-			return client.RenderFrame(context.Background(), "r9", "project", RenderPlanV3{}, ExecutionManifestV1{}, ExactFrameRequestV1{})
+			return client.PreflightRender(context.Background(), "r9", "project", RenderPlanV3{}, ExecutionManifestV1{})
 		},
 		func() (Result, error) {
-			return client.SubmitRender(context.Background(), "r10", "project", RenderJobV1{})
+			return client.RenderFrame(context.Background(), "r10", "project", RenderPlanV3{}, ExecutionManifestV1{}, ExactFrameRequestV1{})
 		},
-		func() (Result, error) { return client.RenderStatus(context.Background(), "r11", "project", "job") },
-		func() (Result, error) { return client.CancelRender(context.Background(), "r12", "project", "job") },
+		func() (Result, error) {
+			return client.SubmitRender(context.Background(), "r11", "project", RenderJobV1{})
+		},
+		func() (Result, error) { return client.RenderStatus(context.Background(), "r12", "project", "job") },
+		func() (Result, error) { return client.CancelRender(context.Background(), "r13", "project", "job") },
 	}
 	for index, call := range calls {
 		if _, err := call(); err != nil {
@@ -67,25 +74,35 @@ func TestTypedAgentActionsBuildExactPayloads(t *testing.T) {
 	if got := string(requests[4].Payload); got != `{"expected_revision":7,"transaction_id":"tx"}` {
 		t.Fatalf("apply payload = %s", got)
 	}
+	wantPrepare, err := canonicaljson.Marshal(renderPreparePayload{
+		Plan: RenderPlanV3{}, Resources: []RenderPrepareResourceV1{{AssetID: "asset", Locator: "/media/asset.mov"}},
+		DeterministicSeed: func() *int64 { value := int64(42); return &value }(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(requests[7].Payload); got != string(wantPrepare) {
+		t.Fatalf("prepare payload = %s, want %s", got, wantPrepare)
+	}
 	wantPreflight, err := canonicaljson.Marshal(renderPreflightPayload{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := string(requests[7].Payload); got != string(wantPreflight) {
+	if got := string(requests[8].Payload); got != string(wantPreflight) {
 		t.Fatalf("preflight payload = %s, want %s", got, wantPreflight)
 	}
 	wantFrame, err := canonicaljson.Marshal(renderFramePayload{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := string(requests[8].Payload); got != string(wantFrame) {
+	if got := string(requests[9].Payload); got != string(wantFrame) {
 		t.Fatalf("frame payload = %s, want %s", got, wantFrame)
 	}
 	wantRender, err := canonicaljson.Marshal(renderPayload{Job: RenderJobV1{}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := string(requests[9].Payload); got != string(wantRender) {
+	if got := string(requests[10].Payload); got != string(wantRender) {
 		t.Fatalf("render payload = %s, want %s", got, wantRender)
 	}
 }
@@ -138,6 +155,29 @@ func TestProjectReceiptDecoders(t *testing.T) {
 }
 
 func TestRenderReceiptDecoders(t *testing.T) {
+	plan, manifest, resources := renderPrepareSDKFixture(t)
+	prepareRaw, err := canonicaljson.Marshal(RenderPrepareReceiptV1{
+		Profile: RenderPrepareReceiptProfileV1, ExecutionManifest: manifest,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	prepared, err := DecodeRenderPrepareReceipt(prepareRaw)
+	seed := int64(7)
+	if err != nil || prepared.ExecutionManifest.Fingerprint != manifest.Fingerprint ||
+		ValidateRenderPrepareReceipt(prepared, plan, resources, &seed) != nil {
+		t.Fatalf("prepare = %+v, decode=%v validate=%v", prepared, err, ValidateRenderPrepareReceipt(prepared, plan, resources, &seed))
+	}
+	wrongResources := append([]RenderPrepareResourceV1(nil), resources...)
+	wrongResources[0].Locator = "/media/other.wav"
+	if err := ValidateRenderPrepareReceipt(prepared, plan, wrongResources, &seed); !errors.Is(err, ErrReceiptInvalid) {
+		t.Fatalf("prepare accepted replaced locator: %v", err)
+	}
+	wrongSeed := int64(8)
+	if err := ValidateRenderPrepareReceipt(prepared, plan, resources, &wrongSeed); !errors.Is(err, ErrReceiptInvalid) {
+		t.Fatalf("prepare accepted wrong seed: %v", err)
+	}
+
 	preflightRaw, err := canonicaljson.Marshal(RenderPreflightReceiptV1{
 		Profile:         "cutly.agent-render-preflight.v1",
 		PlanFingerprint: digestString('a'), ExecutionManifestFingerprint: digestString('b'),
@@ -172,6 +212,87 @@ func TestRenderReceiptDecoders(t *testing.T) {
 	if _, err := DecodeRenderPreflightReceipt(bad); !errors.Is(err, ErrReceiptInvalid) {
 		t.Fatalf("bad preflight = %v", err)
 	}
+}
+
+func TestPrepareRenderOmitsAbsentSeedAndOwnsEmptyResources(t *testing.T) {
+	var captured agentprotocol.Request
+	client, err := NewClient(TransportFunc(func(_ context.Context, raw []byte) ([]byte, error) {
+		decoded, decodeErr := agentprotocol.DecodeRequest(raw)
+		if decodeErr != nil {
+			return nil, decodeErr
+		}
+		captured = decoded
+		return agentprotocol.CanonicalResult(Result{
+			ProtocolVersion: ProtocolVersion, OK: true, RequestID: captured.RequestID,
+			Tool: captured.Tool, Action: captured.Action, ProjectID: captured.ProjectID, State: "prepared",
+			Diagnostics: []videoedit.Diagnostic{}, NextActions: []NextAction{},
+		})
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.PrepareRender(context.Background(), "prepare", "project", RenderPlanV3{}, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := string(captured.Payload); !strings.Contains(got, `"resources":[]`) || strings.Contains(got, "deterministic_seed") {
+		t.Fatalf("prepare payload = %s", got)
+	}
+}
+
+func renderPrepareSDKFixture(t *testing.T) (RenderPlanV3, ExecutionManifestV1, []RenderPrepareResourceV1) {
+	t.Helper()
+	zero := videoedit.RationalTime{Value: 0, Rate: 1}
+	one := videoedit.RationalTime{Value: 1, Rate: 1}
+	document := videoedit.Document{
+		SchemaVersion: videoedit.SchemaVersion, ID: "document", Revision: 1,
+		Assets: []videoedit.Asset{{
+			ID: "audio", Kind: videoedit.AssetKindAudio, URI: "audio.wav", ContentHash: digestString('a'), Duration: &one,
+		}},
+		Timelines: []videoedit.Timeline{{ID: "timeline", Tracks: []videoedit.Track{{
+			ID: "audio-track", Kind: videoedit.TrackKindAudio, Clips: []videoedit.Clip{{
+				ID: "audio-clip", AssetID: "audio", TimelineRange: videoedit.TimeRange{Start: zero, Duration: one},
+				SourceRange: videoedit.TimeRange{Start: zero, Duration: one},
+			}},
+		}}}},
+	}
+	plan, diagnostics := videoedit.Resolve(document, videoedit.TimeRange{Start: zero, Duration: one}, videoedit.RenderTarget{
+		TimelineID: "timeline", Width: 64, Height: 64,
+		FrameClock:  videoedit.FrameClock{Origin: zero, FramesPerSecond: videoedit.RationalTime{Value: 30, Rate: 1}},
+		SampleClock: videoedit.SampleClock{Origin: zero, SamplesPerSecond: 48_000},
+		Channels:    2, PixelFormat: "yuv420p", ColorSpace: "bt709",
+	})
+	if videoedit.HasErrorDiagnostics(diagnostics) {
+		t.Fatalf("plan diagnostics = %+v", diagnostics)
+	}
+	capabilities := videoedit.BackendCapabilities{
+		BackendID: "cutly.ffmpeg-hardcut.v1", BuildFingerprint: digestString('b'),
+		TrackKinds: []videoedit.TrackKind{videoedit.TrackKindAudio},
+		AssetKinds: []videoedit.AssetKind{videoedit.AssetKindAudio}, MaxWidth: 8192, MaxHeight: 8192,
+	}
+	manifest, err := renderapi.FreezeExecutionManifest(plan, renderapi.ExecutionManifest{
+		CompilerBuild: digestString('c'), EvaluatorBuild: digestString('d'),
+		Resources: []renderapi.MaterializedResource{{
+			AssetID: "audio", Kind: videoedit.AssetKindAudio, ContentHash: digestString('a'), SizeBytes: 10,
+			LocatorScheme: renderapi.LocatorFile, Locator: "/media/audio.wav", ProbeFingerprint: digestString('f'),
+		}},
+		Backend: capabilities,
+		MediaRuntime: renderapi.MediaRuntime{
+			FFmpegBuild: digestString('e'), DecoderProfile: "ffmpeg-hardcut-v1",
+			EncoderProfile: "libx264-aac-mp4.v1", ColorProfile: "cutly.bt709.v1",
+		},
+		Output: renderapi.OutputSpec{
+			ReferenceProfile: "cutly.hardcut.bt709.v1", Format: "mp4", Width: 64, Height: 64,
+			PixelFormat: "yuv420p", ColorSpace: "bt709", VideoCodec: "h264", AudioCodec: "aac",
+			SampleRate: 48_000, Channels: 2, DecodedVideoProfile: renderapi.DecodedVideoProfileRGBA8V1,
+			DecodedAudioProfile: renderapi.DecodedAudioProfilePCM16LEV1,
+		},
+		DeterministicSeed: 7,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resources := []RenderPrepareResourceV1{{AssetID: "audio", Locator: "/media/audio.wav"}}
+	return plan, manifest, resources
 }
 
 func digestString(fill byte) string {

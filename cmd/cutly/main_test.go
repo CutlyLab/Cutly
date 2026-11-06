@@ -94,6 +94,16 @@ func TestTransportFactoryFailure(t *testing.T) {
 	}
 }
 
+func TestUsageAdvertisesRenderPrepare(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if code := run(context.Background(), []string{"help"}, strings.NewReader(""), &stdout, &stderr, nil); code != 0 {
+		t.Fatalf("help code = %d, stderr=%q", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "Render actions:  prepare, preflight") {
+		t.Fatalf("help does not advertise prepare: %q", stdout.String())
+	}
+}
+
 func validCLIResult(requestID string) agentprotocol.Result {
 	return agentprotocol.Result{
 		ProtocolVersion: agentprotocol.ProtocolVersion,

@@ -19,7 +19,7 @@ const MAX_LIST_ITEMS = 4096;
 const ACTIONS = Object.freeze({
   cutly_project: Object.freeze(new Set(["inspect", "status", "history", "capabilities"])),
   cutly_edit: Object.freeze(new Set(["plan", "apply", "discard", "revert"])),
-  cutly_render: Object.freeze(new Set(["preflight", "frame", "render", "status", "cancel"])),
+  cutly_render: Object.freeze(new Set(["prepare", "preflight", "frame", "render", "status", "cancel"])),
 });
 
 const textEncoder = new TextEncoder();
@@ -150,6 +150,17 @@ export class CutlyClient {
     return this.callAction({
       requestId, projectId, tool: "cutly_edit", action: "revert",
       payload: { transaction_id: transactionId, expected_revision: expectedRevision },
+    }, options);
+  }
+
+  prepareRender({ requestId, projectId, plan, resources, deterministicSeed }, options) {
+    return this.callAction({
+      requestId, projectId, tool: "cutly_render", action: "prepare",
+      payload: {
+        plan,
+        resources: resources.map(({ assetId, locator }) => ({ asset_id: assetId, locator })),
+        ...(deterministicSeed === undefined ? {} : { deterministic_seed: deterministicSeed }),
+      },
     }, options);
   }
 

@@ -116,6 +116,20 @@ type renderPayload struct {
 	Job RenderJobV1 `json:"job"`
 }
 
+// RenderPrepareResourceV1 binds one immutable plan resource to a host-local
+// file. Backend, runtime and output choices are deliberately absent: cutlyd
+// observes and freezes those trusted values.
+type RenderPrepareResourceV1 struct {
+	AssetID videoedit.ID `json:"asset_id"`
+	Locator string       `json:"locator"`
+}
+
+type renderPreparePayload struct {
+	Plan              RenderPlanV3              `json:"plan"`
+	Resources         []RenderPrepareResourceV1 `json:"resources"`
+	DeterministicSeed *int64                    `json:"deterministic_seed,omitempty"`
+}
+
 type renderPreflightPayload struct {
 	Plan              RenderPlanV3        `json:"plan"`
 	ExecutionManifest ExecutionManifestV1 `json:"execution_manifest"`
@@ -129,6 +143,13 @@ type renderFramePayload struct {
 
 type jobPayload struct {
 	JobID string `json:"job_id"`
+}
+
+const RenderPrepareReceiptProfileV1 = "cutly.agent-render-prepare.v1"
+
+type RenderPrepareReceiptV1 struct {
+	Profile           string              `json:"profile"`
+	ExecutionManifest ExecutionManifestV1 `json:"execution_manifest"`
 }
 
 type RenderPreflightReceiptV1 struct {
@@ -182,6 +203,27 @@ func (client *Client) RevertEditV1(
 ) (Result, error) {
 	return client.Invoke(ctx, requestID, ToolEdit, "revert", projectID, revisionPayload{
 		TransactionID: transactionID, ExpectedRevision: expectedRevision,
+	})
+}
+
+// PrepareRender asks the trusted host to probe the supplied local resources
+// and freeze the environment-specific ExecutionManifest. A nil seed omits the
+// wire field and has the protocol-defined value zero.
+func (client *Client) PrepareRender(
+	ctx context.Context,
+	requestID, projectID string,
+	plan RenderPlanV3,
+	resources []RenderPrepareResourceV1,
+	deterministicSeed *int64,
+) (Result, error) {
+	ownedResources := append([]RenderPrepareResourceV1{}, resources...)
+	var ownedSeed *int64
+	if deterministicSeed != nil {
+		seed := *deterministicSeed
+		ownedSeed = &seed
+	}
+	return client.Invoke(ctx, requestID, ToolRender, "prepare", projectID, renderPreparePayload{
+		Plan: plan, Resources: ownedResources, DeterministicSeed: ownedSeed,
 	})
 }
 
@@ -256,6 +298,77 @@ func DecodeProjectMutationReceipt(raw json.RawMessage) (ProjectMutationReceiptV1
 		return ProjectMutationReceiptV1{}, err
 	}
 	return receipt, nil
+}
+
+func DecodeRenderPrepareReceipt(raw json.RawMessage) (RenderPrepareReceiptV1, error) {
+	var receipt RenderPrepareReceiptV1
+	if err := decodeReceipt(raw, RenderPrepareReceiptProfileV1, &receipt, func() string { return receipt.Profile }); err != nil {
+		return RenderPrepareReceiptV1{}, err
+	}
+	encoded, err := canonicaljson.Marshal(receipt.ExecutionManifest)
+	if err != nil {
+		return RenderPrepareReceiptV1{}, fmt.Errorf("%w: execution manifest encode: %v", ErrReceiptInvalid, err)
+	}
+	verified, err := renderapi.DecodeExecutionManifest(encoded)
+	if err != nil {
+		return RenderPrepareReceiptV1{}, fmt.Errorf("%w: execution manifest: %v", ErrReceiptInvalid, err)
+	}
+	receipt.ExecutionManifest = verified
+	return receipt, nil
+}
+
+func ValidateRenderPrepareReceipt(
+	receipt RenderPrepareReceiptV1,
+	plan RenderPlanV3,
+	resources []RenderPrepareResourceV1,
+	deterministicSeed *int64,
+) error {
+	if receipt.Profile != RenderPrepareReceiptProfileV1 {
+		return fmt.Errorf("%w: prepare receipt profile", ErrReceiptInvalid)
+	}
+	expectedSeed := int64(0)
+	if deterministicSeed != nil {
+		expectedSeed = *deterministicSeed
+	}
+	if receipt.ExecutionManifest.DeterministicSeed != expectedSeed {
+		return fmt.Errorf("%w: prepare deterministic seed binding", ErrReceiptInvalid)
+	}
+	refrozen, err := renderapi.FreezeExecutionManifest(plan, receipt.ExecutionManifest)
+	var suppliedManifest, refrozenManifest []byte
+	if err == nil {
+		suppliedManifest, err = canonicaljson.Marshal(receipt.ExecutionManifest)
+	}
+	if err == nil {
+		refrozenManifest, err = canonicaljson.Marshal(refrozen)
+	}
+	if err != nil || !bytes.Equal(suppliedManifest, refrozenManifest) {
+		return fmt.Errorf("%w: prepare plan/manifest binding: %v", ErrReceiptInvalid, err)
+	}
+
+	wanted := make(map[videoedit.ID]string, len(resources))
+	for _, resource := range resources {
+		if resource.AssetID == "" || resource.Locator == "" {
+			return fmt.Errorf("%w: prepare resource binding is incomplete", ErrReceiptInvalid)
+		}
+		if _, duplicate := wanted[resource.AssetID]; duplicate {
+			return fmt.Errorf("%w: duplicate prepare resource binding", ErrReceiptInvalid)
+		}
+		wanted[resource.AssetID] = resource.Locator
+	}
+	if len(wanted) != len(receipt.ExecutionManifest.Resources) {
+		return fmt.Errorf("%w: prepare resource binding count", ErrReceiptInvalid)
+	}
+	for _, materialized := range receipt.ExecutionManifest.Resources {
+		locator, exists := wanted[materialized.AssetID]
+		if !exists || materialized.LocatorScheme != renderapi.LocatorFile || materialized.Locator != locator {
+			return fmt.Errorf("%w: prepare resource binding", ErrReceiptInvalid)
+		}
+		delete(wanted, materialized.AssetID)
+	}
+	if len(wanted) != 0 {
+		return fmt.Errorf("%w: prepare resource binding is incomplete", ErrReceiptInvalid)
+	}
+	return nil
 }
 
 func DecodeRenderPreflightReceipt(raw json.RawMessage) (RenderPreflightReceiptV1, error) {
