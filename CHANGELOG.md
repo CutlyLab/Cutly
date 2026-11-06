@@ -14,8 +14,10 @@ within their declared version.
 - Added host-owned render planning and preparation, fresh media probing, and
   strict project, runtime, backend, and output identity binding.
 - Added public Go and TypeScript SDKs, the `cutly` CLI, `cutlyd`, headless
-  player/timeline primitives, and local project initialization.
-- Added Linux/macOS runtime gates, portable build checks, npm package smoke
-  tests, checksummed release archives, and build provenance.
+  player/timeline primitives, the exact-frame Agent preview adapter, local
+  project initialization, and caller-bound Go/TypeScript receipt validators.
+- Added standalone target-repository CI, Linux/macOS runtime gates, portable
+  build checks, npm package smoke tests, Apache-2.0 package alignment,
+  checksummed release archives, and build provenance.
 
 See [KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md) before integrating the RC.
