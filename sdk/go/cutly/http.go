@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	agentprotocol "github.com/CutlyLab/Cutly/agent/protocol"
+	"github.com/CutlyLab/Cutly/protocol/canonicaljson"
 )
 
 const AgentMediaType = agentprotocol.MediaType
@@ -50,7 +51,7 @@ func (transport *HTTPTransport) RoundTrip(ctx context.Context, canonicalRequest 
 	if err != nil {
 		return nil, err
 	}
-	request.Header.Set("Content-Type", AgentMediaType+"; profile=\"cutly.json.canonical-integer.v1\"")
+	request.Header.Set("Content-Type", AgentMediaType+"; profile=\""+canonicaljson.Profile+"\"")
 	request.Header.Set("Accept", AgentMediaType+", application/json")
 	response, err := transport.client.Do(request)
 	if err != nil {
@@ -69,8 +70,7 @@ func (transport *HTTPTransport) RoundTrip(ctx context.Context, canonicalRequest 
 	if response.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("HTTP status %d: %s", response.StatusCode, boundedStatusText(body, response.StatusCode))
 	}
-	contentType := strings.ToLower(response.Header.Get("Content-Type"))
-	if contentType != "" && !strings.HasPrefix(contentType, AgentMediaType) && !strings.HasPrefix(contentType, "application/json") {
+	if !agentprotocol.ValidContentType(response.Header.Get("Content-Type")) {
 		return nil, fmt.Errorf("unexpected Content-Type %q", response.Header.Get("Content-Type"))
 	}
 	return append([]byte(nil), body...), nil

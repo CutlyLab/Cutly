@@ -84,6 +84,34 @@ var actions = map[Tool]map[string]struct{}{
 	ToolRender:  actionSet("preflight", "frame", "render", "status", "cancel"),
 }
 
+// ValidContentType reports whether value names an Agent JSON representation.
+// The only permitted parameter is one optional, literal profile parameter for
+// the canonical integer JSON profile. Raw-form checks intentionally reject
+// duplicate parameters, trailing semicolons and RFC 2231 extended parameter
+// spellings so every Cutly transport implements the same narrow contract.
+func ValidContentType(value string) bool {
+	parts := strings.Split(value, ";")
+	if len(parts) < 1 || len(parts) > 2 {
+		return false
+	}
+	mediaType := strings.ToLower(strings.TrimSpace(parts[0]))
+	if mediaType != MediaType && mediaType != "application/json" {
+		return false
+	}
+	if len(parts) == 2 {
+		parameter := strings.TrimSpace(parts[1])
+		equals := strings.IndexByte(parameter, '=')
+		if equals < 0 || !strings.EqualFold(strings.TrimSpace(parameter[:equals]), "profile") {
+			return false
+		}
+		profile := strings.TrimSpace(parameter[equals+1:])
+		if profile != canonicaljson.Profile && profile != `"`+canonicaljson.Profile+`"` {
+			return false
+		}
+	}
+	return true
+}
+
 func DecodeRequest(raw []byte) (Request, error) {
 	if len(raw) == 0 || len(raw) > MaxRequestBytes {
 		return Request{}, fmt.Errorf("%w: encoded length %d", ErrRequestInvalid, len(raw))

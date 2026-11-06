@@ -128,6 +128,42 @@ test("HTTP Agent transport is bounded, canonical and redirect-safe", async () =>
   assert.throws(() => new HTTPAgentTransport("https://user@example.invalid/", { fetch }), /ENDPOINT_INVALID/);
 });
 
+test("HTTP Agent transport accepts only protocol JSON content types", async () => {
+  const request = createAgentRequest({ requestId: "r", tool: "cutly_project", action: "capabilities" });
+  const body = encodeCanonicalValue(resultFor(request));
+  for (const contentType of [
+    AGENT_MEDIA_TYPE,
+    `${AGENT_MEDIA_TYPE}; profile=\"cutly.json.canonical-integer.v1\"`,
+    "Application/JSON; PROFILE=cutly.json.canonical-integer.v1",
+  ]) {
+    const transport = new HTTPAgentTransport("https://example.invalid/v1/agent", {
+      fetch: async () => new Response(body, { status: 200, headers: { "Content-Type": contentType } }),
+    });
+    await assert.doesNotReject(() => transport.roundTrip(encodeCanonicalValue(request)));
+  }
+  for (const contentType of [
+    "",
+    "application/jsonp",
+    `${AGENT_MEDIA_TYPE}-evil`,
+    "text/json",
+    "application/json; charset=utf-8",
+    `${AGENT_MEDIA_TYPE}; profile=\"other\"`,
+    `${AGENT_MEDIA_TYPE}; profile=\"cutly.json.canonical-integer.v1\"; profile=\"cutly.json.canonical-integer.v1\"`,
+    `${AGENT_MEDIA_TYPE}; broken`,
+    "application/json;",
+    `${AGENT_MEDIA_TYPE}; profile*=UTF-8''cutly.json.canonical-integer.v1`,
+  ]) {
+    const transport = new HTTPAgentTransport("https://example.invalid/v1/agent", {
+      fetch: async () => new Response(body, { status: 200, headers: { "Content-Type": contentType } }),
+    });
+    await assert.rejects(
+      () => transport.roundTrip(encodeCanonicalValue(request)),
+      (error) => error instanceof AgentProtocolError && error.code === "AGENT.CONTENT_TYPE",
+      contentType,
+    );
+  }
+});
+
 test("Agent result rejects ok/error contradictions and unknown fields", async () => {
   const request = createAgentRequest({ requestId: "r", tool: "cutly_project", action: "capabilities" });
   const invalid = new CutlyClient(async (raw) => {

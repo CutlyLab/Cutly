@@ -63,6 +63,34 @@ func TestHTTPTransportRejectsRedirectAndInvalidEndpoint(t *testing.T) {
 	}
 }
 
+func TestHTTPTransportAcceptsOnlyAgentJSONContentTypes(t *testing.T) {
+	tests := []struct {
+		contentType string
+		valid       bool
+	}{
+		{contentType: AgentMediaType, valid: true},
+		{contentType: AgentMediaType + `; profile="cutly.json.canonical-integer.v1"`, valid: true},
+		{contentType: `Application/JSON; PROFILE=cutly.json.canonical-integer.v1`, valid: true},
+		{contentType: "", valid: false},
+		{contentType: "application/jsonp", valid: false},
+		{contentType: AgentMediaType + "-evil", valid: false},
+		{contentType: "text/json", valid: false},
+		{contentType: "application/json; charset=utf-8", valid: false},
+		{contentType: AgentMediaType + `; profile="other"`, valid: false},
+		{contentType: AgentMediaType + `; profile="cutly.json.canonical-integer.v1"; profile="cutly.json.canonical-integer.v1"`, valid: false},
+		{contentType: AgentMediaType + "; broken", valid: false},
+		{contentType: "application/json;", valid: false},
+		{contentType: AgentMediaType + `; profile*=UTF-8''cutly.json.canonical-integer.v1`, valid: false},
+	}
+	for _, test := range tests {
+		t.Run(test.contentType, func(t *testing.T) {
+			if got := agentprotocol.ValidContentType(test.contentType); got != test.valid {
+				t.Fatalf("ValidContentType(%q) = %t, want %t", test.contentType, got, test.valid)
+			}
+		})
+	}
+}
+
 func mustReadRequest(t *testing.T, request *http.Request) []byte {
 	t.Helper()
 	defer request.Body.Close()

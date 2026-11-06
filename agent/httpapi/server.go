@@ -6,9 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"mime"
 	"net/http"
-	"strings"
 
 	agentprotocol "github.com/CutlyLab/Cutly/agent/protocol"
 	"github.com/CutlyLab/Cutly/protocol/canonicaljson"
@@ -44,7 +42,7 @@ func (server Server) ServeHTTP(writer http.ResponseWriter, request *http.Request
 		writeProblem(writer, http.StatusServiceUnavailable, "handler_unavailable")
 		return
 	}
-	if !validContentType(request.Header.Get("Content-Type")) {
+	if !agentprotocol.ValidContentType(request.Header.Get("Content-Type")) {
 		writeProblem(writer, http.StatusUnsupportedMediaType, "unsupported_media_type")
 		return
 	}
@@ -94,23 +92,6 @@ func correlate(request agentprotocol.Request, result agentprotocol.Result) error
 		return errors.New("project identity mismatch")
 	}
 	return nil
-}
-
-func validContentType(value string) bool {
-	mediaType, parameters, err := mime.ParseMediaType(value)
-	if err != nil {
-		return false
-	}
-	mediaType = strings.ToLower(mediaType)
-	if mediaType != agentprotocol.MediaType && mediaType != "application/json" {
-		return false
-	}
-	for name, value := range parameters {
-		if strings.ToLower(name) != "profile" || value != canonicaljson.Profile {
-			return false
-		}
-	}
-	return true
 }
 
 func writeProblem(writer http.ResponseWriter, status int, code string) {

@@ -91,6 +91,33 @@ func TestServerRejectsOversizedBeforeHandler(t *testing.T) {
 	}
 }
 
+func TestValidContentTypeRequiresTheAgentJSONContract(t *testing.T) {
+	tests := []struct {
+		contentType string
+		valid       bool
+	}{
+		{contentType: agentprotocol.MediaType, valid: true},
+		{contentType: agentprotocol.MediaType + `; profile="cutly.json.canonical-integer.v1"`, valid: true},
+		{contentType: `Application/JSON; PROFILE=cutly.json.canonical-integer.v1`, valid: true},
+		{contentType: "", valid: false},
+		{contentType: "application/jsonp", valid: false},
+		{contentType: agentprotocol.MediaType + "-evil", valid: false},
+		{contentType: "application/json; charset=utf-8", valid: false},
+		{contentType: agentprotocol.MediaType + `; profile="other"`, valid: false},
+		{contentType: agentprotocol.MediaType + `; profile="cutly.json.canonical-integer.v1"; profile="cutly.json.canonical-integer.v1"`, valid: false},
+		{contentType: agentprotocol.MediaType + "; broken", valid: false},
+		{contentType: "application/json;", valid: false},
+		{contentType: agentprotocol.MediaType + `; profile*=UTF-8''cutly.json.canonical-integer.v1`, valid: false},
+	}
+	for _, test := range tests {
+		t.Run(test.contentType, func(t *testing.T) {
+			if got := agentprotocol.ValidContentType(test.contentType); got != test.valid {
+				t.Fatalf("ValidContentType(%q) = %t, want %t", test.contentType, got, test.valid)
+			}
+		})
+	}
+}
+
 func inertHandler() Handler {
 	return HandlerFunc(func(context.Context, agentprotocol.Request) (agentprotocol.Result, error) {
 		panic("must not be called")

@@ -1,4 +1,5 @@
 import {
+  CANONICAL_JSON_PROFILE,
   canonicalizeJSON,
   decodeCanonicalJSON,
   encodeCanonicalValue,
@@ -212,7 +213,7 @@ export class HTTPAgentTransport {
     this.endpoint = parsed.href;
     this.#fetch = fetchImplementation;
     const normalizedHeaders = new Headers(headers);
-    normalizedHeaders.set("Content-Type", `${AGENT_MEDIA_TYPE}; profile=\"cutly.json.canonical-integer.v1\"`);
+    normalizedHeaders.set("Content-Type", `${AGENT_MEDIA_TYPE}; profile=\"${CANONICAL_JSON_PROFILE}\"`);
     normalizedHeaders.set("Accept", `${AGENT_MEDIA_TYPE}, application/json`);
     this.#headerEntries = Object.freeze([...normalizedHeaders.entries()].map((entry) => Object.freeze(entry)));
     this.maxResponseBytes = maxResponseBytes;
@@ -236,12 +237,26 @@ export class HTTPAgentTransport {
       const detail = new TextDecoder().decode(bytes.subarray(0, 1024)).trim();
       fail("AGENT.HTTP_STATUS", `HTTP ${response.status}${detail === "" ? "" : `: ${detail}`}`);
     }
-    const contentType = (response.headers.get("Content-Type") ?? "").toLowerCase();
-    if (contentType !== "" && !contentType.startsWith(AGENT_MEDIA_TYPE) && !contentType.startsWith("application/json")) {
+    const contentType = response.headers.get("Content-Type") ?? "";
+    if (!validAgentContentType(contentType)) {
       fail("AGENT.CONTENT_TYPE", `unexpected Content-Type ${JSON.stringify(response.headers.get("Content-Type"))}`);
     }
     return bytes;
   }
+}
+
+function validAgentContentType(value) {
+  // Keep this contract aligned with agent/httpapi.validContentType. Prefix
+  // matching would accept unrelated values such as application/jsonp, while
+  // ignoring parameters could silently negotiate a different JSON profile.
+  const parts = value.split(";");
+  const essence = parts.shift()?.trim().toLowerCase();
+  if (essence !== AGENT_MEDIA_TYPE && essence !== "application/json") return false;
+  if (parts.length === 0) return true;
+  if (parts.length !== 1) return false;
+  const parameter = parts[0].trim().match(/^profile\s*=\s*(?:"([^"]*)"|([^\s"]+))$/i);
+  if (parameter === null) return false;
+  return (parameter[1] ?? parameter[2]) === CANONICAL_JSON_PROFILE;
 }
 
 function validateRequest(request) {

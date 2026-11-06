@@ -139,8 +139,18 @@ export interface PlayerEvent {
 
 export declare const PLAYER_PROFILE: "cutly.player.exact-audio-master.v1";
 
+export type PlayerStateErrorCode =
+  | "PLAYER.BUFFER_RANGE_INVALID"
+  | "PLAYER.CLOCK_INVALID"
+  | "PLAYER.INTEGER_INVALID"
+  | "PLAYER.LOOP_RANGE_INVALID"
+  | "PLAYER.NO_FRAME"
+  | "PLAYER.RANGE_INVALID"
+  | "PLAYER.TIME_OVERFLOW";
+
 export declare class PlayerStateError extends Error {
-  readonly code: string;
+  readonly code: PlayerStateErrorCode;
+  constructor(code: PlayerStateErrorCode, detail: string);
 }
 
 export declare class HeadlessPlayer {
