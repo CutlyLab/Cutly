@@ -50,3 +50,5 @@ export {
   HTTPAgentTransport,
   createAgentRequest,
 } from "./client.js";
+
+export { createRenderJob } from "./render-job.js";

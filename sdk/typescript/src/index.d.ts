@@ -474,6 +474,58 @@ export interface RenderPrepareResource {
   locator: string;
 }
 
+export interface RenderJobV1 {
+  readonly schema_version: 1n;
+  readonly id: string;
+  readonly idempotency_key: string;
+  readonly plan_fingerprint: string;
+  readonly execution_manifest_fingerprint: string;
+  readonly timeline_range: Readonly<Record<string, CanonicalJSONValue>>;
+  readonly frame_range: Readonly<Record<string, CanonicalJSONValue>>;
+  readonly sample_range: Readonly<Record<string, CanonicalJSONValue>>;
+  readonly artifact_uri: string;
+}
+
+export type RenderJobState = "queued" | "running" | "canceling" | "canceled" | "failed" | "complete";
+
+export interface RenderArtifactV1 {
+  readonly uri: string;
+  readonly content_hash: string;
+  readonly size_bytes: bigint;
+  readonly execution_manifest_fingerprint: string;
+  readonly evidence_uri: string;
+  readonly evidence_fingerprint: string;
+  readonly duration: Readonly<Record<string, CanonicalJSONValue>>;
+  readonly frame_count: bigint;
+  readonly sample_count: bigint;
+}
+
+export interface RenderJobSnapshotV1 {
+  readonly schema_version: 1n;
+  readonly job: RenderJobV1;
+  readonly state: RenderJobState;
+  readonly last_sequence: bigint;
+  readonly failure_class?: string;
+  readonly failure_message?: string;
+  readonly artifact?: RenderArtifactV1;
+}
+
+export declare function createRenderJob(input: {
+  jobId: string;
+  idempotencyKey: string;
+  artifactUri: string;
+  plan: Readonly<Record<string, CanonicalJSONInput>> & {
+    readonly fingerprint: string;
+    readonly requested_range: Readonly<Record<string, CanonicalJSONInput>>;
+    readonly frame_range: Readonly<Record<string, CanonicalJSONInput>>;
+    readonly sample_range: Readonly<Record<string, CanonicalJSONInput>>;
+  };
+  executionManifest: Readonly<Record<string, CanonicalJSONInput>> & {
+    readonly fingerprint: string;
+    readonly plan_fingerprint: string;
+  };
+}): RenderJobV1;
+
 export declare class CutlyClient {
   constructor(transport: AgentTransport | AgentTransportFunction);
   call(request: AgentRequest, options?: { signal?: AbortSignal }): Promise<AgentResult>;
