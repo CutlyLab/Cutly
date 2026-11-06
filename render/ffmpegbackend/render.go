@@ -189,6 +189,9 @@ func (backend *Backend) Render(ctx context.Context, request renderapi.RenderRequ
 	if err != nil {
 		return renderapi.RenderArtifact{}, emitter.fail(ctx, CodeRenderFailed, fmt.Errorf("%w: encode evidence: %v", ErrCommand, err))
 	}
+	if int64(len(evidenceRaw)) > MaxPublishedEvidenceBytes {
+		return renderapi.RenderArtifact{}, emitter.fail(ctx, CodeRenderFailed, fmt.Errorf("%w: evidence bytes exceed %d", ErrCommand, MaxPublishedEvidenceBytes))
+	}
 	evidenceTemporary, evidenceTemporaryName, err := backend.createOutputTemp(".cutly-evidence-", ".json")
 	if err != nil {
 		return renderapi.RenderArtifact{}, emitter.fail(ctx, CodePublicationRejected, fmt.Errorf("%w: create evidence temporary: %v", ErrPublication, err))
@@ -340,6 +343,25 @@ func (backend *Backend) verifyRuntime(ctx context.Context) error {
 }
 
 func (backend *Backend) resolveArtifact(raw string) (string, error) {
+	path, err := backend.resolveArtifactPath(raw)
+	if err != nil {
+		return "", err
+	}
+	if _, err := backend.outputHandle.Lstat(filepath.Base(path)); err == nil {
+		return "", fmt.Errorf("%w: artifact already exists", ErrPublication)
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return "", fmt.Errorf("%w: inspect artifact: %v", ErrPublication, err)
+	}
+	return path, nil
+}
+
+// resolveArtifactPath authorizes the immutable job target without inspecting
+// whether it is currently present. Render uses resolveArtifact for a missing
+// target; crash recovery uses this helper for an already-published target.
+func (backend *Backend) resolveArtifactPath(raw string) (string, error) {
+	if backend == nil || backend.outputHandle == nil {
+		return "", fmt.Errorf("%w: output root is closed", ErrConfiguration)
+	}
 	parsed, err := url.Parse(raw)
 	if err != nil || parsed.Scheme != "file" || parsed.Host != "" || parsed.RawQuery != "" || parsed.Fragment != "" {
 		return "", fmt.Errorf("%w: artifact URI must be a hostless local file URI without query or fragment", ErrPublication)
@@ -351,11 +373,6 @@ func (backend *Backend) resolveArtifact(raw string) (string, error) {
 	path = filepath.Clean(path)
 	if filepath.Dir(path) != backend.outputRoot || filepath.Ext(path) != ".mp4" || filepath.Base(path) == ".mp4" {
 		return "", fmt.Errorf("%w: artifact must be a direct .mp4 child of the configured output root", ErrPublication)
-	}
-	if _, err := backend.outputHandle.Lstat(filepath.Base(path)); err == nil {
-		return "", fmt.Errorf("%w: artifact already exists", ErrPublication)
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return "", fmt.Errorf("%w: inspect artifact: %v", ErrPublication, err)
 	}
 	return path, nil
 }

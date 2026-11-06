@@ -3,6 +3,11 @@
 // The v1 backend is deliberately narrow. It accepts one continuous video track and one
 // continuous audio track, with cuts only, no clip properties and no retiming. Unsupported plans
 // fail during preflight instead of being approximated by FFmpeg defaults.
+//
+// OutputRoot is a host-scheduler trust boundary, not a multi-tenant authorization
+// mechanism. Give each mutually untrusted project its own host-owned root and serialize
+// publication/recovery for a job. Evidence is an integrity record bound to a frozen request;
+// it is not a signature or third-party attestation.
 package ffmpegbackend
 
 import (
@@ -93,6 +98,10 @@ type Backend struct {
 	// syncDirectory is fixed by New. Keeping the durability boundary explicit lets fault tests
 	// inject the exact errno returned by fsync without replacing filesystem or publication logic.
 	syncDirectory func() error
+	// recoveryHook is nil in production. Fault tests use it to replace a
+	// published leaf at exact inspection boundaries without weakening the
+	// public API or introducing package-global mutable state.
+	recoveryHook func(string)
 }
 
 var _ renderapi.RenderBackend = (*Backend)(nil)
@@ -183,7 +192,7 @@ func New(ctx context.Context, options Options) (*Backend, error) {
 func (backend *Backend) ID() string { return BackendID }
 
 // Close releases the directory handles used for input and publication confinement. Callers must
-// not race Close with Capabilities, Preflight, or Render.
+// not race Close with Capabilities, Preflight, Render, InspectPublished, or OpenPublished.
 func (backend *Backend) Close() error {
 	if backend == nil {
 		return nil
