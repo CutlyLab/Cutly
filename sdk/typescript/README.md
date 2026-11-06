@@ -35,6 +35,15 @@ const result = await client.call(createAgentRequest({
 
 // Typed convenience methods build the same strict envelope.
 const status = await client.projectStatus({ requestId: "status-42", projectId: "demo" });
+
+// Preflight and exact-frame preview send the same frozen plan/environment
+// that the queued render will consume; the daemon revalidates every binding.
+const ready = await client.preflightRender({
+  requestId: "preflight-42", projectId: "demo", plan, executionManifest,
+});
+const preview = await client.renderFrame({
+  requestId: "frame-42", projectId: "demo", plan, executionManifest, frame,
+});
 ```
 
 `HeadlessPlayer` already provides the exact audio-master playback state machine:

@@ -152,6 +152,20 @@ export class CutlyClient {
     }, options);
   }
 
+  preflightRender({ requestId, projectId, plan, executionManifest }, options) {
+    return this.callAction({
+      requestId, projectId, tool: "cutly_render", action: "preflight",
+      payload: { plan, execution_manifest: executionManifest },
+    }, options);
+  }
+
+  renderFrame({ requestId, projectId, plan, executionManifest, frame }, options) {
+    return this.callAction({
+      requestId, projectId, tool: "cutly_render", action: "frame",
+      payload: { plan, execution_manifest: executionManifest, frame },
+    }, options);
+  }
+
   submitRender({ requestId, projectId, job }, options) {
     return this.callAction({
       requestId, projectId, tool: "cutly_render", action: "render", payload: { job },

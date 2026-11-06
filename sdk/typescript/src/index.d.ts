@@ -475,6 +475,15 @@ export declare class CutlyClient {
   applyEdit(input: AgentRevisionAction, options?: { signal?: AbortSignal }): Promise<AgentResult>;
   discardEdit(input: AgentTransactionAction, options?: { signal?: AbortSignal }): Promise<AgentResult>;
   revertEdit(input: AgentRevisionAction, options?: { signal?: AbortSignal }): Promise<AgentResult>;
+  preflightRender(input: AgentActionIdentity & {
+    plan: Readonly<Record<string, CanonicalJSONInput>>;
+    executionManifest: Readonly<Record<string, CanonicalJSONInput>>;
+  }, options?: { signal?: AbortSignal }): Promise<AgentResult>;
+  renderFrame(input: AgentActionIdentity & {
+    plan: Readonly<Record<string, CanonicalJSONInput>>;
+    executionManifest: Readonly<Record<string, CanonicalJSONInput>>;
+    frame: Readonly<Record<string, CanonicalJSONInput>>;
+  }, options?: { signal?: AbortSignal }): Promise<AgentResult>;
   submitRender(input: AgentActionIdentity & {
     job: Readonly<Record<string, CanonicalJSONInput>>;
   }, options?: { signal?: AbortSignal }): Promise<AgentResult>;

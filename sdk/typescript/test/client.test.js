@@ -70,17 +70,28 @@ test("typed client actions build exact project, edit and render payloads", async
   await client.applyEdit({ requestId: "apply", projectId: "project", transactionId: "tx", expectedRevision: 7n });
   await client.discardEdit({ requestId: "discard", projectId: "project", transactionId: "tx" });
   await client.revertEdit({ requestId: "revert", projectId: "project", transactionId: "tx", expectedRevision: 8n });
+  await client.preflightRender({
+    requestId: "preflight", projectId: "project",
+    plan: { fingerprint: "plan" }, executionManifest: { fingerprint: "manifest" },
+  });
+  await client.renderFrame({
+    requestId: "frame", projectId: "project",
+    plan: { fingerprint: "plan" }, executionManifest: { fingerprint: "manifest" },
+    frame: { id: "frame-1" },
+  });
   await client.submitRender({ requestId: "render", projectId: "project", job: { id: "job" } });
   await client.renderStatus({ requestId: "status", projectId: "project", jobId: "job" });
   await client.cancelRender({ requestId: "cancel", projectId: "project", jobId: "job" });
 
   assert.deepEqual(observed.map((request) => request.action), [
-    "inspect", "history", "plan", "apply", "discard", "revert", "render", "status", "cancel",
+    "inspect", "history", "plan", "apply", "discard", "revert", "preflight", "frame", "render", "status", "cancel",
   ]);
   assert.deepEqual(observed[1].payload, Object.assign(Object.create(null), { after_sequence: 4n, limit: 10n }));
   assert.equal(observed[3].payload.expected_revision, 7n);
-  assert.equal(observed[6].payload.job.id, "job");
-  assert.equal(observed[8].payload.job_id, "job");
+  assert.equal(observed[6].payload.execution_manifest.fingerprint, "manifest");
+  assert.equal(observed[7].payload.frame.id, "frame-1");
+  assert.equal(observed[8].payload.job.id, "job");
+  assert.equal(observed[10].payload.job_id, "job");
 });
 
 test("Agent request rejects invalid pairs, missing projects and fractional payloads", () => {
