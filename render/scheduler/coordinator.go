@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"sync"
 
 	renderapi "github.com/CutlyLab/Cutly/render/api"
@@ -134,6 +135,39 @@ func (value *Coordinator) Start(ctx context.Context, jobID string) (JobSnapshot,
 	return value.transition(ctx, jobID, EventStarted, "", "", nil)
 }
 
+// StartNext atomically selects the lexicographically first queued job and
+// durably transitions it to running. Selection and transition share the
+// Coordinator lock, so multiple worker goroutines in one owning process cannot
+// claim the same job. A deployment must still run one Coordinator owner per
+// journal root; cross-process worker leases are a separate distributed profile.
+func (value *Coordinator) StartNext(ctx context.Context) (JobSnapshot, bool, error) {
+	value.mu.Lock()
+	defer value.mu.Unlock()
+	if err := contextError(ctx); err != nil {
+		return JobSnapshot{}, false, err
+	}
+	if err := value.readyLocked(); err != nil {
+		return JobSnapshot{}, false, err
+	}
+	jobID := ""
+	for candidate, snapshot := range value.jobs {
+		if snapshot.State == renderapi.JobQueued && (jobID == "" || candidate < jobID) {
+			jobID = candidate
+		}
+	}
+	if jobID == "" {
+		return JobSnapshot{}, false, nil
+	}
+	snapshot := value.jobs[jobID]
+	event := nextEvent(snapshot, EventStarted)
+	if err := value.appendLocked(ctx, event); err != nil {
+		return JobSnapshot{}, false, err
+	}
+	snapshot = applyEvent(snapshot, event)
+	value.jobs[jobID] = snapshot
+	return cloneSnapshot(snapshot), true, nil
+}
+
 // RequestCancel is idempotent for canceling and terminal jobs. The first
 // request durably moves queued/running work to canceling.
 func (value *Coordinator) RequestCancel(ctx context.Context, jobID string) (JobSnapshot, bool, error) {
@@ -190,6 +224,35 @@ func (value *Coordinator) Snapshot(jobID string) (JobSnapshot, error) {
 		return JobSnapshot{}, ErrJobNotFound
 	}
 	return cloneSnapshot(snapshot), nil
+}
+
+// Snapshots returns an owned, job-ID-sorted point-in-time view. With no state
+// arguments it returns all jobs; otherwise it returns the union of the
+// requested states. The result is bounded by the Coordinator replay ceiling.
+func (value *Coordinator) Snapshots(states ...renderapi.JobState) ([]JobSnapshot, error) {
+	filter := make(map[renderapi.JobState]struct{}, len(states))
+	for _, state := range states {
+		if !validJobState(state) {
+			return nil, fmt.Errorf("%w: snapshot filter state %q", ErrProtocolInvalid, state)
+		}
+		filter[state] = struct{}{}
+	}
+	value.mu.RLock()
+	defer value.mu.RUnlock()
+	if err := value.readyLocked(); err != nil {
+		return nil, err
+	}
+	result := make([]JobSnapshot, 0, len(value.jobs))
+	for _, snapshot := range value.jobs {
+		if len(filter) != 0 {
+			if _, included := filter[snapshot.State]; !included {
+				continue
+			}
+		}
+		result = append(result, cloneSnapshot(snapshot))
+	}
+	sort.Slice(result, func(left, right int) bool { return result[left].Job.ID < result[right].Job.ID })
+	return result, nil
 }
 
 func (value *Coordinator) transition(ctx context.Context, jobID string, kind JobEventKind,

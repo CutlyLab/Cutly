@@ -86,6 +86,104 @@ func TestCoordinatorConcurrentDuplicateSubmitAppendsOnce(t *testing.T) {
 	}
 }
 
+func TestCoordinatorStartNextClaimsQueuedJobsOnceInDeterministicOrder(t *testing.T) {
+	store := &memoryStore{}
+	coordinator, err := Open(context.Background(), store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"job-c", "job-a", "job-b"} {
+		if _, _, err := coordinator.Submit(context.Background(), schedulerTestJob(id, "request-"+id)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for index, want := range []string{"job-a", "job-b", "job-c"} {
+		claimed, found, err := coordinator.StartNext(context.Background())
+		if err != nil || !found || claimed.Job.ID != want || claimed.State != renderapi.JobRunning || claimed.LastSequence != 2 {
+			t.Fatalf("claim %d = %+v found=%v err=%v", index, claimed, found, err)
+		}
+	}
+	if claimed, found, err := coordinator.StartNext(context.Background()); err != nil || found || claimed != (JobSnapshot{}) {
+		t.Fatalf("empty claim = %+v found=%v err=%v", claimed, found, err)
+	}
+
+	running, err := coordinator.Snapshots(renderapi.JobRunning)
+	if err != nil || len(running) != 3 {
+		t.Fatalf("running snapshots = %+v err=%v", running, err)
+	}
+	for index, want := range []string{"job-a", "job-b", "job-c"} {
+		if running[index].Job.ID != want {
+			t.Fatalf("snapshot order[%d] = %q, want %q", index, running[index].Job.ID, want)
+		}
+	}
+	if _, err := coordinator.Snapshots(renderapi.JobState("hostile")); !errors.Is(err, ErrProtocolInvalid) {
+		t.Fatalf("invalid state filter = %v", err)
+	}
+	if len(store.events) != 6 {
+		t.Fatalf("events = %d", len(store.events))
+	}
+}
+
+func TestCoordinatorConcurrentStartNextNeverDoubleClaimsAndReplays(t *testing.T) {
+	store := &memoryStore{}
+	coordinator, err := Open(context.Background(), store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const jobs = 32
+	for index := 0; index < jobs; index++ {
+		id := fmt.Sprintf("job-%02d", index)
+		if _, _, err := coordinator.Submit(context.Background(), schedulerTestJob(id, "request-"+id)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	results := make(chan JobSnapshot, jobs)
+	errorsSeen := make(chan error, jobs)
+	var wait sync.WaitGroup
+	for index := 0; index < jobs; index++ {
+		wait.Add(1)
+		go func() {
+			defer wait.Done()
+			snapshot, found, claimErr := coordinator.StartNext(context.Background())
+			if claimErr == nil && !found {
+				claimErr = errors.New("queued job was not claimed")
+			}
+			results <- snapshot
+			errorsSeen <- claimErr
+		}()
+	}
+	wait.Wait()
+	close(results)
+	close(errorsSeen)
+	for err := range errorsSeen {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	seen := make(map[string]struct{}, jobs)
+	for snapshot := range results {
+		if _, duplicate := seen[snapshot.Job.ID]; duplicate {
+			t.Fatalf("job %q claimed twice", snapshot.Job.ID)
+		}
+		seen[snapshot.Job.ID] = struct{}{}
+	}
+	if len(seen) != jobs {
+		t.Fatalf("unique claims = %d", len(seen))
+	}
+
+	reopened, err := Open(context.Background(), store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, found, err := reopened.StartNext(context.Background()); err != nil || found {
+		t.Fatalf("replayed queue claim found=%v err=%v", found, err)
+	}
+	running, err := reopened.Snapshots(renderapi.JobRunning)
+	if err != nil || len(running) != jobs {
+		t.Fatalf("replayed running = %d err=%v", len(running), err)
+	}
+}
+
 func TestCoordinatorTransitionsTerminalOnceAndReplays(t *testing.T) {
 	store := &memoryStore{}
 	first, err := Open(context.Background(), store)
