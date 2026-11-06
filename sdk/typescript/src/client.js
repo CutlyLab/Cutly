@@ -110,6 +110,65 @@ export class CutlyClient {
   callAction(input, options) {
     return this.call(createAgentRequest(input), options);
   }
+
+  inspectProject({ requestId, projectId }, options) {
+    return this.callAction({ requestId, projectId, tool: "cutly_project", action: "inspect" }, options);
+  }
+
+  projectStatus({ requestId, projectId }, options) {
+    return this.callAction({ requestId, projectId, tool: "cutly_project", action: "status" }, options);
+  }
+
+  projectHistory({ requestId, projectId, afterSequence = 0n, limit = 0n }, options) {
+    return this.callAction({
+      requestId, projectId, tool: "cutly_project", action: "history",
+      payload: { after_sequence: afterSequence, limit },
+    }, options);
+  }
+
+  planEdit({ requestId, projectId, transaction }, options) {
+    return this.callAction({
+      requestId, projectId, tool: "cutly_edit", action: "plan", payload: { transaction },
+    }, options);
+  }
+
+  applyEdit({ requestId, projectId, transactionId, expectedRevision }, options) {
+    return this.callAction({
+      requestId, projectId, tool: "cutly_edit", action: "apply",
+      payload: { transaction_id: transactionId, expected_revision: expectedRevision },
+    }, options);
+  }
+
+  discardEdit({ requestId, projectId, transactionId }, options) {
+    return this.callAction({
+      requestId, projectId, tool: "cutly_edit", action: "discard", payload: { transaction_id: transactionId },
+    }, options);
+  }
+
+  revertEdit({ requestId, projectId, transactionId, expectedRevision }, options) {
+    return this.callAction({
+      requestId, projectId, tool: "cutly_edit", action: "revert",
+      payload: { transaction_id: transactionId, expected_revision: expectedRevision },
+    }, options);
+  }
+
+  submitRender({ requestId, projectId, job }, options) {
+    return this.callAction({
+      requestId, projectId, tool: "cutly_render", action: "render", payload: { job },
+    }, options);
+  }
+
+  renderStatus({ requestId, projectId, jobId }, options) {
+    return this.callAction({
+      requestId, projectId, tool: "cutly_render", action: "status", payload: { job_id: jobId },
+    }, options);
+  }
+
+  cancelRender({ requestId, projectId, jobId }, options) {
+    return this.callAction({
+      requestId, projectId, tool: "cutly_render", action: "cancel", payload: { job_id: jobId },
+    }, options);
+  }
 }
 
 export class HTTPAgentTransport {

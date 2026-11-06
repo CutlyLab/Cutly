@@ -442,10 +442,44 @@ export interface AgentTransport {
   ): Promise<string | Uint8Array> | string | Uint8Array;
 }
 
+export interface AgentActionIdentity {
+  requestId: string;
+  projectId: string;
+}
+
+export interface AgentTransactionAction extends AgentActionIdentity {
+  transactionId: string;
+}
+
+export interface AgentRevisionAction extends AgentTransactionAction {
+  expectedRevision: IntegerLike;
+}
+
+export interface AgentJobAction extends AgentActionIdentity {
+  jobId: string;
+}
+
 export declare class CutlyClient {
   constructor(transport: AgentTransport | AgentTransportFunction);
   call(request: AgentRequest, options?: { signal?: AbortSignal }): Promise<AgentResult>;
   callAction(input: AgentRequestInput, options?: { signal?: AbortSignal }): Promise<AgentResult>;
+  inspectProject(input: AgentActionIdentity, options?: { signal?: AbortSignal }): Promise<AgentResult>;
+  projectStatus(input: AgentActionIdentity, options?: { signal?: AbortSignal }): Promise<AgentResult>;
+  projectHistory(input: AgentActionIdentity & {
+    afterSequence?: IntegerLike;
+    limit?: IntegerLike;
+  }, options?: { signal?: AbortSignal }): Promise<AgentResult>;
+  planEdit(input: AgentActionIdentity & {
+    transaction: Readonly<Record<string, CanonicalJSONInput>>;
+  }, options?: { signal?: AbortSignal }): Promise<AgentResult>;
+  applyEdit(input: AgentRevisionAction, options?: { signal?: AbortSignal }): Promise<AgentResult>;
+  discardEdit(input: AgentTransactionAction, options?: { signal?: AbortSignal }): Promise<AgentResult>;
+  revertEdit(input: AgentRevisionAction, options?: { signal?: AbortSignal }): Promise<AgentResult>;
+  submitRender(input: AgentActionIdentity & {
+    job: Readonly<Record<string, CanonicalJSONInput>>;
+  }, options?: { signal?: AbortSignal }): Promise<AgentResult>;
+  renderStatus(input: AgentJobAction, options?: { signal?: AbortSignal }): Promise<AgentResult>;
+  cancelRender(input: AgentJobAction, options?: { signal?: AbortSignal }): Promise<AgentResult>;
 }
 
 export interface HTTPAgentTransportOptions {

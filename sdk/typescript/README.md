@@ -32,6 +32,9 @@ const result = await client.call(createAgentRequest({
   action: "inspect",
   projectId: "demo",
 }));
+
+// Typed convenience methods build the same strict envelope.
+const status = await client.projectStatus({ requestId: "status-42", projectId: "demo" });
 ```
 
 `HeadlessPlayer` already provides the exact audio-master playback state machine:

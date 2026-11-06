@@ -54,6 +54,35 @@ test("Agent client validates, correlates and preserves business rejection", asyn
   await assert.rejects(() => mismatch.call(request), (error) => error instanceof AgentProtocolError && error.code === "AGENT.CORRELATION");
 });
 
+test("typed client actions build exact project, edit and render payloads", async () => {
+  const observed = [];
+  const client = new CutlyClient(async (raw) => {
+    const request = decodeCanonicalJSON(raw);
+    observed.push(request);
+    return encodeCanonicalValue(resultFor(request));
+  });
+  await client.inspectProject({ requestId: "inspect", projectId: "project" });
+  await client.projectHistory({ requestId: "history", projectId: "project", afterSequence: 4n, limit: 10n });
+  await client.planEdit({
+    requestId: "plan", projectId: "project",
+    transaction: { id: "tx", idempotency_key: "key", expected_revision: 7n, operations: [] },
+  });
+  await client.applyEdit({ requestId: "apply", projectId: "project", transactionId: "tx", expectedRevision: 7n });
+  await client.discardEdit({ requestId: "discard", projectId: "project", transactionId: "tx" });
+  await client.revertEdit({ requestId: "revert", projectId: "project", transactionId: "tx", expectedRevision: 8n });
+  await client.submitRender({ requestId: "render", projectId: "project", job: { id: "job" } });
+  await client.renderStatus({ requestId: "status", projectId: "project", jobId: "job" });
+  await client.cancelRender({ requestId: "cancel", projectId: "project", jobId: "job" });
+
+  assert.deepEqual(observed.map((request) => request.action), [
+    "inspect", "history", "plan", "apply", "discard", "revert", "render", "status", "cancel",
+  ]);
+  assert.deepEqual(observed[1].payload, Object.assign(Object.create(null), { after_sequence: 4n, limit: 10n }));
+  assert.equal(observed[3].payload.expected_revision, 7n);
+  assert.equal(observed[6].payload.job.id, "job");
+  assert.equal(observed[8].payload.job_id, "job");
+});
+
 test("Agent request rejects invalid pairs, missing projects and fractional payloads", () => {
   assert.throws(() => createAgentRequest({ requestId: "r", tool: "cutly_edit", action: "inspect", projectId: "p" }), /TOOL_ACTION_INVALID/);
   assert.throws(() => createAgentRequest({ requestId: "r", tool: "cutly_edit", action: "plan" }), /REQUEST_INVALID/);
