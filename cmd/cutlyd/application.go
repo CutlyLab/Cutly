@@ -11,6 +11,7 @@ import (
 	"github.com/CutlyLab/Cutly/agent/ffmpeghost"
 	"github.com/CutlyLab/Cutly/agent/projectlocal"
 	"github.com/CutlyLab/Cutly/agent/renderexec"
+	"github.com/CutlyLab/Cutly/agent/renderprepare"
 	"github.com/CutlyLab/Cutly/agent/renderqueue"
 	"github.com/CutlyLab/Cutly/agent/router"
 	"github.com/CutlyLab/Cutly/cache/cas"
@@ -218,6 +219,13 @@ func buildRenderApplication(ctx context.Context, configuration config) (_ *rende
 	if err != nil {
 		return nil, fmt.Errorf("cutlyd: initialize host resolver: %w", err)
 	}
+	prepareActions, err := renderprepare.New(renderprepare.Config{
+		ProjectID: configuration.projectID,
+		Preparer:  hostResolver,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("cutlyd: initialize render prepare actions: %w", err)
+	}
 	executionActions, err := renderexec.NewWithRecorder(hostResolver, renderexec.RecorderFunc(
 		func(ctx context.Context, projectID string, plan videoedit.RenderPlan, manifest renderapi.ExecutionManifest) error {
 			if projectID != configuration.projectID {
@@ -247,7 +255,8 @@ func buildRenderApplication(ctx context.Context, configuration config) (_ *rende
 	if err != nil {
 		return nil, fmt.Errorf("cutlyd: initialize render queue actions: %w", err)
 	}
-	result.routes = append(executionActions.Routes(), queueActions.Routes()...)
+	result.routes = append(prepareActions.Routes(), executionActions.Routes()...)
+	result.routes = append(result.routes, queueActions.Routes()...)
 	return result, nil
 }
 

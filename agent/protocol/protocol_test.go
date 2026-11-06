@@ -79,6 +79,25 @@ func TestProtocolFailsClosed(t *testing.T) {
 	}
 }
 
+func TestRenderPrepareIsAProtocolAction(t *testing.T) {
+	request := Request{
+		ProtocolVersion: ProtocolVersion, RequestID: "prepare-1", Tool: ToolRender,
+		Action: "prepare", ProjectID: "project", Payload: json.RawMessage(`{"plan":{},"resources":[]}`),
+	}
+	if _, err := CanonicalRequest(request); err != nil {
+		t.Fatalf("prepare request rejected: %v", err)
+	}
+	result := Result{
+		ProtocolVersion: ProtocolVersion, OK: true, RequestID: request.RequestID,
+		Tool: ToolRender, Action: "prepare", State: "prepared", ProjectID: request.ProjectID,
+		RenderRequired: true, Diagnostics: []videoedit.Diagnostic{},
+		NextActions: []NextAction{{Tool: ToolRender, Action: "preflight", ProjectID: request.ProjectID}},
+	}
+	if err := ValidateResult(result); err != nil {
+		t.Fatalf("prepare result rejected: %v", err)
+	}
+}
+
 func TestDecodedValuesOwnRawBuffers(t *testing.T) {
 	raw := []byte(`{"protocol_version":1,"request_id":"r","tool":"cutly_edit","action":"plan","project_id":"p","payload":{"value":1}}`)
 	request, err := DecodeRequest(raw)

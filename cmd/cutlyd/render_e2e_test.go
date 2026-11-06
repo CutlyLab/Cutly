@@ -12,6 +12,7 @@ import (
 	"time"
 
 	agentprotocol "github.com/CutlyLab/Cutly/agent/protocol"
+	"github.com/CutlyLab/Cutly/agent/renderprepare"
 	"github.com/CutlyLab/Cutly/core/videoedit"
 	cutlyffprobe "github.com/CutlyLab/Cutly/media/ffprobe"
 	"github.com/CutlyLab/Cutly/media/probe"
@@ -55,20 +56,7 @@ func TestRenderApplicationEndToEndAndOfflinePublicationRecovery(t *testing.T) {
 		probes[input.id] = manifest
 	}
 	plan := acceptancePlan(t, probes)
-	resources := make([]renderapi.MaterializedResource, 0, len(plan.Resources))
 	paths := map[videoedit.ID]string{"video": videoPath, "audio": audioPath}
-	for _, resource := range plan.Resources {
-		manifest := probes[resource.AssetID]
-		fingerprint, fingerprintErr := probe.Fingerprint(manifest)
-		if fingerprintErr != nil {
-			t.Fatal(fingerprintErr)
-		}
-		resources = append(resources, renderapi.MaterializedResource{
-			AssetID: resource.AssetID, Kind: resource.Kind, ContentHash: manifest.Resource.ContentHash,
-			SizeBytes: manifest.Resource.SizeBytes, LocatorScheme: renderapi.LocatorFile,
-			Locator: paths[resource.AssetID], ProbeFingerprint: fingerprint,
-		})
-	}
 
 	application, err := buildApplication(ctx, configuration)
 	if err != nil {
@@ -76,31 +64,25 @@ func TestRenderApplicationEndToEndAndOfflinePublicationRecovery(t *testing.T) {
 	}
 	openApplication := application
 	t.Cleanup(func() { _ = openApplication.Close() })
-	capabilities, err := application.render.backend.Capabilities(ctx)
-	if err != nil {
-		t.Fatal(err)
+	bindings := make([]map[string]any, 0, len(plan.Resources))
+	for _, resource := range plan.Resources {
+		bindings = append(bindings, map[string]any{"asset_id": resource.AssetID, "locator": paths[resource.AssetID]})
 	}
-	runtimeFingerprint, err := application.render.backend.FFmpegRuntimeFingerprint(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	manifest, err := renderapi.FreezeExecutionManifest(plan, renderapi.ExecutionManifest{
-		CompilerBuild: configuration.render.compilerBuild, EvaluatorBuild: configuration.render.evaluatorBuild,
-		Resources: resources, Backend: capabilities,
-		MediaRuntime: renderapi.MediaRuntime{
-			FFmpegBuild: runtimeFingerprint, DecoderProfile: "ffmpeg-hardcut-v1",
-			EncoderProfile: "libx264-aac-mp4.v1", ColorProfile: "cutly.bt709.v1",
-		},
-		Output: renderapi.OutputSpec{
-			ReferenceProfile: "cutly.hardcut.bt709.v1", Format: "mp4", Width: 64, Height: 64,
-			PixelFormat: "yuv420p", ColorSpace: "bt709", VideoCodec: "h264", AudioCodec: "aac",
-			SampleRate: 48_000, Channels: 2, DecodedVideoProfile: renderapi.DecodedVideoProfileRGBA8V1,
-			DecodedAudioProfile: renderapi.DecodedAudioProfilePCM16LEV1,
-		},
-		DeterministicSeed: 1,
+	prepared := callRenderAction(t, ctx, application, "prepare", "e2e-prepare", map[string]any{
+		"plan": plan, "resources": bindings, "deterministic_seed": int64(1),
 	})
-	if err != nil {
-		t.Fatal(err)
+	if !prepared.OK || prepared.State != "prepared" || len(prepared.NextActions) != 1 ||
+		prepared.NextActions[0].Tool != agentprotocol.ToolRender || prepared.NextActions[0].Action != "preflight" {
+		t.Fatalf("prepare = %+v", prepared)
+	}
+	var preparedReceipt renderprepare.Receipt
+	if err := json.Unmarshal(prepared.Receipt, &preparedReceipt); err != nil {
+		t.Fatalf("decode prepare receipt: %v", err)
+	}
+	manifest := preparedReceipt.ExecutionManifest
+	if preparedReceipt.Profile != renderprepare.ReceiptProfile || manifest.PlanFingerprint != plan.Fingerprint ||
+		manifest.DeterministicSeed != 1 || len(manifest.Resources) != len(plan.Resources) {
+		t.Fatalf("prepare receipt = %+v", preparedReceipt)
 	}
 	preflight := callRenderAction(t, ctx, application, "preflight", "e2e-preflight", map[string]any{
 		"plan": plan, "execution_manifest": manifest,

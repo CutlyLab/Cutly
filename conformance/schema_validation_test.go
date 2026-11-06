@@ -76,8 +76,8 @@ func TestSchemasCompileAndValidateInstances(t *testing.T) {
 	}
 
 	validInstances := map[string]string{
-		"cutly.agent-request.v1.schema.json":        "agent/protocol/testdata/agent-request-v1.canonical.json",
-		"cutly.agent-result.v1.schema.json":         "agent/protocol/testdata/agent-result-v1.canonical.json",
+		"cutly.agent-request.v1.schema.json":       "agent/protocol/testdata/agent-request-v1.canonical.json",
+		"cutly.agent-result.v1.schema.json":        "agent/protocol/testdata/agent-result-v1.canonical.json",
 		"cutly.document.v1.schema.json":            "conformance/fixtures/document-v1.valid.json",
 		"cutly.document.v2.schema.json":            "conformance/fixtures/document-v2.valid.json",
 		"cutly.transaction.v1.schema.json":         "conformance/fixtures/transaction-v1.valid.json",
@@ -123,6 +123,15 @@ func TestSchemasCompileAndValidateInstances(t *testing.T) {
 		if err := resolved[name].Validate(critical); err == nil {
 			t.Fatalf("schema %s accepted its critical invalid contract case", name)
 		}
+	}
+
+	prepareRequest := decodeSchemaInstance(t, []byte(`{"protocol_version":1,"request_id":"prepare-1","tool":"cutly_render","action":"prepare","project_id":"project","payload":{"plan":{},"resources":[]}}`))
+	if err := resolved["cutly.agent-request.v1.schema.json"].Validate(prepareRequest); err != nil {
+		t.Fatalf("render prepare request rejected by published Agent schema: %v", err)
+	}
+	prepareResult := decodeSchemaInstance(t, []byte(`{"protocol_version":1,"ok":true,"request_id":"prepare-1","tool":"cutly_render","action":"prepare","state":"prepared","project_id":"project","changed":false,"replayed":false,"render_required":true,"diagnostics":[],"receipt":{},"next_actions":[{"tool":"cutly_render","action":"preflight","project_id":"project"}]}`))
+	if err := resolved["cutly.agent-result.v1.schema.json"].Validate(prepareResult); err != nil {
+		t.Fatalf("render prepare result rejected by published Agent schema: %v", err)
 	}
 
 	audioProcessingRaw, err := os.ReadFile(filepath.Join(moduleRoot, "conformance", "fixtures", "document-v2-audio-processing.valid.json"))
