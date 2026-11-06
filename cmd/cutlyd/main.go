@@ -34,21 +34,26 @@ type config struct {
 const maxRenderInputRoots = 64
 
 type renderConfig struct {
-	enabled                             bool
-	stateDir                            string
-	outputDir                           string
-	inputRoots                          stringList
-	ffmpegExecutable                    string
-	ffprobeExecutable                   string
-	sdkBuildDigest                      string
-	compilerBuild                       string
-	evaluatorBuild                      string
-	ffmpegRuntimeDependencyFingerprint  string
-	ffprobeRuntimeDependencyFingerprint string
-	stageMemoryBytes                    uint64
-	stageDiskBytes                      uint64
-	maxConcurrentJobs                   int
-	workerPollInterval                  time.Duration
+	enabled                               bool
+	stateDir                              string
+	outputDir                             string
+	inputRoots                            stringList
+	mediaRuntimeBundleRoot                string
+	unsafeAllowUnverifiedMediaRuntime     bool
+	legacyMediaRuntimeConfigured          bool
+	mediaRuntimeResolver                  mediaRuntimeBundleResolver
+	expectedMediaRuntimeBundleFingerprint string
+	ffmpegExecutable                      string
+	ffprobeExecutable                     string
+	sdkBuildDigest                        string
+	compilerBuild                         string
+	evaluatorBuild                        string
+	ffmpegRuntimeDependencyFingerprint    string
+	ffprobeRuntimeDependencyFingerprint   string
+	stageMemoryBytes                      uint64
+	stageDiskBytes                        uint64
+	maxConcurrentJobs                     int
+	workerPollInterval                    time.Duration
 }
 
 type stringList []string
@@ -121,8 +126,10 @@ func parseConfig(args []string) (config, error) {
 	flags.StringVar(&configuration.render.stateDir, "render-state-dir", "", "existing host-owned durable render state directory")
 	flags.StringVar(&configuration.render.outputDir, "render-output-dir", "", "existing dedicated host-owned render publication directory")
 	flags.Var(&configuration.render.inputRoots, "render-input-root", "existing input root allowed for local media (repeatable)")
-	flags.StringVar(&configuration.render.ffmpegExecutable, "ffmpeg", "ffmpeg", "host-owned FFmpeg executable")
-	flags.StringVar(&configuration.render.ffprobeExecutable, "ffprobe", "ffprobe", "host-owned FFprobe executable")
+	flags.StringVar(&configuration.render.mediaRuntimeBundleRoot, "media-runtime-bundle-root", "", "canonical physical root of the release-signed FFmpeg/FFprobe bundle")
+	flags.BoolVar(&configuration.render.unsafeAllowUnverifiedMediaRuntime, "unsafe-allow-unverified-media-runtime", false, "development only: allow direct FFmpeg/FFprobe paths and caller-declared closure fingerprints")
+	flags.StringVar(&configuration.render.ffmpegExecutable, "ffmpeg", "", "development-only host-owned FFmpeg executable")
+	flags.StringVar(&configuration.render.ffprobeExecutable, "ffprobe", "", "development-only host-owned FFprobe executable")
 	flags.StringVar(&configuration.render.sdkBuildDigest, "sdk-build-digest", "", "sha256 identity of this Cutly SDK build")
 	flags.StringVar(&configuration.render.compilerBuild, "compiler-build", "", "sha256 identity accepted for semantic compiler output")
 	flags.StringVar(&configuration.render.evaluatorBuild, "evaluator-build", "", "sha256 identity accepted for expression evaluation")
@@ -138,14 +145,22 @@ func parseConfig(args []string) (config, error) {
 	}
 	renderFlags := map[string]struct{}{
 		"render-state-dir": {}, "render-output-dir": {}, "render-input-root": {},
+		"media-runtime-bundle-root": {}, "unsafe-allow-unverified-media-runtime": {},
 		"ffmpeg": {}, "ffprobe": {}, "sdk-build-digest": {}, "compiler-build": {}, "evaluator-build": {},
 		"ffmpeg-runtime-dependency-fingerprint": {}, "ffprobe-runtime-dependency-fingerprint": {},
 		"render-stage-memory-bytes": {}, "render-stage-disk-bytes": {}, "render-max-concurrent-jobs": {},
 		"render-worker-poll-interval": {},
 	}
+	legacyMediaRuntimeFlags := map[string]struct{}{
+		"ffmpeg": {}, "ffprobe": {},
+		"ffmpeg-runtime-dependency-fingerprint": {}, "ffprobe-runtime-dependency-fingerprint": {},
+	}
 	flags.Visit(func(value *flag.Flag) {
 		if _, ok := renderFlags[value.Name]; ok {
 			configuration.render.enabled = true
+		}
+		if _, ok := legacyMediaRuntimeFlags[value.Name]; ok {
+			configuration.render.legacyMediaRuntimeConfigured = true
 		}
 	})
 	if flags.NArg() != 0 {
@@ -153,6 +168,14 @@ func parseConfig(args []string) (config, error) {
 	}
 	if configuration.version {
 		return configuration, nil
+	}
+	if configuration.render.mediaRuntimeBundleRoot == "" {
+		if configuration.render.ffmpegExecutable == "" {
+			configuration.render.ffmpegExecutable = "ffmpeg"
+		}
+		if configuration.render.ffprobeExecutable == "" {
+			configuration.render.ffprobeExecutable = "ffprobe"
+		}
 	}
 	if configuration.shutdownTimeout <= 0 || configuration.writeTimeout <= 0 {
 		return config{}, errors.New("shutdown-timeout and write-timeout must be positive")
@@ -164,6 +187,9 @@ func parseConfig(args []string) (config, error) {
 		return config{}, err
 	}
 	if err := validateRenderConfig(configuration); err != nil {
+		return config{}, err
+	}
+	if err := configureParsedMediaRuntime(&configuration.render); err != nil {
 		return config{}, err
 	}
 	return configuration, nil
@@ -197,18 +223,40 @@ func validateRenderConfig(configuration config) error {
 			return fmt.Errorf("render-input-root %d: %w", index, err)
 		}
 	}
-	if render.ffmpegExecutable == "" || render.ffprobeExecutable == "" {
-		return errors.New("ffmpeg and ffprobe executables are required")
+	if render.mediaRuntimeBundleRoot != "" {
+		if err := validateCleanAbsolutePath(render.mediaRuntimeBundleRoot); err != nil {
+			return fmt.Errorf("media-runtime-bundle-root: %w", err)
+		}
+		if render.unsafeAllowUnverifiedMediaRuntime || render.legacyMediaRuntimeConfigured ||
+			render.ffmpegExecutable != "" || render.ffprobeExecutable != "" ||
+			render.ffmpegRuntimeDependencyFingerprint != "" || render.ffprobeRuntimeDependencyFingerprint != "" {
+			return errors.New("signed media runtime bundle cannot be combined with direct executables, declared closure fingerprints, or the unsafe development gate")
+		}
+	} else {
+		if !render.unsafeAllowUnverifiedMediaRuntime {
+			return errors.New("rendering requires media-runtime-bundle-root; direct media tools require the explicit unsafe-allow-unverified-media-runtime development gate")
+		}
+		if render.ffmpegExecutable == "" || render.ffprobeExecutable == "" {
+			return errors.New("ffmpeg and ffprobe executables are required in development mode")
+		}
 	}
 	for _, field := range []struct{ name, value string }{
 		{"sdk-build-digest", render.sdkBuildDigest},
 		{"compiler-build", render.compilerBuild},
 		{"evaluator-build", render.evaluatorBuild},
-		{"ffmpeg-runtime-dependency-fingerprint", render.ffmpegRuntimeDependencyFingerprint},
-		{"ffprobe-runtime-dependency-fingerprint", render.ffprobeRuntimeDependencyFingerprint},
 	} {
 		if !canonicalSHA256(field.value) {
 			return fmt.Errorf("%s must be a canonical sha256 digest", field.name)
+		}
+	}
+	if render.mediaRuntimeBundleRoot == "" {
+		for _, field := range []struct{ name, value string }{
+			{"ffmpeg-runtime-dependency-fingerprint", render.ffmpegRuntimeDependencyFingerprint},
+			{"ffprobe-runtime-dependency-fingerprint", render.ffprobeRuntimeDependencyFingerprint},
+		} {
+			if !canonicalSHA256(field.value) {
+				return fmt.Errorf("%s must be a canonical sha256 digest", field.name)
+			}
 		}
 	}
 	if render.stageMemoryBytes == 0 || render.stageDiskBytes == 0 {

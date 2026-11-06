@@ -55,6 +55,7 @@ func TestRenderConfigIsExplicitCompleteAndBounded(t *testing.T) {
 		"--render-state-dir", filepath.Join(root, "state"),
 		"--render-output-dir", filepath.Join(root, "output"),
 		"--render-input-root", filepath.Join(root, "input"),
+		"--unsafe-allow-unverified-media-runtime",
 		"--sdk-build-digest", digest,
 		"--compiler-build", digest,
 		"--evaluator-build", digest,
@@ -176,7 +177,8 @@ func TestRenderApplicationOwnsAndReopensDurableState(t *testing.T) {
 		render: renderConfig{
 			enabled: true, stateDir: filepath.Join(root, "state"), outputDir: filepath.Join(root, "output"),
 			inputRoots: stringList{filepath.Join(root, "input")}, ffmpegExecutable: ffmpeg, ffprobeExecutable: ffprobe,
-			sdkBuildDigest: testSHA256('a'), compilerBuild: testSHA256('b'), evaluatorBuild: testSHA256('c'),
+			unsafeAllowUnverifiedMediaRuntime: true,
+			sdkBuildDigest:                    testSHA256('a'), compilerBuild: testSHA256('b'), evaluatorBuild: testSHA256('c'),
 			ffmpegRuntimeDependencyFingerprint: testSHA256('d'), ffprobeRuntimeDependencyFingerprint: testSHA256('e'),
 			stageMemoryBytes: 64 << 20, stageDiskBytes: 256 << 20, maxConcurrentJobs: 1,
 			workerPollInterval: 10 * time.Millisecond,

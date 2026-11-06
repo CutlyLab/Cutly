@@ -139,6 +139,24 @@ func buildRenderApplication(
 	if err := validateRenderRootSeparation(render.stateDir, render.outputDir, render.inputRoots); err != nil {
 		return nil, err
 	}
+	if render.mediaRuntimeBundleRoot != "" {
+		if err := requireRealDirectory(render.mediaRuntimeBundleRoot); err != nil {
+			return nil, fmt.Errorf("cutlyd: media runtime bundle directory: %w", err)
+		}
+		if err := validateMediaRuntimeRootSeparation(
+			render.mediaRuntimeBundleRoot,
+			configuration.projectDir,
+			render.stateDir,
+			render.outputDir,
+			render.inputRoots,
+		); err != nil {
+			return nil, err
+		}
+	}
+	mediaRuntime, err := resolveMediaRuntime(ctx, render)
+	if err != nil {
+		return nil, fmt.Errorf("cutlyd: initialize media runtime: %w", err)
+	}
 
 	owner, err := acquireRenderStateOwner(render.stateDir)
 	if err != nil {
@@ -158,20 +176,26 @@ func buildRenderApplication(
 	if err != nil {
 		return nil, fmt.Errorf("cutlyd: initialize probe registry: %w", err)
 	}
-	prober, err := cutlyffprobe.New(ctx, render.ffprobeExecutable,
-		cutlyffprobe.DefaultBuildIdentity(render.ffprobeRuntimeDependencyFingerprint), cutlyffprobe.Options{})
+	prober, err := cutlyffprobe.New(ctx, mediaRuntime.ffprobeExecutable,
+		cutlyffprobe.DefaultBuildIdentity(mediaRuntime.ffprobeRuntimeDependencyFingerprint), cutlyffprobe.Options{})
 	if err != nil {
 		return nil, fmt.Errorf("cutlyd: initialize FFprobe: %w", err)
 	}
+	if err := mediaRuntime.Revalidate(ctx); err != nil {
+		return nil, fmt.Errorf("cutlyd: revalidate media runtime after FFprobe initialization: %w", err)
+	}
 	backend, err := ffmpegbackend.New(ctx, ffmpegbackend.Options{
-		Executable: render.ffmpegExecutable, OutputRoot: render.outputDir, InputRoots: []string(render.inputRoots),
+		Executable: mediaRuntime.ffmpegExecutable, OutputRoot: render.outputDir, InputRoots: []string(render.inputRoots),
 		ProbeResolver: probeRegistry, SDKBuildDigest: render.sdkBuildDigest,
-		RuntimeDependencyFingerprint: render.ffmpegRuntimeDependencyFingerprint,
+		RuntimeDependencyFingerprint: mediaRuntime.ffmpegRuntimeDependencyFingerprint,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("cutlyd: initialize FFmpeg backend: %w", err)
 	}
 	result.backend = backend
+	if err := mediaRuntime.Revalidate(ctx); err != nil {
+		return nil, fmt.Errorf("cutlyd: revalidate media runtime after FFmpeg initialization: %w", err)
+	}
 	stageBackend, err := backendstage.AdaptFFmpeg(backend)
 	if err != nil {
 		return nil, fmt.Errorf("cutlyd: adapt FFmpeg backend: %w", err)
