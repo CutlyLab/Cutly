@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	agentprotocol "github.com/CutlyLab/Cutly/agent/protocol"
@@ -41,10 +42,16 @@ func TestTypedAgentActionsBuildExactPayloads(t *testing.T) {
 		func() (Result, error) { return client.DiscardEditV1(context.Background(), "r6", "project", "tx") },
 		func() (Result, error) { return client.RevertEditV1(context.Background(), "r7", "project", "tx", 8) },
 		func() (Result, error) {
-			return client.SubmitRender(context.Background(), "r8", "project", RenderJobV1{})
+			return client.PreflightRender(context.Background(), "r8", "project", RenderPlanV3{}, ExecutionManifestV1{})
 		},
-		func() (Result, error) { return client.RenderStatus(context.Background(), "r9", "project", "job") },
-		func() (Result, error) { return client.CancelRender(context.Background(), "r10", "project", "job") },
+		func() (Result, error) {
+			return client.RenderFrame(context.Background(), "r9", "project", RenderPlanV3{}, ExecutionManifestV1{}, ExactFrameRequestV1{})
+		},
+		func() (Result, error) {
+			return client.SubmitRender(context.Background(), "r10", "project", RenderJobV1{})
+		},
+		func() (Result, error) { return client.RenderStatus(context.Background(), "r11", "project", "job") },
+		func() (Result, error) { return client.CancelRender(context.Background(), "r12", "project", "job") },
 	}
 	for index, call := range calls {
 		if _, err := call(); err != nil {
@@ -60,11 +67,25 @@ func TestTypedAgentActionsBuildExactPayloads(t *testing.T) {
 	if got := string(requests[4].Payload); got != `{"expected_revision":7,"transaction_id":"tx"}` {
 		t.Fatalf("apply payload = %s", got)
 	}
+	wantPreflight, err := canonicaljson.Marshal(renderPreflightPayload{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(requests[7].Payload); got != string(wantPreflight) {
+		t.Fatalf("preflight payload = %s, want %s", got, wantPreflight)
+	}
+	wantFrame, err := canonicaljson.Marshal(renderFramePayload{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(requests[8].Payload); got != string(wantFrame) {
+		t.Fatalf("frame payload = %s, want %s", got, wantFrame)
+	}
 	wantRender, err := canonicaljson.Marshal(renderPayload{Job: RenderJobV1{}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := string(requests[7].Payload); got != string(wantRender) {
+	if got := string(requests[9].Payload); got != string(wantRender) {
 		t.Fatalf("render payload = %s, want %s", got, wantRender)
 	}
 }
@@ -113,6 +134,43 @@ func TestProjectReceiptDecoders(t *testing.T) {
 		if _, err := DecodeProjectMutationReceipt(raw); !errors.Is(err, ErrReceiptInvalid) {
 			t.Fatalf("invalid receipt %s: %v", raw, err)
 		}
+	}
+}
+
+func TestRenderReceiptDecoders(t *testing.T) {
+	preflightRaw, err := canonicaljson.Marshal(RenderPreflightReceiptV1{
+		Profile:         "cutly.agent-render-preflight.v1",
+		PlanFingerprint: digestString('a'), ExecutionManifestFingerprint: digestString('b'),
+		BackendID: "native-cpu", BackendBuildFingerprint: digestString('c'),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	preflight, err := DecodeRenderPreflightReceipt(preflightRaw)
+	if err != nil || preflight.BackendID != "native-cpu" {
+		t.Fatalf("preflight = %+v, %v", preflight, err)
+	}
+
+	frameRaw, err := canonicaljson.Marshal(RenderFrameReceiptV1{
+		Profile: "cutly.agent-render-frame.v1",
+		Request: ExactFrameRequestV1{
+			SchemaVersion: 1, ID: "frame", IdempotencyKey: "frame-once",
+			PlanFingerprint: digestString('a'), ExecutionManifestFingerprint: digestString('b'),
+			ArtifactURI: "file:///controlled/frame.png",
+		},
+		Artifact: ExactFrameArtifactV1{},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if receipt, err := DecodeRenderFrameReceipt(frameRaw); err != nil || receipt.Request.ID != "frame" {
+		t.Fatalf("frame = %+v, %v", receipt, err)
+	}
+
+	bad := append([]byte(nil), preflightRaw...)
+	bad = []byte(strings.Replace(string(bad), digestString('a'), "sha256:ABC", 1))
+	if _, err := DecodeRenderPreflightReceipt(bad); !errors.Is(err, ErrReceiptInvalid) {
+		t.Fatalf("bad preflight = %v", err)
 	}
 }
 

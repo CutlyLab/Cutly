@@ -6,11 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
+	"strings"
 
 	agentprotocol "github.com/CutlyLab/Cutly/agent/protocol"
 	"github.com/CutlyLab/Cutly/core/videoedit"
 	"github.com/CutlyLab/Cutly/internal/wirejson"
 	"github.com/CutlyLab/Cutly/protocol/canonicaljson"
+	renderapi "github.com/CutlyLab/Cutly/render/api"
 )
 
 var ErrReceiptInvalid = errors.New("cutly sdk: Agent receipt is invalid")
@@ -113,8 +116,33 @@ type renderPayload struct {
 	Job RenderJobV1 `json:"job"`
 }
 
+type renderPreflightPayload struct {
+	Plan              RenderPlanV3        `json:"plan"`
+	ExecutionManifest ExecutionManifestV1 `json:"execution_manifest"`
+}
+
+type renderFramePayload struct {
+	Plan              RenderPlanV3        `json:"plan"`
+	ExecutionManifest ExecutionManifestV1 `json:"execution_manifest"`
+	Frame             ExactFrameRequestV1 `json:"frame"`
+}
+
 type jobPayload struct {
 	JobID string `json:"job_id"`
+}
+
+type RenderPreflightReceiptV1 struct {
+	Profile                      string `json:"profile"`
+	PlanFingerprint              string `json:"plan_fingerprint"`
+	ExecutionManifestFingerprint string `json:"execution_manifest_fingerprint"`
+	BackendID                    string `json:"backend_id"`
+	BackendBuildFingerprint      string `json:"backend_build_fingerprint"`
+}
+
+type RenderFrameReceiptV1 struct {
+	Profile  string               `json:"profile"`
+	Request  ExactFrameRequestV1  `json:"request"`
+	Artifact ExactFrameArtifactV1 `json:"artifact"`
 }
 
 func (client *Client) InspectProject(ctx context.Context, requestID, projectID string) (Result, error) {
@@ -154,6 +182,29 @@ func (client *Client) RevertEditV1(
 ) (Result, error) {
 	return client.Invoke(ctx, requestID, ToolEdit, "revert", projectID, revisionPayload{
 		TransactionID: transactionID, ExpectedRevision: expectedRevision,
+	})
+}
+
+func (client *Client) PreflightRender(
+	ctx context.Context,
+	requestID, projectID string,
+	plan RenderPlanV3,
+	manifest ExecutionManifestV1,
+) (Result, error) {
+	return client.Invoke(ctx, requestID, ToolRender, "preflight", projectID, renderPreflightPayload{
+		Plan: plan, ExecutionManifest: manifest,
+	})
+}
+
+func (client *Client) RenderFrame(
+	ctx context.Context,
+	requestID, projectID string,
+	plan RenderPlanV3,
+	manifest ExecutionManifestV1,
+	frame ExactFrameRequestV1,
+) (Result, error) {
+	return client.Invoke(ctx, requestID, ToolRender, "frame", projectID, renderFramePayload{
+		Plan: plan, ExecutionManifest: manifest, Frame: frame,
 	})
 }
 
@@ -207,6 +258,75 @@ func DecodeProjectMutationReceipt(raw json.RawMessage) (ProjectMutationReceiptV1
 	return receipt, nil
 }
 
+func DecodeRenderPreflightReceipt(raw json.RawMessage) (RenderPreflightReceiptV1, error) {
+	var receipt RenderPreflightReceiptV1
+	if err := decodeReceipt(raw, "cutly.agent-render-preflight.v1", &receipt, func() string { return receipt.Profile }); err != nil {
+		return RenderPreflightReceiptV1{}, err
+	}
+	if !canonicalDigest(receipt.PlanFingerprint) || !canonicalDigest(receipt.ExecutionManifestFingerprint) ||
+		!canonicalDigest(receipt.BackendBuildFingerprint) || strings.TrimSpace(receipt.BackendID) == "" {
+		return RenderPreflightReceiptV1{}, fmt.Errorf("%w: preflight identities are incomplete", ErrReceiptInvalid)
+	}
+	return receipt, nil
+}
+
+func ValidateRenderPreflightReceipt(
+	receipt RenderPreflightReceiptV1,
+	plan RenderPlanV3,
+	manifest ExecutionManifestV1,
+) error {
+	if receipt.Profile != "cutly.agent-render-preflight.v1" || receipt.PlanFingerprint != plan.Fingerprint ||
+		receipt.ExecutionManifestFingerprint != manifest.Fingerprint ||
+		receipt.BackendID != manifest.Backend.BackendID ||
+		receipt.BackendBuildFingerprint != manifest.Backend.BuildFingerprint {
+		return fmt.Errorf("%w: preflight receipt binding", ErrReceiptInvalid)
+	}
+	refrozen, err := renderapi.FreezeExecutionManifest(plan, manifest)
+	var suppliedManifest, refrozenManifest []byte
+	if err == nil {
+		suppliedManifest, err = canonicaljson.Marshal(manifest)
+	}
+	if err == nil {
+		refrozenManifest, err = canonicaljson.Marshal(refrozen)
+	}
+	if err != nil || !bytes.Equal(suppliedManifest, refrozenManifest) {
+		return fmt.Errorf("%w: plan/manifest binding: %v", ErrReceiptInvalid, err)
+	}
+	return nil
+}
+
+func DecodeRenderFrameReceipt(raw json.RawMessage) (RenderFrameReceiptV1, error) {
+	var receipt RenderFrameReceiptV1
+	if err := decodeReceipt(raw, "cutly.agent-render-frame.v1", &receipt, func() string { return receipt.Profile }); err != nil {
+		return RenderFrameReceiptV1{}, err
+	}
+	requestRaw, err := canonicaljson.Marshal(receipt.Request)
+	if err != nil {
+		return RenderFrameReceiptV1{}, fmt.Errorf("%w: frame request encode: %v", ErrReceiptInvalid, err)
+	}
+	verified, err := renderapi.DecodeExactFrameRequest(requestRaw)
+	if err != nil || !reflect.DeepEqual(verified, receipt.Request) {
+		return RenderFrameReceiptV1{}, fmt.Errorf("%w: frame request: %v", ErrReceiptInvalid, err)
+	}
+	return receipt, nil
+}
+
+func ValidateRenderFrameReceipt(
+	receipt RenderFrameReceiptV1,
+	plan RenderPlanV3,
+	manifest ExecutionManifestV1,
+) error {
+	if receipt.Profile != "cutly.agent-render-frame.v1" {
+		return fmt.Errorf("%w: frame receipt profile", ErrReceiptInvalid)
+	}
+	if err := renderapi.ValidateExactFrameArtifact(receipt.Artifact, renderapi.ExactFrameRenderRequest{
+		Frame: receipt.Request, Plan: plan, Manifest: manifest,
+	}); err != nil {
+		return fmt.Errorf("%w: frame artifact: %v", ErrReceiptInvalid, err)
+	}
+	return nil
+}
+
 func decodeReceipt(raw json.RawMessage, profile string, target any, actual func() string) error {
 	if len(raw) == 0 || len(raw) > agentprotocol.MaxResultBytes {
 		return fmt.Errorf("%w: encoded length %d", ErrReceiptInvalid, len(raw))
@@ -222,4 +342,16 @@ func decodeReceipt(raw json.RawMessage, profile string, target any, actual func(
 		return fmt.Errorf("%w: profile %q, want %q", ErrReceiptInvalid, actual(), profile)
 	}
 	return nil
+}
+
+func canonicalDigest(value string) bool {
+	if len(value) != len("sha256:")+64 || !strings.HasPrefix(value, "sha256:") {
+		return false
+	}
+	for _, character := range value[len("sha256:"):] {
+		if (character < '0' || character > '9') && (character < 'a' || character > 'f') {
+			return false
+		}
+	}
+	return true
 }
