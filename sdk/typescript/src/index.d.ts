@@ -352,7 +352,7 @@ export declare function selectionPrimitive(input?: {
 export type AgentTool = "cutly_project" | "cutly_edit" | "cutly_render";
 export type ProjectAction = "inspect" | "status" | "history" | "capabilities";
 export type EditAction = "plan" | "apply" | "discard" | "revert";
-export type RenderAction = "plan" | "prepare" | "preflight" | "frame" | "render" | "status" | "cancel";
+export type RenderAction = "plan" | "prepare" | "preflight" | "frame" | "render" | "status" | "history" | "cancel";
 export type AgentAction = ProjectAction | EditAction | RenderAction;
 
 export interface AgentRequestInput {
@@ -666,6 +666,30 @@ export interface RenderJobSnapshotV1 {
   readonly artifact?: RenderArtifactV1;
 }
 
+export type RenderJobEventKind = "submitted" | "started" | "cancel_requested" | "canceled" | "failed" | "completed";
+
+export interface RenderJobEventV1 {
+  readonly schema_version: 1n;
+  readonly job_id: string;
+  readonly sequence: bigint;
+  readonly kind: RenderJobEventKind;
+  readonly state: RenderJobState;
+  readonly job?: RenderJobV1;
+  readonly failure_class?: string;
+  readonly failure_message?: string;
+  readonly artifact?: RenderArtifactV1;
+}
+
+export interface RenderJobHistoryPageV1 {
+  readonly schema_version: 1n;
+  readonly profile: "cutly.render-job-history.v1";
+  readonly after_sequence: bigint;
+  readonly next_after_sequence: bigint;
+  readonly caught_up: boolean;
+  readonly events: readonly RenderJobEventV1[];
+  readonly snapshot: RenderJobSnapshotV1;
+}
+
 export interface RenderJobSnapshotReceiptBinding {
   requestId: string;
   projectId: string;
@@ -677,6 +701,18 @@ export declare function decodeRenderJobSnapshotReceipt(
   result: AgentResult,
   expected: RenderJobSnapshotReceiptBinding,
 ): RenderJobSnapshotV1;
+
+export interface RenderJobHistoryPageReceiptBinding {
+  requestId: string;
+  projectId: string;
+  job: RenderJobV1;
+  afterSequence: number | bigint;
+}
+
+export declare function decodeRenderJobHistoryPageReceipt(
+  result: AgentResult,
+  expected: RenderJobHistoryPageReceiptBinding,
+): RenderJobHistoryPageV1;
 
 export declare function createRenderJob(input: {
   jobId: string;
@@ -732,6 +768,10 @@ export declare class CutlyClient {
     job: Readonly<Record<string, CanonicalJSONInput>>;
   }, options?: { signal?: AbortSignal }): Promise<AgentResult>;
   renderStatus(input: AgentJobAction, options?: { signal?: AbortSignal }): Promise<AgentResult>;
+  renderHistory(input: AgentJobAction & {
+    afterSequence?: number | bigint;
+    limit?: number | bigint;
+  }, options?: { signal?: AbortSignal }): Promise<AgentResult>;
   cancelRender(input: AgentJobAction, options?: { signal?: AbortSignal }): Promise<AgentResult>;
 }
 

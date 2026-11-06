@@ -19,7 +19,7 @@ const MAX_LIST_ITEMS = 4096;
 const ACTIONS = Object.freeze({
   cutly_project: Object.freeze(new Set(["inspect", "status", "history", "capabilities"])),
   cutly_edit: Object.freeze(new Set(["plan", "apply", "discard", "revert"])),
-  cutly_render: Object.freeze(new Set(["plan", "prepare", "preflight", "frame", "render", "status", "cancel"])),
+  cutly_render: Object.freeze(new Set(["plan", "prepare", "preflight", "frame", "render", "status", "history", "cancel"])),
 });
 
 const textEncoder = new TextEncoder();
@@ -193,6 +193,13 @@ export class CutlyClient {
   renderStatus({ requestId, projectId, jobId }, options) {
     return this.callAction({
       requestId, projectId, tool: "cutly_render", action: "status", payload: { job_id: jobId },
+    }, options);
+  }
+
+  renderHistory({ requestId, projectId, jobId, afterSequence = 0n, limit = 0n }, options) {
+    return this.callAction({
+      requestId, projectId, tool: "cutly_render", action: "history",
+      payload: { job_id: jobId, after_sequence: afterSequence, limit },
     }, options);
   }
 

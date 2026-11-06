@@ -55,6 +55,19 @@ func TestQueueRoutesSubmitStatusCancelAndReplay(t *testing.T) {
 	if err != nil || !status.OK || status.State != string(renderapi.JobQueued) {
 		t.Fatalf("status = %+v, err = %v", status, err)
 	}
+	history, err := actionRouter.HandleAgent(context.Background(), request("history", json.RawMessage(`{"job_id":"job-1","after_sequence":0,"limit":1}`)))
+	if err != nil || !history.OK || history.State != string(renderapi.JobQueued) {
+		t.Fatalf("history = %+v, err = %v", history, err)
+	}
+	page, err := scheduler.DecodeJobEventPage(history.Receipt)
+	if err != nil || len(page.Events) != 1 || page.Events[0].Kind != scheduler.EventSubmitted || !page.CaughtUp {
+		t.Fatalf("event receipt = %+v, err = %v", page, err)
+	}
+	invalidCursor, err := actionRouter.HandleAgent(context.Background(), request("history", json.RawMessage(`{"job_id":"job-1","after_sequence":2}`)))
+	if err != nil || invalidCursor.OK || len(invalidCursor.Diagnostics) != 1 ||
+		invalidCursor.Diagnostics[0].Code != CodePayloadInvalid || invalidCursor.Diagnostics[0].Path != "/payload/after_sequence" {
+		t.Fatalf("invalid history cursor = %+v, err = %v", invalidCursor, err)
+	}
 	canceled, err := actionRouter.HandleAgent(context.Background(), request("cancel", json.RawMessage(`{"job_id":"job-1"}`)))
 	if err != nil || !canceled.OK || !canceled.Changed || canceled.State != string(renderapi.JobCanceling) {
 		t.Fatalf("cancel = %+v, err = %v", canceled, err)
@@ -73,6 +86,8 @@ func TestQueueRejectsPayloadAndSchedulerBusinessErrors(t *testing.T) {
 		{action: "render", payload: json.RawMessage(`{}`), code: CodePayloadInvalid},
 		{action: "status", payload: json.RawMessage(`{"job_id":"missing","extra":1}`), code: CodePayloadInvalid},
 		{action: "status", payload: json.RawMessage(`{"job_id":"missing"}`), code: CodeJobNotFound},
+		{action: "history", payload: json.RawMessage(`{"job_id":"missing"}`), code: CodeJobNotFound},
+		{action: "history", payload: json.RawMessage(`{"job_id":"job-1","limit":65}`), code: CodePayloadInvalid},
 	} {
 		result, err := actionRouter.HandleAgent(context.Background(), request(test.action, test.payload))
 		if err != nil || result.OK || result.Diagnostics[0].Code != test.code {
@@ -104,9 +119,10 @@ func TestScopedQueueRejectsAnotherProjectBeforeCallbacks(t *testing.T) {
 		t.Fatal(err)
 	}
 	payloads := map[string]json.RawMessage{
-		"render": mustJobPayload(t),
-		"status": json.RawMessage(`{"job_id":"job-1"}`),
-		"cancel": json.RawMessage(`{"job_id":"job-1"}`),
+		"render":  mustJobPayload(t),
+		"status":  json.RawMessage(`{"job_id":"job-1"}`),
+		"history": json.RawMessage(`{"job_id":"job-1"}`),
+		"cancel":  json.RawMessage(`{"job_id":"job-1"}`),
 	}
 	for _, route := range service.Routes() {
 		foreign := request(route.Action, payloads[route.Action])
@@ -117,7 +133,7 @@ func TestScopedQueueRejectsAnotherProjectBeforeCallbacks(t *testing.T) {
 		}
 	}
 	if admissionCalls.Load() != 0 || coordinator.submitCalls.Load() != 0 ||
-		coordinator.snapshotCalls.Load() != 0 || coordinator.cancelCalls.Load() != 0 {
+		coordinator.snapshotCalls.Load() != 0 || coordinator.historyCalls.Load() != 0 || coordinator.cancelCalls.Load() != 0 {
 		t.Fatalf("callbacks admission=%d submit=%d snapshot=%d cancel=%d",
 			admissionCalls.Load(), coordinator.submitCalls.Load(), coordinator.snapshotCalls.Load(), coordinator.cancelCalls.Load())
 	}
@@ -292,6 +308,9 @@ func (failingCoordinator) Submit(context.Context, renderapi.RenderJob) (schedule
 func (failingCoordinator) Snapshot(string) (scheduler.JobSnapshot, error) {
 	return scheduler.JobSnapshot{}, scheduler.ErrStore
 }
+func (failingCoordinator) History(string, uint64, int) (scheduler.JobEventPage, error) {
+	return scheduler.JobEventPage{}, scheduler.ErrStore
+}
 func (failingCoordinator) RequestCancel(context.Context, string) (scheduler.JobSnapshot, bool, error) {
 	return scheduler.JobSnapshot{}, false, scheduler.ErrStore
 }
@@ -299,6 +318,7 @@ func (failingCoordinator) RequestCancel(context.Context, string) (scheduler.JobS
 type countingCoordinator struct {
 	submitCalls   atomic.Int32
 	snapshotCalls atomic.Int32
+	historyCalls  atomic.Int32
 	cancelCalls   atomic.Int32
 }
 
@@ -310,6 +330,11 @@ func (coordinator *countingCoordinator) Submit(context.Context, renderapi.Render
 func (coordinator *countingCoordinator) Snapshot(string) (scheduler.JobSnapshot, error) {
 	coordinator.snapshotCalls.Add(1)
 	return scheduler.JobSnapshot{}, errors.New("unexpected snapshot")
+}
+
+func (coordinator *countingCoordinator) History(string, uint64, int) (scheduler.JobEventPage, error) {
+	coordinator.historyCalls.Add(1)
+	return scheduler.JobEventPage{}, errors.New("unexpected history")
 }
 
 func (coordinator *countingCoordinator) RequestCancel(context.Context, string) (scheduler.JobSnapshot, bool, error) {

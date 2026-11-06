@@ -44,6 +44,10 @@ func (*stubQueueCoordinator) Snapshot(string) (scheduler.JobSnapshot, error) {
 	return scheduler.JobSnapshot{}, nil
 }
 
+func (*stubQueueCoordinator) History(string, uint64, int) (scheduler.JobEventPage, error) {
+	return scheduler.JobEventPage{}, nil
+}
+
 func (coordinator *stubQueueCoordinator) RequestCancel(context.Context, string) (scheduler.JobSnapshot, bool, error) {
 	return scheduler.JobSnapshot{}, false, coordinator.err
 }

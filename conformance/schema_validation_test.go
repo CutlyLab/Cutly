@@ -87,6 +87,7 @@ func TestSchemasCompileAndValidateInstances(t *testing.T) {
 		"cutly.media-runtime-bundle.v1.schema.json": "conformance/fixtures/media-runtime-bundle-v1.valid.json",
 		"cutly.execution-manifest.v1.schema.json":   "render/api/testdata/execution-manifest-v1.valid.json",
 		"cutly.render-job.v1.schema.json":           "render/api/testdata/render-job-v1.valid.json",
+		"cutly.render-job-history.v1.schema.json":   "render/scheduler/testdata/job-history-page-v1.canonical.json",
 		"cutly.exact-frame-request.v1.schema.json":  "render/api/testdata/exact-frame-request-v1.valid.json",
 		"cutly.evidence-manifest.v1.schema.json":    "render/evidence/testdata/evidence-manifest-v1.valid.json",
 	}
@@ -442,6 +443,8 @@ func mutateCriticalSchemaInvalid(t *testing.T, name string, value map[string]any
 		value["resources"].([]any)[0].(map[string]any)["locator"] = "cas://sha256/not-a-digest"
 	case "cutly.render-job.v1.schema.json":
 		value["artifact_uri"] = "https://example.invalid/output.mp4"
+	case "cutly.render-job-history.v1.schema.json":
+		value["events"].([]any)[0].(map[string]any)["state"] = "complete"
 	case "cutly.exact-frame-request.v1.schema.json":
 		value["artifact_uri"] = "https://example.invalid/frame.png"
 	case "cutly.evidence-manifest.v1.schema.json":

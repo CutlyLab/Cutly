@@ -150,6 +150,12 @@ type jobPayload struct {
 	JobID string `json:"job_id"`
 }
 
+type jobHistoryPayload struct {
+	JobID         string `json:"job_id"`
+	AfterSequence uint64 `json:"after_sequence,omitempty"`
+	Limit         uint64 `json:"limit,omitempty"`
+}
+
 const RenderPlanReceiptProfileV1 = "cutly.agent-render-plan.v1"
 
 type RenderPlanReceiptV1 struct {
@@ -281,6 +287,19 @@ func (client *Client) SubmitRender(ctx context.Context, requestID, projectID str
 
 func (client *Client) RenderStatus(ctx context.Context, requestID, projectID, jobID string) (Result, error) {
 	return client.Invoke(ctx, requestID, ToolRender, "status", projectID, jobPayload{JobID: jobID})
+}
+
+// RenderHistory returns one cursor-bound page of durable scheduler lifecycle
+// history. A zero limit selects the protocol default. Pass the receipt's
+// NextAfterSequence to continue without missing a concurrent transition.
+func (client *Client) RenderHistory(
+	ctx context.Context,
+	requestID, projectID, jobID string,
+	afterSequence, limit uint64,
+) (Result, error) {
+	return client.Invoke(ctx, requestID, ToolRender, "history", projectID, jobHistoryPayload{
+		JobID: jobID, AfterSequence: afterSequence, Limit: limit,
+	})
 }
 
 func (client *Client) CancelRender(ctx context.Context, requestID, projectID, jobID string) (Result, error) {

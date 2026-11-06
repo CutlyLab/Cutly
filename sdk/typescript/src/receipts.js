@@ -5,6 +5,8 @@ import {
 } from "./canonical-json.js";
 
 const MAX_RECEIPT_BYTES = 16 << 20;
+const MAX_SCHEDULER_RECEIPT_BYTES = 4 << 20;
+const MAX_FAILURE_MESSAGE_BYTES = 64 << 10;
 const INT64_MIN = -(1n << 63n);
 const INT64_MAX = (1n << 63n) - 1n;
 const UINT64_MAX = (1n << 64n) - 1n;
@@ -67,6 +69,17 @@ const SNAPSHOT_REQUIRED_KEYS = Object.freeze([
 const ARTIFACT_KEYS = Object.freeze([
   "content_hash", "duration", "evidence_fingerprint", "evidence_uri",
   "execution_manifest_fingerprint", "frame_count", "sample_count", "size_bytes", "uri",
+]);
+const EVENT_PAGE_KEYS = Object.freeze([
+  "after_sequence", "caught_up", "events", "next_after_sequence", "profile",
+  "schema_version", "snapshot",
+]);
+const JOB_EVENT_KEYS = Object.freeze([
+  "artifact", "failure_class", "failure_message", "job", "job_id", "kind",
+  "schema_version", "sequence", "state",
+]);
+const JOB_EVENT_REQUIRED_KEYS = Object.freeze([
+  "job_id", "kind", "schema_version", "sequence", "state",
 ]);
 
 const ASSET_KINDS = new Set(["video", "audio", "image", "font", "data"]);
@@ -183,8 +196,91 @@ export function decodeRenderJobSnapshotReceipt(result, expected) {
   const job = validateRenderJob(binding.job, "expected render job", "RECEIPT.INPUT_INVALID");
   const normalized = ownResult(result);
   requireRenderSuccess(normalized, binding, binding.action, undefined, job.id);
-  const snapshot = normalized.receipt;
+  const snapshot = validateRenderJobSnapshot(normalized.receipt, job);
+  if (normalized.state !== snapshot.state) {
+    fail("RECEIPT.BINDING_INVALID", "Agent result state does not match the snapshot state");
+  }
+  const shouldRender = binding.action === "cancel" ? false : !TERMINAL_STATES.has(snapshot.state);
+  if (normalized.render_required !== shouldRender) {
+    fail("RECEIPT.BINDING_INVALID", "Agent render_required does not match the snapshot state/action");
+  }
+
+  return snapshot;
+}
+
+// decodeRenderJobHistoryPageReceipt validates a lifecycle-history cursor page and the embedded
+// current snapshot against the exact submitted job. Pages are point-in-time:
+// caught_up applies to the embedded snapshot, while a later transition may be
+// committed immediately after the response.
+export function decodeRenderJobHistoryPageReceipt(result, expected) {
+  const binding = ownInput(
+    expected,
+    ["afterSequence", "job", "projectId", "requestId"],
+    "render history binding",
+  );
+  const job = validateRenderJob(binding.job, "expected render job", "RECEIPT.INPUT_INVALID");
+  const afterSequence = requireInteger(
+    binding.afterSequence,
+    "render history afterSequence",
+    0n,
+    UINT64_MAX,
+    "RECEIPT.INPUT_INVALID",
+  );
+  const normalized = ownResult(result);
+  requireRenderSuccess(normalized, binding, "history", undefined, job.id);
+  const page = normalized.receipt;
+  requireObject(page, "render job history page");
+  enforceSchedulerReceiptSize(page, "render job history page");
+  requireKeys(page, EVENT_PAGE_KEYS, EVENT_PAGE_KEYS, "render job history page");
+  if (page.schema_version !== 1n || page.profile !== "cutly.render-job-history.v1") {
+    fail("RECEIPT.PROFILE_INVALID", "render job history page profile is unsupported");
+  }
+  if (page.after_sequence !== afterSequence) {
+    fail("RECEIPT.BINDING_INVALID", "history page cursor does not match the request");
+  }
+  const snapshot = validateRenderJobSnapshot(page.snapshot, job);
+  if (normalized.state !== snapshot.state || normalized.render_required !== !TERMINAL_STATES.has(snapshot.state)) {
+    fail("RECEIPT.BINDING_INVALID", "Agent history result does not match the embedded snapshot");
+  }
+  const next = requireInteger(page.next_after_sequence, "history page next cursor", afterSequence, snapshot.last_sequence);
+  if (typeof page.caught_up !== "boolean" || page.caught_up !== (next === snapshot.last_sequence)) {
+    fail("RECEIPT.INVALID", "history page caught_up does not match its cursor boundary");
+  }
+  if (!Array.isArray(page.events) || page.events.length > 64) {
+    fail("RECEIPT.INVALID", "history page events must be a bounded array");
+  }
+  if (afterSequence < snapshot.last_sequence && page.events.length === 0) {
+    fail("RECEIPT.INVALID", "history page omitted an available event");
+  }
+  if (afterSequence === snapshot.last_sequence && page.events.length !== 0) {
+    fail("RECEIPT.INVALID", "caught-up history page contains events");
+  }
+  let wanted = afterSequence + 1n;
+  for (let index = 0; index < page.events.length; index += 1) {
+    validateRenderJobEvent(page.events[index], job, wanted, snapshot.last_sequence, `event page events[${index}]`);
+    if (index !== 0 && !validJobTransition(page.events[index - 1].state, page.events[index].state)) {
+      fail("RECEIPT.INVALID", `event page events[${index}] is not a legal lifecycle transition`);
+    }
+    wanted += 1n;
+  }
+  const wantedNext = page.events.length === 0 ? afterSequence : page.events[page.events.length - 1].sequence;
+  if (next !== wantedNext) fail("RECEIPT.INVALID", "history page next cursor does not follow its events");
+  if (next === snapshot.last_sequence && page.events.length !== 0) {
+    const finalEvent = page.events[page.events.length - 1];
+    if (finalEvent.state !== snapshot.state || finalEvent.failure_class !== snapshot.failure_class ||
+        finalEvent.failure_message !== snapshot.failure_message ||
+        !canonicalOptionalEqual(finalEvent.artifact, snapshot.artifact)) {
+      fail("RECEIPT.INVALID", "history page final event differs from its snapshot");
+    }
+  } else if (page.events.length !== 0 && !eventCanReachSnapshot(page.events[page.events.length - 1], snapshot)) {
+    fail("RECEIPT.INVALID", "history page lifecycle cannot reach its snapshot");
+  }
+  return page;
+}
+
+function validateRenderJobSnapshot(snapshot, job) {
   requireObject(snapshot, "render job snapshot");
+  enforceSchedulerReceiptSize(snapshot, "render job snapshot");
   requireKeys(snapshot, SNAPSHOT_KEYS, SNAPSHOT_REQUIRED_KEYS, "render job snapshot");
   if (snapshot.schema_version !== 1n) fail("RECEIPT.INVALID", "snapshot schema_version must be 1");
   const snapshotJob = validateRenderJob(snapshot.job, "snapshot job");
@@ -196,28 +292,55 @@ export function decodeRenderJobSnapshotReceipt(result, expected) {
   if (!validSnapshotSequence(snapshot.state, lastSequence)) {
     fail("RECEIPT.INVALID", "snapshot state and sequence are inconsistent");
   }
-  if (normalized.state !== snapshot.state) {
-    fail("RECEIPT.BINDING_INVALID", "Agent result state does not match the snapshot state");
-  }
-  const shouldRender = binding.action === "cancel" ? false : !TERMINAL_STATES.has(snapshot.state);
-  if (normalized.render_required !== shouldRender) {
-    fail("RECEIPT.BINDING_INVALID", "Agent render_required does not match the snapshot state/action");
-  }
-
   if (snapshot.state === "failed") {
-    if (!FAILURE_CLASSES.has(snapshot.failure_class) || !isNonblank(snapshot.failure_message)) {
+    if (!FAILURE_CLASSES.has(snapshot.failure_class) || !validFailureMessage(snapshot.failure_message)) {
       fail("RECEIPT.INVALID", "failed snapshot requires a supported failure class and message");
     }
   } else if (snapshot.failure_class !== undefined || snapshot.failure_message !== undefined) {
     fail("RECEIPT.INVALID", "failure fields are valid only for a failed snapshot");
   }
-
   if (snapshot.state === "complete") {
     validateRenderArtifact(snapshot.artifact, snapshotJob);
   } else if (snapshot.artifact !== undefined) {
     fail("RECEIPT.INVALID", "artifact is valid only for a complete snapshot");
   }
   return snapshot;
+}
+
+function validateRenderJobEvent(event, job, wantedSequence, lastSequence, name) {
+  requireObject(event, name);
+  requireKeys(event, JOB_EVENT_KEYS, JOB_EVENT_REQUIRED_KEYS, name);
+  if (event.schema_version !== 1n || event.job_id !== job.id) {
+    fail("RECEIPT.BINDING_INVALID", `${name} is not bound to the submitted job`);
+  }
+  const sequence = requireInteger(event.sequence, `${name}.sequence`, 1n, UINT64_MAX);
+  if (sequence !== wantedSequence || sequence > lastSequence) {
+    fail("RECEIPT.INVALID", `${name} sequence is not contiguous`);
+  }
+  const states = {
+    submitted: "queued", started: "running", cancel_requested: "canceling",
+    canceled: "canceled", failed: "failed", completed: "complete",
+  };
+  if (states[event.kind] === undefined || states[event.kind] !== event.state || !validEventSequence(event.kind, sequence)) {
+    fail("RECEIPT.INVALID", `${name} kind, state, and sequence are inconsistent`);
+  }
+  if (event.kind === "submitted") {
+    if (!canonicalEqual(validateRenderJob(event.job, `${name}.job`), job)) {
+      fail("RECEIPT.BINDING_INVALID", `${name} submitted job differs from the expected job`);
+    }
+  } else if (event.job !== undefined) {
+    fail("RECEIPT.INVALID", `${name}.job is valid only for submitted`);
+  }
+  if (event.kind === "failed") {
+    if (!FAILURE_CLASSES.has(event.failure_class) || !validFailureMessage(event.failure_message)) {
+      fail("RECEIPT.INVALID", `${name} failed event requires failure details`);
+    }
+  } else if (event.failure_class !== undefined || event.failure_message !== undefined) {
+    fail("RECEIPT.INVALID", `${name} failure fields are valid only for failed`);
+  }
+  if (event.kind === "completed") validateRenderArtifact(event.artifact, job);
+  else if (event.artifact !== undefined) fail("RECEIPT.INVALID", `${name}.artifact is valid only for completed`);
+  return event;
 }
 
 function ownInput(value, allowed, name, required = allowed) {
@@ -792,6 +915,42 @@ function validSnapshotSequence(state, sequence) {
   return false;
 }
 
+function validEventSequence(kind, sequence) {
+  if (kind === "submitted") return sequence === 1n;
+  if (kind === "started") return sequence === 2n;
+  if (kind === "cancel_requested") return sequence === 2n || sequence === 3n;
+  if (kind === "canceled") return sequence === 3n || sequence === 4n;
+  if (kind === "failed") return sequence >= 2n && sequence <= 4n;
+  if (kind === "completed") return sequence === 3n;
+  return false;
+}
+
+function validJobTransition(from, to) {
+  if (from === "queued") return to === "running" || to === "canceling" || to === "failed";
+  if (from === "running") return to === "canceling" || to === "failed" || to === "complete";
+  if (from === "canceling") return to === "canceled" || to === "failed";
+  return false;
+}
+
+function eventCanReachSnapshot(event, snapshot) {
+  if (event.sequence >= snapshot.last_sequence) {
+    return event.sequence === snapshot.last_sequence && event.state === snapshot.state;
+  }
+  const allStates = ["queued", "running", "canceling", "canceled", "failed", "complete"];
+  let states = new Set([event.state]);
+  for (let sequence = event.sequence + 1n; sequence <= snapshot.last_sequence; sequence += 1n) {
+    const next = new Set();
+    for (const from of states) {
+      for (const to of allStates) {
+        if (validJobTransition(from, to) && validSnapshotSequence(to, sequence)) next.add(to);
+      }
+    }
+    if (next.size === 0) return false;
+    states = next;
+  }
+  return states.has(snapshot.state);
+}
+
 async function fingerprintGoValue(input, name) {
   try {
     return (await digestCanonicalValue(input, { maxInputBytes: MAX_RECEIPT_BYTES })).digest;
@@ -1024,6 +1183,11 @@ function canonicalEqual(left, right) {
   return leftBytes.every((value, index) => value === rightBytes[index]);
 }
 
+function canonicalOptionalEqual(left, right) {
+  if (left === undefined || right === undefined) return left === undefined && right === undefined;
+  return canonicalEqual(left, right);
+}
+
 function ownCanonical(value, name, code) {
   try {
     const bytes = encodeCanonicalValue(value, { maxInputBytes: MAX_RECEIPT_BYTES });
@@ -1070,6 +1234,18 @@ function requireNonblank(value, name, code = "RECEIPT.INVALID") {
 
 function isNonblank(value) {
   return typeof value === "string" && value.length > 0 && !/^\p{White_Space}*$/u.test(value);
+}
+
+function validFailureMessage(value) {
+  return isNonblank(value) && UTF8.encode(value).byteLength <= MAX_FAILURE_MESSAGE_BYTES;
+}
+
+function enforceSchedulerReceiptSize(value, name) {
+  try {
+    encodeCanonicalValue(value, { maxInputBytes: MAX_SCHEDULER_RECEIPT_BYTES });
+  } catch (error) {
+    fail("RECEIPT.INVALID", `${name} exceeds the scheduler wire limit`, error);
+  }
 }
 
 function capabilityID(value) {

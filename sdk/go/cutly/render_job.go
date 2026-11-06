@@ -17,6 +17,10 @@ import (
 // status, and cancel actions.
 type RenderJobSnapshotV1 = scheduler.JobSnapshot
 
+// RenderJobHistoryPageV1 is the strict cursor receipt returned by the render
+// history action. Structured stage/progress events use a separate future API.
+type RenderJobHistoryPageV1 = scheduler.JobEventPage
+
 // BuildRenderJobV1 creates the whole-plan public render job. The ranges and
 // immutable fingerprints are copied from the verified plan and manifest so a
 // caller cannot accidentally submit a job that addresses different work.
@@ -100,6 +104,18 @@ func DecodeRenderJobSnapshotReceipt(raw json.RawMessage) (RenderJobSnapshotV1, e
 	return snapshot, nil
 }
 
+// DecodeRenderJobHistoryPageReceipt strictly decodes one canonical cursor page.
+func DecodeRenderJobHistoryPageReceipt(raw json.RawMessage) (RenderJobHistoryPageV1, error) {
+	if len(raw) == 0 || len(raw) > scheduler.MaxProtocolBytes {
+		return RenderJobHistoryPageV1{}, fmt.Errorf("%w: scheduler history receipt encoded length %d", ErrReceiptInvalid, len(raw))
+	}
+	page, err := scheduler.DecodeJobEventPage(raw)
+	if err != nil {
+		return RenderJobHistoryPageV1{}, fmt.Errorf("%w: scheduler history receipt: %v", ErrReceiptInvalid, err)
+	}
+	return page, nil
+}
+
 // ValidateRenderJobSnapshotReceipt binds a decoded scheduler receipt to the
 // exact job submitted by the caller. DecodeRenderJobSnapshotReceipt remains a
 // useful low-level shape boundary; callers that act on a status or terminal
@@ -142,6 +158,27 @@ func ValidateRenderJobSnapshotReceipt(snapshot RenderJobSnapshotV1, expected Ren
 			artifact.SampleCount != verifiedExpected.SampleRange.Count {
 			return fmt.Errorf("%w: terminal artifact does not match the submitted job", ErrReceiptInvalid)
 		}
+	}
+	return nil
+}
+
+// ValidateRenderJobHistoryPageReceipt binds a lifecycle-history receipt to the exact job
+// and cursor requested by the caller. It also revalidates the embedded current
+// snapshot and terminal artifact through the public snapshot validator.
+func ValidateRenderJobHistoryPageReceipt(page RenderJobHistoryPageV1, expected RenderJobV1, afterSequence uint64) error {
+	pageRaw, err := canonicaljson.Marshal(page)
+	if err != nil {
+		return fmt.Errorf("%w: encode scheduler history receipt: %v", ErrReceiptInvalid, err)
+	}
+	verifiedPage, err := scheduler.DecodeJobEventPage(pageRaw)
+	if err != nil || !reflect.DeepEqual(verifiedPage, page) {
+		return fmt.Errorf("%w: scheduler history receipt: %v", ErrReceiptInvalid, err)
+	}
+	if verifiedPage.AfterSequence != afterSequence {
+		return fmt.Errorf("%w: scheduler history receipt cursor does not match the request", ErrReceiptInvalid)
+	}
+	if err := ValidateRenderJobSnapshotReceipt(verifiedPage.Snapshot, expected); err != nil {
+		return err
 	}
 	return nil
 }

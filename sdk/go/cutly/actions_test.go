@@ -72,7 +72,10 @@ func TestTypedAgentActionsBuildExactPayloads(t *testing.T) {
 			return client.SubmitRender(context.Background(), "r12", "project", RenderJobV1{})
 		},
 		func() (Result, error) { return client.RenderStatus(context.Background(), "r13", "project", "job") },
-		func() (Result, error) { return client.CancelRender(context.Background(), "r14", "project", "job") },
+		func() (Result, error) {
+			return client.RenderHistory(context.Background(), "r14", "project", "job", 2, 4)
+		},
+		func() (Result, error) { return client.CancelRender(context.Background(), "r15", "project", "job") },
 	}
 	for index, call := range calls {
 		if _, err := call(); err != nil {
@@ -125,6 +128,12 @@ func TestTypedAgentActionsBuildExactPayloads(t *testing.T) {
 	}
 	if got := string(requests[11].Payload); got != string(wantRender) {
 		t.Fatalf("render payload = %s, want %s", got, wantRender)
+	}
+	if got := string(requests[13].Payload); got != `{"after_sequence":2,"job_id":"job","limit":4}` {
+		t.Fatalf("render history payload = %s", got)
+	}
+	if requests[13].Action != "history" {
+		t.Fatalf("render history action = %s", requests[13].Action)
 	}
 }
 

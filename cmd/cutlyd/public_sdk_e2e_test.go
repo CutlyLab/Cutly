@@ -178,6 +178,31 @@ func TestPublicGoSDKHTTPRenderEndToEnd(t *testing.T) {
 		complete.Artifact.SampleCount != job.SampleRange.Count {
 		t.Fatalf("public artifact binding = %+v", complete.Artifact)
 	}
+	var cursor uint64
+	var lifecycle []string
+	for pageIndex := 0; ; pageIndex++ {
+		historyResult, historyErr := client.RenderHistory(
+			ctx, fmt.Sprintf("public-history-%d", pageIndex), "project", job.ID, cursor, 1,
+		)
+		history := requirePublicSDKResult(t, historyResult, historyErr)
+		page, decodeErr := cutly.DecodeRenderJobHistoryPageReceipt(history.Receipt)
+		if decodeErr != nil {
+			t.Fatalf("decode public history receipt: %v", decodeErr)
+		}
+		if validateErr := cutly.ValidateRenderJobHistoryPageReceipt(page, job, cursor); validateErr != nil {
+			t.Fatalf("validate public history receipt: %v", validateErr)
+		}
+		for _, event := range page.Events {
+			lifecycle = append(lifecycle, string(event.Kind))
+		}
+		cursor = page.NextAfterSequence
+		if page.CaughtUp {
+			break
+		}
+	}
+	if fmt.Sprint(lifecycle) != "[submitted started completed]" {
+		t.Fatalf("public lifecycle history = %v", lifecycle)
+	}
 	assertPublishedEvidence(t, job, manifest.Fingerprint)
 }
 

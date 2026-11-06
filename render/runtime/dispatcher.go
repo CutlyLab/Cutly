@@ -170,6 +170,13 @@ func (dispatcher *Dispatcher) Snapshot(jobID string) (scheduler.JobSnapshot, err
 	return dispatcher.coordinator.Snapshot(jobID)
 }
 
+func (dispatcher *Dispatcher) History(jobID string, afterSequence uint64, limit int) (scheduler.JobEventPage, error) {
+	if dispatcher == nil || dispatcher.coordinator == nil {
+		return scheduler.JobEventPage{}, ErrConfiguration
+	}
+	return dispatcher.coordinator.History(jobID, afterSequence, limit)
+}
+
 func (dispatcher *Dispatcher) Snapshots(states ...renderapi.JobState) ([]scheduler.JobSnapshot, error) {
 	if dispatcher == nil || dispatcher.coordinator == nil {
 		return nil, ErrConfiguration

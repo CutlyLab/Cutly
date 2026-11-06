@@ -438,6 +438,10 @@ func (coordinator *notifyingCoordinator) Snapshot(jobID string) (scheduler.JobSn
 	return coordinator.dispatcher.Snapshot(jobID)
 }
 
+func (coordinator *notifyingCoordinator) History(jobID string, afterSequence uint64, limit int) (scheduler.JobEventPage, error) {
+	return coordinator.dispatcher.History(jobID, afterSequence, limit)
+}
+
 func (coordinator *notifyingCoordinator) RequestCancel(ctx context.Context, jobID string) (scheduler.JobSnapshot, bool, error) {
 	snapshot, changed, err := coordinator.dispatcher.RequestCancel(ctx, jobID)
 	if err == nil {

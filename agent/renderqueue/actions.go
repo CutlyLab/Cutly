@@ -31,6 +31,7 @@ const (
 type Coordinator interface {
 	Submit(context.Context, renderapi.RenderJob) (scheduler.JobSnapshot, bool, error)
 	Snapshot(string) (scheduler.JobSnapshot, error)
+	History(string, uint64, int) (scheduler.JobEventPage, error)
 	RequestCancel(context.Context, string) (scheduler.JobSnapshot, bool, error)
 }
 
@@ -88,6 +89,7 @@ func (service *Service) Routes() []router.Route {
 	return []router.Route{
 		{Tool: agentprotocol.ToolRender, Action: "render", Handler: router.ActionFunc(service.render)},
 		{Tool: agentprotocol.ToolRender, Action: "status", Handler: router.ActionFunc(service.status)},
+		{Tool: agentprotocol.ToolRender, Action: "history", Handler: router.ActionFunc(service.history)},
 		{Tool: agentprotocol.ToolRender, Action: "cancel", Handler: router.ActionFunc(service.cancel)},
 	}
 }
@@ -98,6 +100,12 @@ type renderPayload struct {
 
 type jobPayload struct {
 	JobID string `json:"job_id"`
+}
+
+type historyPayload struct {
+	JobID         string `json:"job_id"`
+	AfterSequence uint64 `json:"after_sequence,omitempty"`
+	Limit         int    `json:"limit,omitempty"`
 }
 
 func (service *Service) render(ctx context.Context, request agentprotocol.Request) (router.Outcome, error) {
@@ -188,6 +196,36 @@ func (service *Service) status(_ context.Context, request agentprotocol.Request)
 		OK: true, State: string(snapshot.State), JobID: snapshot.Job.ID,
 		RenderRequired: !terminal(snapshot.State), Diagnostics: []videoedit.Diagnostic{}, Receipt: receipt,
 		NextActions: queueNextActions(service.outcomeProjectID(request.ProjectID), snapshot),
+	}, nil
+}
+
+func (service *Service) history(_ context.Context, request agentprotocol.Request) (router.Outcome, error) {
+	if outcome, rejected := service.requireProject(request.ProjectID); rejected {
+		return outcome, nil
+	}
+	var payload historyPayload
+	if err := decodePayload(request.Payload, &payload); err != nil || !validJobID(payload.JobID) ||
+		payload.Limit < 0 || payload.Limit > scheduler.MaxJobEventPageLimit {
+		return reject(CodePayloadInvalid, "/payload", payloadError("history payload requires a valid job_id, cursor and limit", err)), nil
+	}
+	page, err := service.coordinator.History(payload.JobID, payload.AfterSequence, payload.Limit)
+	if err != nil {
+		if errors.Is(err, scheduler.ErrProtocolInvalid) {
+			return reject(CodePayloadInvalid, "/payload/after_sequence", err.Error()), nil
+		}
+		if outcome, ok := schedulerRejection(err); ok {
+			return outcome, nil
+		}
+		return router.Outcome{}, err
+	}
+	receipt, err := historyPageReceipt(page)
+	if err != nil {
+		return router.Outcome{}, err
+	}
+	return router.Outcome{
+		OK: true, State: string(page.Snapshot.State), JobID: page.Snapshot.Job.ID,
+		RenderRequired: !terminal(page.Snapshot.State), Diagnostics: []videoedit.Diagnostic{}, Receipt: receipt,
+		NextActions: queueNextActions(service.outcomeProjectID(request.ProjectID), page.Snapshot),
 	}, nil
 }
 
@@ -336,6 +374,17 @@ func snapshotReceipt(snapshot scheduler.JobSnapshot) (json.RawMessage, error) {
 	encoded, err := canonicaljson.Marshal(snapshot)
 	if err != nil {
 		return nil, fmt.Errorf("renderqueue: encode scheduler receipt: %w", err)
+	}
+	return encoded, nil
+}
+
+func historyPageReceipt(page scheduler.JobEventPage) (json.RawMessage, error) {
+	encoded, err := canonicaljson.Marshal(page)
+	if err != nil {
+		return nil, fmt.Errorf("renderqueue: encode scheduler history receipt: %w", err)
+	}
+	if _, err := scheduler.DecodeJobEventPage(encoded); err != nil {
+		return nil, fmt.Errorf("renderqueue: validate scheduler history receipt: %w", err)
 	}
 	return encoded, nil
 }

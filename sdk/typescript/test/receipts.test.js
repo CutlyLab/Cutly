@@ -6,6 +6,7 @@ import {
   AgentReceiptError,
   createRenderJob,
   decodeCanonicalJSON,
+  decodeRenderJobHistoryPageReceipt,
   decodeRenderJobSnapshotReceipt,
   decodeRenderPlanReceipt,
   decodeRenderPreflightReceipt,
@@ -186,6 +187,157 @@ test("strict receipt decoders validate and bind the complete public render chain
   assert.equal(decodeRenderJobSnapshotReceipt(status, {
     requestId: "status", projectId: "project", action: "status", job: fixture.job,
   }).artifact.content_hash, digest("8"));
+});
+
+test("render history page decoder enforces cursor continuity and snapshot binding", async () => {
+  const fixture = await fixtures();
+  const completeArtifact = artifact(fixture.job);
+  const completeSnapshot = snapshot(fixture.job, "complete", 3n, { artifact: completeArtifact });
+  const submitted = {
+    schema_version: 1n,
+    job_id: fixture.job.id,
+    sequence: 1n,
+    kind: "submitted",
+    state: "queued",
+    job: fixture.job,
+  };
+  const started = {
+    schema_version: 1n,
+    job_id: fixture.job.id,
+    sequence: 2n,
+    kind: "started",
+    state: "running",
+  };
+  const completed = {
+    schema_version: 1n,
+    job_id: fixture.job.id,
+    sequence: 3n,
+    kind: "completed",
+    state: "complete",
+    artifact: completeArtifact,
+  };
+  const page = {
+    schema_version: 1n,
+    profile: "cutly.render-job-history.v1",
+    after_sequence: 0n,
+    next_after_sequence: 2n,
+    caught_up: false,
+    events: [submitted, started],
+    snapshot: completeSnapshot,
+  };
+  const response = result({
+    action: "history",
+    requestId: "history",
+    state: "complete",
+    renderRequired: false,
+    jobId: fixture.job.id,
+    receipt: page,
+  });
+  const decoded = decodeRenderJobHistoryPageReceipt(response, {
+    requestId: "history",
+    projectId: "project",
+    job: fixture.job,
+    afterSequence: 0n,
+  });
+  assert.equal(decoded.next_after_sequence, 2n);
+  assert.equal(decoded.events[0].job.id, fixture.job.id);
+  assert.equal(Object.isFrozen(decoded), true);
+  assert.equal(Object.isFrozen(decoded.events), true);
+
+  const finalPage = {
+    ...page,
+    after_sequence: 2n,
+    next_after_sequence: 3n,
+    caught_up: true,
+    events: [completed],
+  };
+  assert.equal(decodeRenderJobHistoryPageReceipt(result({
+    action: "history",
+    requestId: "history-final",
+    state: "complete",
+    renderRequired: false,
+    jobId: fixture.job.id,
+    receipt: finalPage,
+  }), {
+    requestId: "history-final",
+    projectId: "project",
+    job: fixture.job,
+    afterSequence: 2n,
+  }).caught_up, true);
+
+  const invalidPages = [
+    { ...page, next_after_sequence: 1n },
+    { ...page, caught_up: true },
+    { ...page, events: [{ ...submitted, sequence: 2n }, started] },
+    { ...page, events: [] },
+    { ...page, hostile: true },
+    { ...finalPage, snapshot: { ...completeSnapshot, state: "running", artifact: undefined } },
+    { ...finalPage, events: [{ ...completed, artifact: { ...completeArtifact, uri: "file:///tmp/other.mp4" } }] },
+    {
+      ...page,
+      next_after_sequence: 3n,
+      caught_up: true,
+      events: [submitted, {
+        schema_version: 1n,
+        job_id: fixture.job.id,
+        sequence: 2n,
+        kind: "failed",
+        state: "failed",
+        failure_class: "non_retryable",
+        failure_message: "failed before an impossible completion",
+      }, completed],
+    },
+    {
+      ...page,
+      events: [submitted, {
+        schema_version: 1n,
+        job_id: fixture.job.id,
+        sequence: 2n,
+        kind: "cancel_requested",
+        state: "canceling",
+      }],
+    },
+    {
+      ...page,
+      after_sequence: 1n,
+      next_after_sequence: 2n,
+      caught_up: true,
+      events: [{
+        schema_version: 1n,
+        job_id: fixture.job.id,
+        sequence: 2n,
+        kind: "failed",
+        state: "failed",
+        failure_class: "non_retryable",
+        failure_message: "x".repeat((64 << 10) + 1),
+      }],
+      snapshot: snapshot(fixture.job, "failed", 2n, {
+        failure_class: "non_retryable",
+        failure_message: "x".repeat((64 << 10) + 1),
+      }),
+    },
+  ];
+  for (const [index, invalid] of invalidPages.entries()) {
+    assert.throws(() => decodeRenderJobHistoryPageReceipt(result({
+      action: "history",
+      requestId: `history-invalid-${index}`,
+      state: invalid.snapshot.state,
+      renderRequired: !new Set(["canceled", "failed", "complete"]).has(invalid.snapshot.state),
+      jobId: fixture.job.id,
+      receipt: invalid,
+    }), {
+      requestId: `history-invalid-${index}`,
+      projectId: "project",
+      job: fixture.job,
+      afterSequence: invalid.after_sequence,
+    }), (error) => error instanceof AgentReceiptError);
+  }
+  assert.throws(() => decodeRenderJobHistoryPageReceipt(response, {
+    requestId: "history",
+    projectId: "project",
+    job: fixture.job,
+    afterSequence: 1n,
+  }), receiptCode("RECEIPT.BINDING_INVALID"));
 });
 
 test("render plan receipt validator accepts the Go conformance fixture", async () => {

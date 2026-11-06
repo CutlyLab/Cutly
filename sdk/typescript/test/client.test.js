@@ -90,10 +90,11 @@ test("typed client actions build exact project, edit and render payloads", async
   });
   await client.submitRender({ requestId: "render", projectId: "project", job: { id: "job" } });
   await client.renderStatus({ requestId: "status", projectId: "project", jobId: "job" });
+  await client.renderHistory({ requestId: "render-history", projectId: "project", jobId: "job", afterSequence: 2n, limit: 4n });
   await client.cancelRender({ requestId: "cancel", projectId: "project", jobId: "job" });
 
   assert.deepEqual(observed.map((request) => request.action), [
-    "inspect", "history", "plan", "apply", "discard", "revert", "plan", "prepare", "preflight", "frame", "render", "status", "cancel",
+    "inspect", "history", "plan", "apply", "discard", "revert", "plan", "prepare", "preflight", "frame", "render", "status", "history", "cancel",
   ]);
   assert.deepEqual(observed[1].payload, Object.assign(Object.create(null), { after_sequence: 4n, limit: 10n }));
   assert.equal(observed[3].payload.expected_revision, 7n);
@@ -105,7 +106,10 @@ test("typed client actions build exact project, edit and render payloads", async
   assert.equal(observed[8].payload.execution_manifest.fingerprint, "manifest");
   assert.equal(observed[9].payload.frame.id, "frame-1");
   assert.equal(observed[10].payload.job.id, "job");
-  assert.equal(observed[12].payload.job_id, "job");
+  assert.deepEqual(observed[12].payload, Object.assign(Object.create(null), {
+    after_sequence: 2n, job_id: "job", limit: 4n,
+  }));
+  assert.equal(observed[13].payload.job_id, "job");
 });
 
 test("prepareRender omits an absent deterministic seed", async () => {

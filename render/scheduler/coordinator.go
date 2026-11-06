@@ -29,6 +29,7 @@ type Coordinator struct {
 	mu             sync.RWMutex
 	store          Store
 	jobs           map[string]JobSnapshot
+	events         map[string][]JobEvent
 	stateJobs      map[renderapi.JobState]*jobIDHeap
 	idempotencyJob map[string]string
 	recoveryNeeded bool
@@ -53,7 +54,8 @@ func openWithReplayLimit(ctx context.Context, store Store, maxReplayEvents int) 
 		return nil, fmt.Errorf("%w: %w", ErrStore, err)
 	}
 	result := &Coordinator{
-		store: store, jobs: make(map[string]JobSnapshot), idempotencyJob: make(map[string]string),
+		store: store, jobs: make(map[string]JobSnapshot), events: make(map[string][]JobEvent),
+		idempotencyJob: make(map[string]string),
 	}
 	for index, event := range events {
 		if index%256 == 0 {
@@ -129,6 +131,7 @@ func (value *Coordinator) Submit(ctx context.Context, job renderapi.RenderJob) (
 	}
 	snapshot := snapshotFromSubmission(verified)
 	value.jobs[verified.ID] = snapshot
+	value.events[verified.ID] = []JobEvent{cloneEvent(event)}
 	value.idempotencyJob[verified.IdempotencyKey] = verified.ID
 	value.indexSnapshotLocked(snapshot)
 	return cloneSnapshot(snapshot), true, nil
@@ -162,6 +165,7 @@ func (value *Coordinator) StartNext(ctx context.Context) (JobSnapshot, bool, err
 	}
 	snapshot = applyEvent(snapshot, event)
 	value.jobs[snapshot.Job.ID] = snapshot
+	value.events[snapshot.Job.ID] = append(value.events[snapshot.Job.ID], cloneEvent(event))
 	value.indexSnapshotLocked(snapshot)
 	return cloneSnapshot(snapshot), true, nil
 }
@@ -193,6 +197,7 @@ func (value *Coordinator) RequestCancel(ctx context.Context, jobID string) (JobS
 	}
 	snapshot = applyEvent(snapshot, event)
 	value.jobs[jobID] = snapshot
+	value.events[jobID] = append(value.events[jobID], cloneEvent(event))
 	value.indexSnapshotLocked(snapshot)
 	return cloneSnapshot(snapshot), true, nil
 }
@@ -223,6 +228,54 @@ func (value *Coordinator) Snapshot(jobID string) (JobSnapshot, error) {
 		return JobSnapshot{}, ErrJobNotFound
 	}
 	return cloneSnapshot(snapshot), nil
+}
+
+// History returns a cursor-bound point-in-time page from one job's durable
+// scheduler history. The coordinator lock makes the event slice and Snapshot
+// one atomic view; callers can repeat NextAfterSequence without missing a
+// transition committed concurrently after this call returns.
+func (value *Coordinator) History(jobID string, afterSequence uint64, limit int) (JobEventPage, error) {
+	if limit == 0 {
+		limit = DefaultJobEventPageLimit
+	}
+	if limit < 1 || limit > MaxJobEventPageLimit {
+		return JobEventPage{}, fmt.Errorf("%w: event page limit must be in [1,%d]", ErrProtocolInvalid, MaxJobEventPageLimit)
+	}
+	value.mu.RLock()
+	defer value.mu.RUnlock()
+	if err := value.readyLocked(); err != nil {
+		return JobEventPage{}, err
+	}
+	snapshot, found := value.jobs[jobID]
+	if !found {
+		return JobEventPage{}, ErrJobNotFound
+	}
+	if afterSequence > snapshot.LastSequence {
+		return JobEventPage{}, fmt.Errorf("%w: event cursor %d is after last sequence %d", ErrProtocolInvalid, afterSequence, snapshot.LastSequence)
+	}
+	history := value.events[jobID]
+	start := 0
+	for start < len(history) && history[start].Sequence <= afterSequence {
+		start++
+	}
+	end := start + limit
+	if end > len(history) {
+		end = len(history)
+	}
+	selected := cloneEvents(history[start:end])
+	next := afterSequence
+	if len(selected) != 0 {
+		next = selected[len(selected)-1].Sequence
+	}
+	page := JobEventPage{
+		SchemaVersion: JobEventPageSchemaVersion, Profile: JobEventPageProfileV1,
+		AfterSequence: afterSequence, NextAfterSequence: next,
+		CaughtUp: next == snapshot.LastSequence, Events: selected, Snapshot: cloneSnapshot(snapshot),
+	}
+	if err := ValidateJobEventPage(page); err != nil {
+		return JobEventPage{}, fmt.Errorf("%w: construct event page: %v", ErrStore, err)
+	}
+	return page, nil
 }
 
 // Snapshots returns an owned, job-ID-sorted point-in-time view. With no state
@@ -326,6 +379,7 @@ func (value *Coordinator) transition(ctx context.Context, jobID string, kind Job
 	}
 	snapshot = applyEvent(snapshot, event)
 	value.jobs[jobID] = snapshot
+	value.events[jobID] = append(value.events[jobID], cloneEvent(event))
 	value.indexSnapshotLocked(snapshot)
 	return cloneSnapshot(snapshot), nil
 }
@@ -364,6 +418,7 @@ func (value *Coordinator) applyReplay(event JobEvent) error {
 		}
 		snapshot := snapshotFromSubmission(*event.Job)
 		value.jobs[event.JobID] = snapshot
+		value.events[event.JobID] = []JobEvent{cloneEvent(event)}
 		value.idempotencyJob[event.Job.IdempotencyKey] = event.JobID
 		return nil
 	}
@@ -377,6 +432,7 @@ func (value *Coordinator) applyReplay(event JobEvent) error {
 		}
 	}
 	value.jobs[event.JobID] = applyEvent(snapshot, event)
+	value.events[event.JobID] = append(value.events[event.JobID], cloneEvent(event))
 	return nil
 }
 

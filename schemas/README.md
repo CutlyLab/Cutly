@@ -29,6 +29,10 @@ remain capability-gated rather than being silently dropped.
   worker locators and versioned decoded-evidence byte profiles for one semantic plan.
 - `cutly.render-job.v1.schema.json` binds an idempotent full-plan or chunk range to both the semantic
   plan and execution-manifest fingerprints.
+- `cutly.render-job-history.v1.schema.json` describes a bounded cursor page from the durable
+  scheduler lifecycle journal, with strict submitted/start/cancel/terminal unions and an atomic
+  current snapshot. It is deliberately named `history`: structured stage progress remains a
+  separate future event stream with range, worker, cache and warning evidence.
 - `cutly.exact-frame-request.v1.schema.json` binds one composition frame and a controlled PNG
   publication target to those same immutable identities.
 - `cutly.evidence-manifest.v1.schema.json` records artifact integrity plus streaming, decoded-domain

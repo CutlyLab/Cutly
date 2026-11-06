@@ -1,0 +1,231 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.cutly.dev/render-job-history/v1",
+  "title": "Cutly render job lifecycle history v1",
+  "description": "One bounded cursor page from the durable scheduler lifecycle journal. This contract does not represent stage progress events.",
+  "$comment": "The Go and TypeScript runtime validators additionally enforce a 4 MiB canonical JSON byte limit and cross-field cursor, transition, snapshot, job and artifact bindings.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "profile", "after_sequence", "next_after_sequence", "caught_up", "events", "snapshot"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "profile": {"const": "cutly.render-job-history.v1"},
+    "after_sequence": {"$ref": "#/$defs/uint64"},
+    "next_after_sequence": {"$ref": "#/$defs/uint64"},
+    "caught_up": {"type": "boolean"},
+    "events": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {"$ref": "#/$defs/event"}
+    },
+    "snapshot": {"$ref": "#/$defs/snapshot"}
+  },
+  "$defs": {
+    "uint64": {"type": "integer", "minimum": 0, "maximum": 18446744073709551615},
+    "int64NonNegative": {"type": "integer", "minimum": 0, "maximum": 9223372036854775807},
+    "positiveInt64": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "jobID": {"type": "string", "minLength": 1, "maxLength": 1024, "pattern": "\\S"},
+    "failureClass": {
+      "enum": ["non_retryable", "input_repairable", "transient", "resource", "integrity", "cancellation"]
+    },
+    "failureMessage": {
+      "$comment": "Runtime validators enforce at most 65536 UTF-8 bytes; JSON Schema maxLength counts Unicode code points.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 65536,
+      "pattern": "\\S"
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["uri", "content_hash", "size_bytes", "execution_manifest_fingerprint", "evidence_uri", "evidence_fingerprint", "duration", "frame_count", "sample_count"],
+      "properties": {
+        "uri": {
+          "type": "string",
+          "maxLength": 16384,
+          "pattern": "^file:///[^/?#][^?#]*$",
+          "not": {"pattern": "(^|/)\\.\\.?(/|$)"}
+        },
+        "content_hash": {"$ref": "#/$defs/digest"},
+        "size_bytes": {"$ref": "#/$defs/positiveInt64"},
+        "execution_manifest_fingerprint": {"$ref": "#/$defs/digest"},
+        "evidence_uri": {
+          "type": "string",
+          "maxLength": 16398,
+          "pattern": "^file:///[^/?#][^?#]*\\.evidence\\.json$",
+          "not": {"pattern": "(^|/)\\.\\.?(/|$)"}
+        },
+        "evidence_fingerprint": {"$ref": "#/$defs/digest"},
+        "duration": {"$ref": "https://schemas.cutly.dev/document/v1#/$defs/positiveTime"},
+        "frame_count": {"$ref": "#/$defs/int64NonNegative"},
+        "sample_count": {"$ref": "#/$defs/int64NonNegative"}
+      }
+    },
+    "submittedEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "job_id", "sequence", "kind", "state", "job"],
+      "properties": {
+        "schema_version": {"const": 1},
+        "job_id": {"$ref": "#/$defs/jobID"},
+        "sequence": {"const": 1},
+        "kind": {"const": "submitted"},
+        "state": {"const": "queued"},
+        "job": {"$ref": "https://schemas.cutly.dev/render-job/v1"}
+      }
+    },
+    "startedEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "job_id", "sequence", "kind", "state"],
+      "properties": {
+        "schema_version": {"const": 1},
+        "job_id": {"$ref": "#/$defs/jobID"},
+        "sequence": {"const": 2},
+        "kind": {"const": "started"},
+        "state": {"const": "running"}
+      }
+    },
+    "cancelRequestedEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "job_id", "sequence", "kind", "state"],
+      "properties": {
+        "schema_version": {"const": 1},
+        "job_id": {"$ref": "#/$defs/jobID"},
+        "sequence": {"enum": [2, 3]},
+        "kind": {"const": "cancel_requested"},
+        "state": {"const": "canceling"}
+      }
+    },
+    "canceledEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "job_id", "sequence", "kind", "state"],
+      "properties": {
+        "schema_version": {"const": 1},
+        "job_id": {"$ref": "#/$defs/jobID"},
+        "sequence": {"enum": [3, 4]},
+        "kind": {"const": "canceled"},
+        "state": {"const": "canceled"}
+      }
+    },
+    "failedEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "job_id", "sequence", "kind", "state", "failure_class", "failure_message"],
+      "properties": {
+        "schema_version": {"const": 1},
+        "job_id": {"$ref": "#/$defs/jobID"},
+        "sequence": {"type": "integer", "minimum": 2, "maximum": 4},
+        "kind": {"const": "failed"},
+        "state": {"const": "failed"},
+        "failure_class": {"$ref": "#/$defs/failureClass"},
+        "failure_message": {"$ref": "#/$defs/failureMessage"}
+      }
+    },
+    "completedEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "job_id", "sequence", "kind", "state", "artifact"],
+      "properties": {
+        "schema_version": {"const": 1},
+        "job_id": {"$ref": "#/$defs/jobID"},
+        "sequence": {"const": 3},
+        "kind": {"const": "completed"},
+        "state": {"const": "complete"},
+        "artifact": {"$ref": "#/$defs/artifact"}
+      }
+    },
+    "event": {
+      "oneOf": [
+        {"$ref": "#/$defs/submittedEvent"},
+        {"$ref": "#/$defs/startedEvent"},
+        {"$ref": "#/$defs/cancelRequestedEvent"},
+        {"$ref": "#/$defs/canceledEvent"},
+        {"$ref": "#/$defs/failedEvent"},
+        {"$ref": "#/$defs/completedEvent"}
+      ]
+    },
+    "queuedSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "job", "state", "last_sequence"],
+      "properties": {
+        "schema_version": {"const": 1},
+        "job": {"$ref": "https://schemas.cutly.dev/render-job/v1"},
+        "state": {"const": "queued"},
+        "last_sequence": {"const": 1}
+      }
+    },
+    "runningSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "job", "state", "last_sequence"],
+      "properties": {
+        "schema_version": {"const": 1},
+        "job": {"$ref": "https://schemas.cutly.dev/render-job/v1"},
+        "state": {"const": "running"},
+        "last_sequence": {"const": 2}
+      }
+    },
+    "cancelingSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "job", "state", "last_sequence"],
+      "properties": {
+        "schema_version": {"const": 1},
+        "job": {"$ref": "https://schemas.cutly.dev/render-job/v1"},
+        "state": {"const": "canceling"},
+        "last_sequence": {"enum": [2, 3]}
+      }
+    },
+    "canceledSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "job", "state", "last_sequence"],
+      "properties": {
+        "schema_version": {"const": 1},
+        "job": {"$ref": "https://schemas.cutly.dev/render-job/v1"},
+        "state": {"const": "canceled"},
+        "last_sequence": {"enum": [3, 4]}
+      }
+    },
+    "failedSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "job", "state", "last_sequence", "failure_class", "failure_message"],
+      "properties": {
+        "schema_version": {"const": 1},
+        "job": {"$ref": "https://schemas.cutly.dev/render-job/v1"},
+        "state": {"const": "failed"},
+        "last_sequence": {"type": "integer", "minimum": 2, "maximum": 4},
+        "failure_class": {"$ref": "#/$defs/failureClass"},
+        "failure_message": {"$ref": "#/$defs/failureMessage"}
+      }
+    },
+    "completeSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "job", "state", "last_sequence", "artifact"],
+      "properties": {
+        "schema_version": {"const": 1},
+        "job": {"$ref": "https://schemas.cutly.dev/render-job/v1"},
+        "state": {"const": "complete"},
+        "last_sequence": {"const": 3},
+        "artifact": {"$ref": "#/$defs/artifact"}
+      }
+    },
+    "snapshot": {
+      "oneOf": [
+        {"$ref": "#/$defs/queuedSnapshot"},
+        {"$ref": "#/$defs/runningSnapshot"},
+        {"$ref": "#/$defs/cancelingSnapshot"},
+        {"$ref": "#/$defs/canceledSnapshot"},
+        {"$ref": "#/$defs/failedSnapshot"},
+        {"$ref": "#/$defs/completeSnapshot"}
+      ]
+    }
+  }
+}

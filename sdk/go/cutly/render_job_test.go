@@ -100,6 +100,56 @@ func TestDecodeRenderJobSnapshotReceipt(t *testing.T) {
 	}
 }
 
+func TestDecodeAndValidateRenderJobHistoryPageReceipt(t *testing.T) {
+	plan, manifest, _ := renderPrepareSDKFixture(t)
+	job, err := BuildRenderJobV1("job-events", "job-events-once", plan, manifest, "file:///tmp/cutly-events.mp4")
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot := scheduler.JobSnapshot{
+		SchemaVersion: scheduler.JobSnapshotSchemaVersion, Job: job,
+		State: renderapi.JobQueued, LastSequence: 1,
+	}
+	eventJob := job
+	page := scheduler.JobEventPage{
+		SchemaVersion: scheduler.JobEventPageSchemaVersion, Profile: scheduler.JobEventPageProfileV1,
+		AfterSequence: 0, NextAfterSequence: 1, CaughtUp: true,
+		Events: []scheduler.JobEvent{{
+			SchemaVersion: scheduler.JobEventSchemaVersion, JobID: job.ID, Sequence: 1,
+			Kind: scheduler.EventSubmitted, State: renderapi.JobQueued, Job: &eventJob,
+		}},
+		Snapshot: snapshot,
+	}
+	raw, err := canonicaljson.Marshal(page)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := DecodeRenderJobHistoryPageReceipt(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ValidateRenderJobHistoryPageReceipt(decoded, job, 0); err != nil {
+		t.Fatalf("valid event receipt rejected: %v", err)
+	}
+	if err := ValidateRenderJobHistoryPageReceipt(decoded, job, 1); !errors.Is(err, ErrReceiptInvalid) {
+		t.Fatalf("wrong cursor accepted: %v", err)
+	}
+	other := job
+	other.ID = "other-job"
+	if err := ValidateRenderJobHistoryPageReceipt(decoded, other, 0); !errors.Is(err, ErrReceiptInvalid) {
+		t.Fatalf("wrong job accepted: %v", err)
+	}
+	if _, err := DecodeRenderJobHistoryPageReceipt(append([]byte{' '}, raw...)); !errors.Is(err, ErrReceiptInvalid) {
+		t.Fatalf("noncanonical event page accepted: %v", err)
+	}
+	changed := page
+	changed.CaughtUp = false
+	changedRaw, _ := canonicaljson.Marshal(changed)
+	if _, err := DecodeRenderJobHistoryPageReceipt(changedRaw); !errors.Is(err, ErrReceiptInvalid) {
+		t.Fatalf("invalid cursor page accepted: %v", err)
+	}
+}
+
 func TestValidateRenderJobSnapshotReceiptBindsSubmittedJobAndArtifact(t *testing.T) {
 	plan, manifest, _ := renderPrepareSDKFixture(t)
 	job, err := BuildRenderJobV1("job-status", "job-status-once", plan, manifest, "file:///tmp/cutly-status.mp4")
