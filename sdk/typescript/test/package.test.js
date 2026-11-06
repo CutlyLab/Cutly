@@ -6,7 +6,7 @@ import * as sdk from "../src/index.js";
 
 test("package metadata exposes the declaration entry and bundled license", async () => {
   const packageJSON = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
-  assert.equal(packageJSON.version, "0.1.0-dev");
+  assert.equal(packageJSON.version, "0.1.0-rc.1");
   assert.equal(packageJSON.type, "module");
   assert.equal(packageJSON.types, "./src/index.d.ts");
   assert.equal(packageJSON.exports["."].types, "./src/index.d.ts");

@@ -1,6 +1,6 @@
 {
   "name": "@cutly/sdk",
-  "version": "0.1.0-dev",
+  "version": "0.1.0-rc.1",
   "description": "Typed protocol and headless client bindings for Cutly",
   "type": "module",
   "types": "./src/index.d.ts",

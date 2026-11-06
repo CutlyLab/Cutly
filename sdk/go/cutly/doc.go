@@ -7,4 +7,4 @@ package cutly
 // Version is the source-level SDK release candidate version. Distribution
 // builds may add provenance through Go build information without changing the
 // Agent protocol version.
-const Version = "0.1.0-dev"
+const Version = "0.1.0-rc.1"
