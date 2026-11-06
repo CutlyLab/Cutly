@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -21,6 +22,21 @@ type memoryCheckpointStore struct {
 	mu     sync.Mutex
 	values map[string]Checkpoint
 	loads  int
+}
+
+type testAttemptExecutor struct {
+	legacy  func(context.Context, Task, []Dependency) (StageOutput, error)
+	attempt func(context.Context, Task, []Dependency, uint8) (StageOutput, error)
+}
+
+func (executor *testAttemptExecutor) Execute(ctx context.Context, task Task, dependencies []Dependency) (StageOutput, error) {
+	return executor.legacy(ctx, task, dependencies)
+}
+
+func (executor *testAttemptExecutor) ExecuteAttempt(
+	ctx context.Context, task Task, dependencies []Dependency, attempt uint8,
+) (StageOutput, error) {
+	return executor.attempt(ctx, task, dependencies, attempt)
 }
 
 func newMemoryCheckpointStore() *memoryCheckpointStore {
@@ -145,7 +161,8 @@ func TestEngineRetriesOnlyClassifiedFailures(t *testing.T) {
 	}
 	plan.Tasks[0].Retry.RetryTransient = true
 	result, err := engine.Run(context.Background(), plan)
-	if err != nil || result.Executed != 1 || result.Retries != 1 || attempts.Load() != 2 {
+	if err != nil || result.Executed != 1 || result.Retries != 1 || attempts.Load() != 2 ||
+		len(result.Checkpoints) != 1 || result.Checkpoints[0].AttemptCount != 2 {
 		t.Fatalf("result = %+v attempts=%d err=%v", result, attempts.Load(), err)
 	}
 
@@ -160,6 +177,121 @@ func TestEngineRetriesOnlyClassifiedFailures(t *testing.T) {
 	})
 	if _, err := engine.Run(context.Background(), plan); !errors.Is(err, ErrExecution) || attempts.Load() != 1 {
 		t.Fatalf("unclassified err=%v attempts=%d", err, attempts.Load())
+	}
+}
+
+func TestEngineAttemptExecutorBindsTheProducingAttempt(t *testing.T) {
+	plan := Plan{
+		Profile: PlanProfileV1, JobID: "job-attempt-aware", PlanFingerprint: digest('a'), ExecutionManifestFingerprint: digest('b'),
+		Tasks: []Task{testTask("retry", renderapi.StageDecode, nil, 1, 1, 3)},
+	}
+	plan.Tasks[0].Retry.RetryTransient = true
+	bindTaskCacheKeys(t, &plan)
+	var legacyCalls int
+	var attempts []uint8
+	executor := &testAttemptExecutor{
+		legacy: func(context.Context, Task, []Dependency) (StageOutput, error) {
+			legacyCalls++
+			return StageOutput{}, errors.New("legacy Execute must not be called")
+		},
+		attempt: func(_ context.Context, task Task, _ []Dependency, attempt uint8) (StageOutput, error) {
+			attempts = append(attempts, attempt)
+			if attempt == 1 {
+				return StageOutput{}, &StageError{Class: renderapi.FailureTransient, Err: errors.New("temporary")}
+			}
+			receipt, err := canonicaljson.Marshal(map[string]any{"attempt": attempt, "task": task.ID})
+			if err != nil {
+				return StageOutput{}, err
+			}
+			return StageOutput{
+				ContentHash: testKey("attempt-aware-output").Digest,
+				SizeBytes:   int64(attempt),
+				Receipt:     receipt,
+			}, nil
+		},
+	}
+	engine := Engine{
+		Store: newMemoryCheckpointStore(), Executor: executor,
+		Limits: Limits{MaxConcurrent: 1, MaxMemoryBytes: 1, MaxDiskBytes: 1},
+	}
+	result, err := engine.Run(context.Background(), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := fmt.Sprint(attempts); got != "[1 2]" || legacyCalls != 0 ||
+		result.Executed != 1 || result.Retries != 1 || len(result.Checkpoints) != 1 {
+		t.Fatalf("attempts=%s legacy=%d result=%+v", got, legacyCalls, result)
+	}
+	checkpoint := result.Checkpoints[0]
+	wantReceipt := `{"attempt":2,"task":"retry"}`
+	if checkpoint.AttemptCount != 2 || string(checkpoint.Output.Receipt) != wantReceipt || checkpoint.Output.SizeBytes != 2 {
+		t.Fatalf("checkpoint = %+v, want receipt %s at attempt 2", checkpoint, wantReceipt)
+	}
+}
+
+func TestEngineAttemptExecutorPreservesFailureClassification(t *testing.T) {
+	tests := []struct {
+		name      string
+		execute   func(uint8) (StageOutput, error)
+		wantError error
+		contains  string
+	}{
+		{
+			name: "canceled",
+			execute: func(uint8) (StageOutput, error) {
+				return StageOutput{}, &StageError{Class: renderapi.FailureTransient, Err: context.Canceled}
+			},
+			wantError: context.Canceled,
+		},
+		{
+			name: "unclassified",
+			execute: func(uint8) (StageOutput, error) {
+				return StageOutput{}, errors.New("unclassified")
+			},
+			wantError: ErrExecution,
+		},
+		{
+			name: "panic",
+			execute: func(uint8) (StageOutput, error) {
+				panic("attempt executor panic")
+			},
+			wantError: ErrExecution,
+			contains:  "executor panic",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			plan := Plan{
+				Profile: PlanProfileV1, JobID: "job-attempt-" + test.name,
+				PlanFingerprint: digest('a'), ExecutionManifestFingerprint: digest('b'),
+				Tasks: []Task{testTask("retry", renderapi.StageDecode, nil, 1, 1, 3)},
+			}
+			plan.Tasks[0].Retry.RetryTransient = true
+			bindTaskCacheKeys(t, &plan)
+			var attempts []uint8
+			legacyCalls := 0
+			executor := &testAttemptExecutor{
+				legacy: func(context.Context, Task, []Dependency) (StageOutput, error) {
+					legacyCalls++
+					return StageOutput{}, errors.New("legacy Execute must not be called")
+				},
+				attempt: func(_ context.Context, _ Task, _ []Dependency, attempt uint8) (StageOutput, error) {
+					attempts = append(attempts, attempt)
+					return test.execute(attempt)
+				},
+			}
+			engine := Engine{
+				Store: newMemoryCheckpointStore(), Executor: executor,
+				Limits: Limits{MaxConcurrent: 1, MaxMemoryBytes: 1, MaxDiskBytes: 1},
+			}
+			_, err := engine.Run(context.Background(), plan)
+			if !errors.Is(err, test.wantError) || len(attempts) != 1 || attempts[0] != 1 || legacyCalls != 0 {
+				t.Fatalf("err=%v attempts=%v legacy=%d", err, attempts, legacyCalls)
+			}
+			if test.contains != "" && !strings.Contains(err.Error(), test.contains) {
+				t.Fatalf("error %q does not contain %q", err, test.contains)
+			}
+		})
 	}
 }
 

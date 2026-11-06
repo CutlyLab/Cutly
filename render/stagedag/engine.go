@@ -41,6 +41,16 @@ type Executor interface {
 	Execute(context.Context, Task, []Dependency) (StageOutput, error)
 }
 
+// AttemptExecutor is an additive extension for executors whose output receipt
+// must bind the 1-based attempt that produced it. Engine prefers
+// ExecuteAttempt when its Executor implements this interface; legacy
+// executors continue to receive Execute calls with identical retry semantics.
+// Implementations must be safe for concurrent calls to both methods.
+type AttemptExecutor interface {
+	Executor
+	ExecuteAttempt(context.Context, Task, []Dependency, uint8) (StageOutput, error)
+}
+
 type ExecutorFunc func(context.Context, Task, []Dependency) (StageOutput, error)
 
 func (fn ExecutorFunc) Execute(ctx context.Context, task Task, dependencies []Dependency) (StageOutput, error) {
@@ -336,7 +346,13 @@ func (engine Engine) executeTask(
 			result.err = err
 			return
 		}
-		output, err := engine.Executor.Execute(ctx, cloneTask(task), cloneDependencies(dependencies))
+		var output StageOutput
+		var err error
+		if executor, ok := engine.Executor.(AttemptExecutor); ok {
+			output, err = executor.ExecuteAttempt(ctx, cloneTask(task), cloneDependencies(dependencies), attempt)
+		} else {
+			output, err = engine.Executor.Execute(ctx, cloneTask(task), cloneDependencies(dependencies))
+		}
 		if err != nil {
 			if !retryable(task.Retry, err, attempt) {
 				result.err = err
