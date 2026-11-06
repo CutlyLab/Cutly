@@ -23,7 +23,7 @@ business rejection is returned as `ok: false`, while transport and correlation
 failures throw `AgentProtocolError`.
 
 ```js
-import { CutlyClient, HTTPAgentTransport, createAgentRequest } from "@cutly/sdk";
+import { CutlyClient, HTTPAgentTransport, createAgentRequest, createRenderJob } from "@cutly/sdk";
 
 const client = new CutlyClient(new HTTPAgentTransport("http://127.0.0.1:9817/v1/agent"));
 const result = await client.call(createAgentRequest({
@@ -36,15 +36,43 @@ const result = await client.call(createAgentRequest({
 // Typed convenience methods build the same strict envelope.
 const status = await client.projectStatus({ requestId: "status-42", projectId: "demo" });
 
-// Preflight and exact-frame preview send the same frozen plan/environment
-// that the queued render will consume; the daemon revalidates every binding.
+// Planning starts from the registered durable project.
+const planned = await client.planRender({
+  requestId: "render-plan-42", projectId: "demo", range, target,
+});
+if (!planned.ok) throw new Error("render plan rejected");
+const plan = planned.receipt.plan;
+
+// Host preparation owns FFmpeg, probe, backend and output identities.
+const prepared = await client.prepareRender({
+  requestId: "prepare-42", projectId: "demo", plan,
+  resources: [
+    { assetId: "video", locator: "/srv/cutly/input/video.mp4" },
+    { assetId: "audio", locator: "/srv/cutly/input/audio.wav" },
+  ],
+});
+if (!prepared.ok) throw new Error("render preparation rejected");
+const executionManifest = prepared.receipt.execution_manifest;
+
+// Preflight re-probes the same frozen environment before durable submission.
 const ready = await client.preflightRender({
   requestId: "preflight-42", projectId: "demo", plan, executionManifest,
 });
-const preview = await client.renderFrame({
-  requestId: "frame-42", projectId: "demo", plan, executionManifest, frame,
+if (!ready.ok) throw new Error("render preflight rejected");
+const job = createRenderJob({
+  jobId: "job-42", idempotencyKey: "job-42-once", plan, executionManifest,
+  artifactUri: "file:///srv/cutly/output/job-42.mp4",
 });
+const queued = await client.submitRender({
+  requestId: "submit-42", projectId: "demo", job,
+});
+if (!queued.ok) throw new Error("render submission rejected");
 ```
+
+Check `result.ok` before consuming each receipt. Agent values are immutable,
+null-prototype objects and all wire integers are `bigint`. See the complete
+runnable [`typescript-render-agent.mjs`](../../examples/typescript-render-agent.mjs)
+for receipt binding checks and terminal-state polling.
 
 `HeadlessPlayer` already provides the exact audio-master playback state machine:
 NTSC-safe bigint frame selection, seek/revision epochs, explicit buffering,

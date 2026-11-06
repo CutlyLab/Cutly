@@ -16,6 +16,7 @@ import (
 // named explicitly below because silently applying them to v2 would discard
 // typed v2 semantics such as transitions, text, vectors and AudioGraph fields.
 type Document = documentv2.Document
+type ID = videoedit.ID
 type Diagnostic = videoedit.Diagnostic
 type BackendCapabilities = videoedit.BackendCapabilities
 type EvaluationProgram = evaluator.Program
