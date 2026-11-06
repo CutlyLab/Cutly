@@ -76,18 +76,19 @@ func TestSchemasCompileAndValidateInstances(t *testing.T) {
 	}
 
 	validInstances := map[string]string{
-		"cutly.agent-request.v1.schema.json":       "agent/protocol/testdata/agent-request-v1.canonical.json",
-		"cutly.agent-result.v1.schema.json":        "agent/protocol/testdata/agent-result-v1.canonical.json",
-		"cutly.document.v1.schema.json":            "conformance/fixtures/document-v1.valid.json",
-		"cutly.document.v2.schema.json":            "conformance/fixtures/document-v2.valid.json",
-		"cutly.transaction.v1.schema.json":         "conformance/fixtures/transaction-v1.valid.json",
-		"cutly.render-plan.v2.schema.json":         "conformance/fixtures/render-plan-v2.valid.json",
-		"cutly.render-plan.v3.schema.json":         "conformance/fixtures/render-plan-v3.valid.json",
-		"cutly.probe-manifest.v1.schema.json":      "media/probe/testdata/probe-manifest-v1.valid.json",
-		"cutly.execution-manifest.v1.schema.json":  "render/api/testdata/execution-manifest-v1.valid.json",
-		"cutly.render-job.v1.schema.json":          "render/api/testdata/render-job-v1.valid.json",
-		"cutly.exact-frame-request.v1.schema.json": "render/api/testdata/exact-frame-request-v1.valid.json",
-		"cutly.evidence-manifest.v1.schema.json":   "render/evidence/testdata/evidence-manifest-v1.valid.json",
+		"cutly.agent-request.v1.schema.json":        "agent/protocol/testdata/agent-request-v1.canonical.json",
+		"cutly.agent-result.v1.schema.json":         "agent/protocol/testdata/agent-result-v1.canonical.json",
+		"cutly.document.v1.schema.json":             "conformance/fixtures/document-v1.valid.json",
+		"cutly.document.v2.schema.json":             "conformance/fixtures/document-v2.valid.json",
+		"cutly.transaction.v1.schema.json":          "conformance/fixtures/transaction-v1.valid.json",
+		"cutly.render-plan.v2.schema.json":          "conformance/fixtures/render-plan-v2.valid.json",
+		"cutly.render-plan.v3.schema.json":          "conformance/fixtures/render-plan-v3.valid.json",
+		"cutly.probe-manifest.v1.schema.json":       "media/probe/testdata/probe-manifest-v1.valid.json",
+		"cutly.media-runtime-bundle.v1.schema.json": "conformance/fixtures/media-runtime-bundle-v1.valid.json",
+		"cutly.execution-manifest.v1.schema.json":   "render/api/testdata/execution-manifest-v1.valid.json",
+		"cutly.render-job.v1.schema.json":           "render/api/testdata/render-job-v1.valid.json",
+		"cutly.exact-frame-request.v1.schema.json":  "render/api/testdata/exact-frame-request-v1.valid.json",
+		"cutly.evidence-manifest.v1.schema.json":    "render/evidence/testdata/evidence-manifest-v1.valid.json",
 	}
 	if len(validInstances) != len(resolved) {
 		t.Fatalf("schema fixture inventory mismatch: %d schemas, %d valid instances", len(resolved), len(validInstances))
@@ -435,6 +436,8 @@ func mutateCriticalSchemaInvalid(t *testing.T, name string, value map[string]any
 		value["resources"].([]any)[0].(map[string]any)["content_hash"] = "sha256:invalid"
 	case "cutly.probe-manifest.v1.schema.json":
 		value["resource"].(map[string]any)["content_hash"] = "sha256:invalid"
+	case "cutly.media-runtime-bundle.v1.schema.json":
+		value["signature"] = "not-an-ed25519-signature"
 	case "cutly.execution-manifest.v1.schema.json":
 		value["resources"].([]any)[0].(map[string]any)["locator"] = "cas://sha256/not-a-digest"
 	case "cutly.render-job.v1.schema.json":

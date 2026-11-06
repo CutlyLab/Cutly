@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.cutly.dev/media-runtime-bundle/v1",
+  "title": "Cutly signed media runtime bundle v1",
+  "description": "Signed, complete FFmpeg and FFprobe executable/dependency closure for one platform and architecture.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "profile", "canonical_json_profile", "platform", "architecture", "ffmpeg_path", "ffprobe_path", "files", "bundle_fingerprint", "key_id", "signature_algorithm", "signature"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "profile": {"const": "cutly.media-runtime-bundle.v1"},
+    "canonical_json_profile": {"const": "cutly.json.canonical-integer.v1"},
+    "platform": {"$ref": "#/$defs/identity"},
+    "architecture": {"$ref": "#/$defs/identity"},
+    "ffmpeg_path": {"$ref": "#/$defs/relativePath"},
+    "ffprobe_path": {"$ref": "#/$defs/relativePath"},
+    "files": {"type": "array", "minItems": 2, "maxItems": 4096, "items": {"$ref": "#/$defs/file"}},
+    "bundle_fingerprint": {"$ref": "#/$defs/sha256"},
+    "key_id": {"$ref": "#/$defs/identity"},
+    "signature_algorithm": {"const": "ed25519.v1"},
+    "signature": {"type": "string", "pattern": "^[0-9a-f]{128}$"}
+  },
+  "$defs": {
+    "identity": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$"},
+    "relativePath": {"type": "string", "minLength": 1, "maxLength": 1024, "pattern": "^[a-z0-9._+-]+(?:/[a-z0-9._+-]+)*$"},
+    "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "tool": {"enum": ["ffmpeg", "ffprobe"]},
+    "file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "size_bytes", "mode", "content_hash", "tools"],
+      "properties": {
+        "path": {"$ref": "#/$defs/relativePath"},
+        "size_bytes": {"type": "integer", "minimum": 1, "maximum": 17179869184},
+        "mode": {"type": "integer", "minimum": 0, "maximum": 511},
+        "content_hash": {"$ref": "#/$defs/sha256"},
+        "tools": {"type": "array", "minItems": 1, "maxItems": 2, "uniqueItems": true, "items": {"$ref": "#/$defs/tool"}}
+      }
+    }
+  }
+}

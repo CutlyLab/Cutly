@@ -21,6 +21,10 @@ remain capability-gated rather than being silently dropped.
   rejects v2 and rebuilds a v3 plan from the committed Document instead of guessing a migration.
 - `cutly.probe-manifest.v1.schema.json` describes immutable resource identity, pinned probe identity,
   container timing, and normalized video/audio stream facts.
+- `cutly.media-runtime-bundle.v1.schema.json` describes a signed, complete FFmpeg/FFprobe closure.
+  Schema validation is only the wire gate: `media/runtimebundle` also verifies the Ed25519 signature,
+  canonical payload fingerprint, platform, directory closure, file metadata and every content hash
+  before it returns executable paths.
 - `cutly.execution-manifest.v1.schema.json` freezes backend/runtime/output choices plus controlled
   worker locators and versioned decoded-evidence byte profiles for one semantic plan.
 - `cutly.render-job.v1.schema.json` binds an idempotent full-plan or chunk range to both the semantic
