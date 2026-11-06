@@ -98,6 +98,25 @@ func TestRenderPrepareIsAProtocolAction(t *testing.T) {
 	}
 }
 
+func TestRenderPlanIsAProtocolAction(t *testing.T) {
+	request := Request{
+		ProtocolVersion: ProtocolVersion, RequestID: "plan-1", Tool: ToolRender,
+		Action: "plan", ProjectID: "project", Payload: json.RawMessage(`{"range":{},"target":{}}`),
+	}
+	if _, err := CanonicalRequest(request); err != nil {
+		t.Fatalf("plan request rejected: %v", err)
+	}
+	result := Result{
+		ProtocolVersion: ProtocolVersion, OK: true, RequestID: request.RequestID,
+		Tool: ToolRender, Action: "plan", State: "planned", ProjectID: request.ProjectID,
+		RenderRequired: true, Diagnostics: []videoedit.Diagnostic{},
+		NextActions: []NextAction{{Tool: ToolRender, Action: "prepare", ProjectID: request.ProjectID}},
+	}
+	if err := ValidateResult(result); err != nil {
+		t.Fatalf("plan result rejected: %v", err)
+	}
+}
+
 func TestDecodedValuesOwnRawBuffers(t *testing.T) {
 	raw := []byte(`{"protocol_version":1,"request_id":"r","tool":"cutly_edit","action":"plan","project_id":"p","payload":{"value":1}}`)
 	request, err := DecodeRequest(raw)

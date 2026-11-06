@@ -254,7 +254,7 @@ func assertRenderRoutesAndAdmission(t *testing.T, application *application) {
 		t.Fatal(err)
 	}
 	wanted := map[string]bool{
-		"cutly_render/prepare": false, "cutly_render/preflight": false, "cutly_render/frame": false, "cutly_render/render": false,
+		"cutly_render/plan": false, "cutly_render/prepare": false, "cutly_render/preflight": false, "cutly_render/frame": false, "cutly_render/render": false,
 		"cutly_render/status": false, "cutly_render/cancel": false,
 	}
 	for _, action := range receipt.Actions {

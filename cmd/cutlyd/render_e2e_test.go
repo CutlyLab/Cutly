@@ -12,10 +12,12 @@ import (
 	"time"
 
 	agentprotocol "github.com/CutlyLab/Cutly/agent/protocol"
+	"github.com/CutlyLab/Cutly/agent/renderplan"
 	"github.com/CutlyLab/Cutly/agent/renderprepare"
 	"github.com/CutlyLab/Cutly/core/videoedit"
 	cutlyffprobe "github.com/CutlyLab/Cutly/media/ffprobe"
 	"github.com/CutlyLab/Cutly/media/probe"
+	"github.com/CutlyLab/Cutly/project/local"
 	renderapi "github.com/CutlyLab/Cutly/render/api"
 	renderevidence "github.com/CutlyLab/Cutly/render/evidence"
 	"github.com/CutlyLab/Cutly/render/scheduler"
@@ -55,7 +57,10 @@ func TestRenderApplicationEndToEndAndOfflinePublicationRecovery(t *testing.T) {
 		}
 		probes[input.id] = manifest
 	}
-	plan := acceptancePlan(t, probes)
+	document := acceptanceDocument(probes)
+	if _, err := local.Create(ctx, configuration.projectDir, document, local.Options{}); err != nil {
+		t.Fatalf("create acceptance project: %v", err)
+	}
 	paths := map[videoedit.ID]string{"video": videoPath, "audio": audioPath}
 
 	application, err := buildApplication(ctx, configuration)
@@ -64,6 +69,21 @@ func TestRenderApplicationEndToEndAndOfflinePublicationRecovery(t *testing.T) {
 	}
 	openApplication := application
 	t.Cleanup(func() { _ = openApplication.Close() })
+	planned := callRenderAction(t, ctx, application, "plan", "e2e-plan", map[string]any{
+		"range": acceptanceRange(0, 1), "target": acceptanceTarget(),
+	})
+	if !planned.OK || planned.State != "planned" || len(planned.NextActions) != 1 ||
+		planned.NextActions[0].Tool != agentprotocol.ToolRender || planned.NextActions[0].Action != "prepare" {
+		t.Fatalf("plan = %+v", planned)
+	}
+	var planReceipt renderplan.Receipt
+	if err := json.Unmarshal(planned.Receipt, &planReceipt); err != nil {
+		t.Fatalf("decode plan receipt: %v", err)
+	}
+	plan := planReceipt.Plan
+	if planReceipt.Profile != renderplan.ReceiptProfile || plan.DocumentHash == "" || plan.Fingerprint == "" {
+		t.Fatalf("plan receipt = %+v", planReceipt)
+	}
 	bindings := make([]map[string]any, 0, len(plan.Resources))
 	for _, resource := range plan.Resources {
 		bindings = append(bindings, map[string]any{"asset_id": resource.AssetID, "locator": paths[resource.AssetID]})
@@ -218,10 +238,9 @@ func runAcceptanceCommand(t *testing.T, ctx context.Context, executable string, 
 	}
 }
 
-func acceptancePlan(t *testing.T, probes map[videoedit.ID]probe.ProbeManifest) videoedit.RenderPlan {
-	t.Helper()
+func acceptanceDocument(probes map[videoedit.ID]probe.ProbeManifest) videoedit.Document {
 	duration := videoedit.RationalTime{Value: 1, Rate: 1}
-	document := videoedit.Document{
+	return videoedit.Document{
 		SchemaVersion: videoedit.SchemaVersion, ID: "document", Revision: 1,
 		Assets: []videoedit.Asset{
 			{ID: "audio", Kind: videoedit.AssetKindAudio, URI: "audio.mov", ContentHash: probes["audio"].Resource.ContentHash, Duration: &duration},
@@ -238,18 +257,17 @@ func acceptancePlan(t *testing.T, probes map[videoedit.ID]probe.ProbeManifest) v
 			},
 		}},
 	}
-	plan, diagnostics := videoedit.Resolve(document, acceptanceRange(0, 1), videoedit.RenderTarget{
+}
+
+func acceptanceTarget() videoedit.RenderTarget {
+	return videoedit.RenderTarget{
 		TimelineID: "timeline", Width: 64, Height: 64,
 		FrameClock: videoedit.FrameClock{
 			Origin: videoedit.RationalTime{Value: 0, Rate: 1}, FramesPerSecond: videoedit.RationalTime{Value: 30, Rate: 1},
 		},
 		SampleClock: videoedit.SampleClock{Origin: videoedit.RationalTime{Value: 0, Rate: 1}, SamplesPerSecond: 48_000},
 		Channels:    2, PixelFormat: "yuv420p", ColorSpace: "bt709",
-	})
-	if videoedit.HasErrorDiagnostics(diagnostics) {
-		t.Fatalf("resolve diagnostics: %+v", diagnostics)
 	}
-	return plan
 }
 
 func acceptanceRange(start, duration int64) videoedit.TimeRange {

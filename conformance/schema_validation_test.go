@@ -133,6 +133,14 @@ func TestSchemasCompileAndValidateInstances(t *testing.T) {
 	if err := resolved["cutly.agent-result.v1.schema.json"].Validate(prepareResult); err != nil {
 		t.Fatalf("render prepare result rejected by published Agent schema: %v", err)
 	}
+	planRequest := decodeSchemaInstance(t, []byte(`{"protocol_version":1,"request_id":"plan-1","tool":"cutly_render","action":"plan","project_id":"project","payload":{"range":{},"target":{}}}`))
+	if err := resolved["cutly.agent-request.v1.schema.json"].Validate(planRequest); err != nil {
+		t.Fatalf("render plan request rejected by published Agent schema: %v", err)
+	}
+	planResult := decodeSchemaInstance(t, []byte(`{"protocol_version":1,"ok":true,"request_id":"plan-1","tool":"cutly_render","action":"plan","state":"planned","project_id":"project","changed":false,"replayed":false,"render_required":true,"diagnostics":[],"receipt":{},"next_actions":[{"tool":"cutly_render","action":"prepare","project_id":"project"}]}`))
+	if err := resolved["cutly.agent-result.v1.schema.json"].Validate(planResult); err != nil {
+		t.Fatalf("render plan result rejected by published Agent schema: %v", err)
+	}
 
 	audioProcessingRaw, err := os.ReadFile(filepath.Join(moduleRoot, "conformance", "fixtures", "document-v2-audio-processing.valid.json"))
 	if err != nil {

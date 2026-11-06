@@ -81,7 +81,7 @@ type Result struct {
 var actions = map[Tool]map[string]struct{}{
 	ToolProject: actionSet("inspect", "status", "history", "capabilities"),
 	ToolEdit:    actionSet("plan", "apply", "discard", "revert"),
-	ToolRender:  actionSet("prepare", "preflight", "frame", "render", "status", "cancel"),
+	ToolRender:  actionSet("plan", "prepare", "preflight", "frame", "render", "status", "cancel"),
 }
 
 // ValidContentType reports whether value names an Agent JSON representation.

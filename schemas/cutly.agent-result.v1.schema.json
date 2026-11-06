@@ -31,7 +31,7 @@
       "oneOf": [
         {"properties": {"tool": {"const": "cutly_project"}, "action": {"enum": ["inspect", "status", "history", "capabilities"]}}},
         {"properties": {"tool": {"const": "cutly_edit"}, "action": {"enum": ["plan", "apply", "discard", "revert"]}}},
-        {"properties": {"tool": {"const": "cutly_render"}, "action": {"enum": ["prepare", "preflight", "frame", "render", "status", "cancel"]}}}
+        {"properties": {"tool": {"const": "cutly_render"}, "action": {"enum": ["plan", "prepare", "preflight", "frame", "render", "status", "cancel"]}}}
       ]
     },
     {
@@ -115,7 +115,7 @@
       "oneOf": [
         {"properties": {"tool": {"const": "cutly_project"}, "action": {"enum": ["inspect", "status", "history", "capabilities"]}}},
         {"properties": {"tool": {"const": "cutly_edit"}, "action": {"enum": ["plan", "apply", "discard", "revert"]}}},
-        {"properties": {"tool": {"const": "cutly_render"}, "action": {"enum": ["prepare", "preflight", "frame", "render", "status", "cancel"]}}}
+        {"properties": {"tool": {"const": "cutly_render"}, "action": {"enum": ["plan", "prepare", "preflight", "frame", "render", "status", "cancel"]}}}
       ],
       "allOf": [
         {

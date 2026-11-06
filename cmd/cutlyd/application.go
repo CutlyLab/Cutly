@@ -11,6 +11,7 @@ import (
 	"github.com/CutlyLab/Cutly/agent/ffmpeghost"
 	"github.com/CutlyLab/Cutly/agent/projectlocal"
 	"github.com/CutlyLab/Cutly/agent/renderexec"
+	"github.com/CutlyLab/Cutly/agent/renderplan"
 	"github.com/CutlyLab/Cutly/agent/renderprepare"
 	"github.com/CutlyLab/Cutly/agent/renderqueue"
 	"github.com/CutlyLab/Cutly/agent/router"
@@ -42,13 +43,13 @@ func buildApplication(ctx context.Context, configuration config) (*application, 
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	routes, err := buildProjectRoutes(configuration)
+	routes, projects, err := buildProjectComponents(configuration)
 	if err != nil {
 		return nil, err
 	}
 	var render *renderApplication
 	if configuration.render.enabled {
-		render, err = buildRenderApplication(ctx, configuration)
+		render, err = buildRenderApplication(ctx, configuration, projects)
 		if err != nil {
 			return nil, err
 		}
@@ -65,22 +66,27 @@ func buildApplication(ctx context.Context, configuration config) (*application, 
 }
 
 func buildProjectRoutes(configuration config) ([]router.Route, error) {
+	routes, _, err := buildProjectComponents(configuration)
+	return routes, err
+}
+
+func buildProjectComponents(configuration config) ([]router.Route, *projectlocal.Registry, error) {
 	if configuration.projectDir == "" {
-		return nil, nil
+		return nil, nil, nil
 	}
 	project, err := local.New(configuration.projectDir, local.Options{})
 	if err != nil {
-		return nil, fmt.Errorf("open local project: %w", err)
+		return nil, nil, fmt.Errorf("open local project: %w", err)
 	}
 	registry, err := projectlocal.NewRegistry(map[string]*local.Service{configuration.projectID: project})
 	if err != nil {
-		return nil, fmt.Errorf("register local project: %w", err)
+		return nil, nil, fmt.Errorf("register local project: %w", err)
 	}
 	projectActions, err := projectlocal.New(registry)
 	if err != nil {
-		return nil, fmt.Errorf("initialize local project actions: %w", err)
+		return nil, nil, fmt.Errorf("initialize local project actions: %w", err)
 	}
-	return projectActions.Routes(), nil
+	return projectActions.Routes(), registry, nil
 }
 
 func (application *application) Errors() <-chan error {
@@ -108,7 +114,14 @@ type renderApplication struct {
 	closeErr  error
 }
 
-func buildRenderApplication(ctx context.Context, configuration config) (_ *renderApplication, returnErr error) {
+func buildRenderApplication(
+	ctx context.Context,
+	configuration config,
+	projects *projectlocal.Registry,
+) (_ *renderApplication, returnErr error) {
+	if projects == nil {
+		return nil, errors.New("cutlyd: render mode requires a registered local project")
+	}
 	render := configuration.render
 	for _, directory := range []struct{ name, path string }{
 		{"render state", render.stateDir},
@@ -219,6 +232,23 @@ func buildRenderApplication(ctx context.Context, configuration config) (_ *rende
 	if err != nil {
 		return nil, fmt.Errorf("cutlyd: initialize host resolver: %w", err)
 	}
+	planActions, err := renderplan.New(renderplan.Config{
+		ProjectID: configuration.projectID,
+		Resolver: renderplan.DocumentResolverFunc(func(ctx context.Context, projectID string) (videoedit.Document, error) {
+			project, err := projects.ResolveProject(ctx, projectID)
+			if err != nil {
+				return videoedit.Document{}, err
+			}
+			snapshot, err := project.Inspect(ctx)
+			if err != nil {
+				return videoedit.Document{}, err
+			}
+			return snapshot.Document, nil
+		}),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("cutlyd: initialize render plan actions: %w", err)
+	}
 	prepareActions, err := renderprepare.New(renderprepare.Config{
 		ProjectID: configuration.projectID,
 		Preparer:  hostResolver,
@@ -255,7 +285,8 @@ func buildRenderApplication(ctx context.Context, configuration config) (_ *rende
 	if err != nil {
 		return nil, fmt.Errorf("cutlyd: initialize render queue actions: %w", err)
 	}
-	result.routes = append(prepareActions.Routes(), executionActions.Routes()...)
+	result.routes = append(planActions.Routes(), prepareActions.Routes()...)
+	result.routes = append(result.routes, executionActions.Routes()...)
 	result.routes = append(result.routes, queueActions.Routes()...)
 	return result, nil
 }
