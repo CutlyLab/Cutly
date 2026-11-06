@@ -27,6 +27,7 @@ var (
 	ErrGeometryMetrics        = errors.New("sfntglyf: outline metrics do not match geometry")
 	ErrOutlineSetInputInvalid = errors.New("sfntglyf: outline-set input is invalid")
 	ErrOutlineSetCoordinate   = errors.New("sfntglyf: outline-set coordinate is not representable")
+	ErrLayoutGraphInvalid     = errors.New("sfntglyf: OpenType layout graph is invalid")
 	ErrResourceLimit          = errors.New("sfntglyf: resource limit exceeded")
 	ErrAllocationFailed       = errors.New("sfntglyf: allocation failed")
 	ErrInvariantFailed        = errors.New("sfntglyf: internal invariant failed")
@@ -61,6 +62,10 @@ const (
 	CodeOutlineSetResourceLimit ErrorCode = "FONT.STATIC_GLYF_OUTLINE_SET_V1.RESOURCE_LIMIT"
 	CodeOutlineSetCoordinate    ErrorCode = "FONT.STATIC_GLYF_OUTLINE_SET_V1.COORDINATE_RANGE"
 	CodeOutlineSetInvariant     ErrorCode = "FONT.STATIC_GLYF_OUTLINE_SET_V1.INVARIANT_FAILED"
+	CodeLayoutGraphInvalid      ErrorCode = "FONT.OPENTYPE_LAYOUT_GRAPH_V1.INVALID"
+	CodeLayoutGraphLimits       ErrorCode = "FONT.OPENTYPE_LAYOUT_GRAPH_V1.LIMITS_INVALID"
+	CodeLayoutGraphResource     ErrorCode = "FONT.OPENTYPE_LAYOUT_GRAPH_V1.RESOURCE_LIMIT"
+	CodeLayoutGraphInvariant    ErrorCode = "FONT.OPENTYPE_LAYOUT_GRAPH_V1.INVARIANT_FAILED"
 	CodeResourceLimit           ErrorCode = "FONT.SFNT_GLYF_CORE_V1.RESOURCE_LIMIT"
 	CodeAllocationFailed        ErrorCode = "FONT.SFNT_GLYF_CORE_V1.ALLOCATION_FAILED"
 	CodeInvariantFailed         ErrorCode = "FONT.SFNT_GLYF_CORE_V1.INVARIANT_FAILED"
