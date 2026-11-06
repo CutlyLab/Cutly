@@ -27,6 +27,7 @@ var (
 	ErrConfiguration = errors.New("render runtime: invalid configuration")
 	ErrCapacity      = errors.New("render runtime: all job slots are occupied")
 	ErrPlanBinding   = errors.New("render runtime: stage plan is not bound to the scheduler job")
+	ErrExecutor      = errors.New("render runtime: stage executor is unavailable")
 )
 
 // PlanSource loads the immutable stage plan selected by a scheduler job. The
@@ -39,6 +40,23 @@ type PlanSourceFunc func(context.Context, renderapi.RenderJob) (stagedag.Plan, e
 
 func (function PlanSourceFunc) ResolveStagePlan(ctx context.Context, job renderapi.RenderJob) (stagedag.Plan, error) {
 	return function(ctx, job)
+}
+
+// ExecutorSource creates an immutable, job-scoped executor after the plan has
+// been frozen and rebound to the scheduler job. The source receives an owned
+// plan copy and may be called concurrently for different jobs; implementations
+// must be concurrency-safe and honor context cancellation. This is required by
+// publish stages whose target belongs to RenderJob; cacheable stages may use
+// Config's shared Executor instead. Exactly one executor mode must be
+// configured.
+type ExecutorSource interface {
+	ResolveExecutor(context.Context, renderapi.RenderJob, stagedag.Plan) (stagedag.Executor, error)
+}
+
+type ExecutorSourceFunc func(context.Context, renderapi.RenderJob, stagedag.Plan) (stagedag.Executor, error)
+
+func (function ExecutorSourceFunc) ResolveExecutor(ctx context.Context, job renderapi.RenderJob, plan stagedag.Plan) (stagedag.Executor, error) {
+	return function(ctx, job, plan)
 }
 
 // ArtifactResolver derives and verifies the final scheduler artifact from
@@ -80,6 +98,7 @@ type Config struct {
 	Plans       PlanSource
 	Checkpoints stagedag.CheckpointStore
 	Executor    stagedag.Executor
+	Executors   ExecutorSource
 	Artifacts   ArtifactResolver
 	StageLimits stagedag.Limits
 	Progress    renderapi.EventSink
@@ -94,6 +113,7 @@ type Dispatcher struct {
 	plans       PlanSource
 	checkpoints stagedag.CheckpointStore
 	executor    stagedag.Executor
+	executors   ExecutorSource
 	artifacts   ArtifactResolver
 	stageLimits stagedag.Limits
 	progress    renderapi.EventSink
@@ -121,14 +141,14 @@ func New(config Config) (*Dispatcher, error) {
 		maximum = DefaultMaxConcurrentJobs
 	}
 	if config.Coordinator == nil || config.Plans == nil || config.Checkpoints == nil ||
-		config.Executor == nil || config.Artifacts == nil || maximum < 1 || maximum > MaxConcurrentJobs ||
+		(config.Executor == nil) == (config.Executors == nil) || config.Artifacts == nil || maximum < 1 || maximum > MaxConcurrentJobs ||
 		config.StageLimits.MaxConcurrent <= 0 || config.StageLimits.MaxConcurrent > stagedag.MaxConcurrentTasks ||
 		config.StageLimits.MaxMemoryBytes == 0 || config.StageLimits.MaxDiskBytes == 0 {
 		return nil, ErrConfiguration
 	}
 	return &Dispatcher{
 		coordinator: config.Coordinator, plans: config.Plans, checkpoints: config.Checkpoints,
-		executor: config.Executor, artifacts: config.Artifacts, stageLimits: config.StageLimits,
+		executor: config.Executor, executors: config.Executors, artifacts: config.Artifacts, stageLimits: config.StageLimits,
 		progress: config.Progress, maximumJobs: maximum, active: make(map[string]*activeRun),
 	}, nil
 }
@@ -217,9 +237,31 @@ func (dispatcher *Dispatcher) RunNext(ctx context.Context) (run Run, found bool,
 		snapshot, finishErr := dispatcher.finishFailure(ctx, claim.snapshot.Job.ID, classifyFailure(err, renderapi.FailureInputRepair), err)
 		return Run{Snapshot: snapshot, Resumed: claim.resumed}, true, finishErr
 	}
+	executor := dispatcher.executor
+	if dispatcher.executors != nil {
+		// Never expose the plan that the Engine and ArtifactResolver will use to
+		// an embedding callback. A source may retain or mutate its owned copy;
+		// neither action can change execution or introduce a race at freeze time.
+		executorPlan, cloneErr := freezeResolvedPlan(plan)
+		if cloneErr != nil {
+			err = cloneErr
+		} else {
+			executor, err = safeResolveExecutor(claim.ctx, dispatcher.executors, claim.snapshot.Job, executorPlan)
+		}
+		if err == nil && executor == nil {
+			err = ErrExecutor
+		}
+		if err != nil {
+			if ctxErr := ctx.Err(); ctxErr != nil && !dispatcher.cancelWasRequested(claim.snapshot.Job.ID) {
+				return Run{Snapshot: claim.snapshot, Resumed: claim.resumed}, true, ctxErr
+			}
+			snapshot, finishErr := dispatcher.finishFailure(ctx, claim.snapshot.Job.ID, classifyFailure(err, renderapi.FailureNonRetryable), err)
+			return Run{Snapshot: snapshot, Resumed: claim.resumed}, true, finishErr
+		}
+	}
 
 	engine := stagedag.Engine{
-		Store: dispatcher.checkpoints, Executor: dispatcher.executor,
+		Store: dispatcher.checkpoints, Executor: executor,
 		Sink: dispatcher.progress, Limits: dispatcher.stageLimits,
 	}
 	dagResult, err := engine.Run(claim.ctx, plan)
@@ -403,11 +445,11 @@ func tickEnd(value videoedit.TickRange) (int64, bool) {
 
 func classifyFailure(err error, fallback renderapi.FailureClass) renderapi.FailureClass {
 	var explicit *FailureError
-	if errors.As(err, &explicit) && validFailureClass(explicit.Class) {
+	if errors.As(err, &explicit) && explicit != nil && validFailureClass(explicit.Class) {
 		return explicit.Class
 	}
 	var stage *stagedag.StageError
-	if errors.As(err, &stage) && validFailureClass(stage.Class) {
+	if errors.As(err, &stage) && stage != nil && validFailureClass(stage.Class) {
 		return stage.Class
 	}
 	switch {
@@ -478,6 +520,15 @@ func freezeResolvedPlan(plan stagedag.Plan) (stagedag.Plan, error) {
 		return stagedag.Plan{}, err
 	}
 	return frozen, nil
+}
+
+func safeResolveExecutor(ctx context.Context, source ExecutorSource, job renderapi.RenderJob, plan stagedag.Plan) (_ stagedag.Executor, returnErr error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			returnErr = fmt.Errorf("render runtime: executor source panic: %v", recovered)
+		}
+	}()
+	return source.ResolveExecutor(ctx, job, plan)
 }
 
 func safeResolveArtifact(ctx context.Context, resolver ArtifactResolver, job renderapi.RenderJob, plan stagedag.Plan, result stagedag.RunResult) (_ renderapi.RenderArtifact, returnErr error) {

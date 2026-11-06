@@ -114,6 +114,161 @@ func TestDispatcherFreezesResolvedPlanBeforeExecution(t *testing.T) {
 	}
 }
 
+func TestDispatcherResolvesJobScopedExecutors(t *testing.T) {
+	coordinator := testCoordinator(t)
+	jobs := []renderapi.RenderJob{testJob("job-scoped-a"), testJob("job-scoped-b")}
+	var mu sync.Mutex
+	var resolved []string
+	dispatcher, err := New(Config{
+		Coordinator: coordinator,
+		Plans: PlanSourceFunc(func(_ context.Context, job renderapi.RenderJob) (stagedag.Plan, error) {
+			return testPlan(t, job), nil
+		}),
+		Checkpoints: &memoryCheckpointStore{values: make(map[string]stagedag.Checkpoint)},
+		Executors: ExecutorSourceFunc(func(_ context.Context, job renderapi.RenderJob, plan stagedag.Plan) (stagedag.Executor, error) {
+			if plan.JobID != job.ID {
+				return nil, errors.New("executor source received unbound plan")
+			}
+			mu.Lock()
+			resolved = append(resolved, job.ID)
+			mu.Unlock()
+			return stagedag.ExecutorFunc(func(context.Context, stagedag.Task, []stagedag.Dependency) (stagedag.StageOutput, error) {
+				return testOutput(t), nil
+			}), nil
+		}),
+		Artifacts: ArtifactResolverFunc(func(_ context.Context, job renderapi.RenderJob, _ stagedag.Plan, _ stagedag.RunResult) (renderapi.RenderArtifact, error) {
+			return testArtifact(job), nil
+		}),
+		StageLimits:       stagedag.Limits{MaxConcurrent: 1, MaxMemoryBytes: 8, MaxDiskBytes: 8},
+		MaxConcurrentJobs: 2,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, job := range jobs {
+		if _, _, err := dispatcher.Submit(context.Background(), job); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for range jobs {
+		run, found, err := dispatcher.RunNext(context.Background())
+		if err != nil || !found || run.Snapshot.State != renderapi.JobComplete {
+			t.Fatalf("scoped run found=%v run=%+v err=%v", found, run, err)
+		}
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(resolved) != len(jobs) || resolved[0] != jobs[0].ID || resolved[1] != jobs[1].ID {
+		t.Fatalf("resolved jobs = %v", resolved)
+	}
+}
+
+func TestDispatcherIsolatesExecutionPlanFromExecutorSource(t *testing.T) {
+	coordinator := testCoordinator(t)
+	job := testJob("job-source-plan-isolation")
+	mutateRetained := make(chan struct{})
+	mutationDone := make(chan struct{})
+	var retained stagedag.Plan
+	dispatcher, err := New(Config{
+		Coordinator: coordinator,
+		Plans: PlanSourceFunc(func(context.Context, renderapi.RenderJob) (stagedag.Plan, error) {
+			return testPlan(t, job), nil
+		}),
+		Checkpoints: &memoryCheckpointStore{values: make(map[string]stagedag.Checkpoint)},
+		Executors: ExecutorSourceFunc(func(_ context.Context, _ renderapi.RenderJob, owned stagedag.Plan) (stagedag.Executor, error) {
+			retained = owned
+			owned.Tasks[0].ID = "mutated-synchronously"
+			go func() {
+				<-mutateRetained
+				retained.Tasks[0].ID = "mutated-after-return"
+				close(mutationDone)
+			}()
+			return stagedag.ExecutorFunc(func(_ context.Context, task stagedag.Task, _ []stagedag.Dependency) (stagedag.StageOutput, error) {
+				if task.ID != "publish" {
+					t.Errorf("engine observed source mutation: %q", task.ID)
+				}
+				close(mutateRetained)
+				<-mutationDone
+				return testOutput(t), nil
+			}), nil
+		}),
+		Artifacts: ArtifactResolverFunc(func(_ context.Context, actual renderapi.RenderJob, plan stagedag.Plan, _ stagedag.RunResult) (renderapi.RenderArtifact, error) {
+			if plan.Tasks[0].ID != "publish" {
+				t.Errorf("artifact resolver observed source mutation: %q", plan.Tasks[0].ID)
+			}
+			return testArtifact(actual), nil
+		}),
+		StageLimits: stagedag.Limits{MaxConcurrent: 1, MaxMemoryBytes: 8, MaxDiskBytes: 8},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := dispatcher.Submit(context.Background(), job); err != nil {
+		t.Fatal(err)
+	}
+	run, found, err := dispatcher.RunNext(context.Background())
+	if err != nil || !found || run.Snapshot.State != renderapi.JobComplete {
+		t.Fatalf("isolated run found=%v run=%+v err=%v", found, run, err)
+	}
+}
+
+func TestDispatcherFailsClosedWhenExecutorSourceReturnsNil(t *testing.T) {
+	coordinator := testCoordinator(t)
+	job := testJob("job-nil-executor")
+	dispatcher, err := New(Config{
+		Coordinator: coordinator,
+		Plans: PlanSourceFunc(func(context.Context, renderapi.RenderJob) (stagedag.Plan, error) {
+			return testPlan(t, job), nil
+		}),
+		Checkpoints: &memoryCheckpointStore{values: make(map[string]stagedag.Checkpoint)},
+		Executors: ExecutorSourceFunc(func(context.Context, renderapi.RenderJob, stagedag.Plan) (stagedag.Executor, error) {
+			return nil, nil
+		}),
+		Artifacts: ArtifactResolverFunc(func(context.Context, renderapi.RenderJob, stagedag.Plan, stagedag.RunResult) (renderapi.RenderArtifact, error) {
+			return renderapi.RenderArtifact{}, errors.New("must not resolve")
+		}),
+		StageLimits: stagedag.Limits{MaxConcurrent: 1, MaxMemoryBytes: 8, MaxDiskBytes: 8},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := dispatcher.Submit(context.Background(), job); err != nil {
+		t.Fatal(err)
+	}
+	run, found, err := dispatcher.RunNext(context.Background())
+	if err != nil || !found || run.Snapshot.State != renderapi.JobFailed ||
+		run.Snapshot.FailureClass != renderapi.FailureNonRetryable || !strings.Contains(run.Snapshot.FailureMessage, ErrExecutor.Error()) {
+		t.Fatalf("nil executor found=%v run=%+v err=%v", found, run, err)
+	}
+}
+
+func TestDispatcherRequiresExactlyOneExecutorMode(t *testing.T) {
+	coordinator := testCoordinator(t)
+	base := Config{
+		Coordinator: coordinator,
+		Plans: PlanSourceFunc(func(context.Context, renderapi.RenderJob) (stagedag.Plan, error) {
+			return stagedag.Plan{}, nil
+		}),
+		Checkpoints: &memoryCheckpointStore{values: make(map[string]stagedag.Checkpoint)},
+		Artifacts: ArtifactResolverFunc(func(context.Context, renderapi.RenderJob, stagedag.Plan, stagedag.RunResult) (renderapi.RenderArtifact, error) {
+			return renderapi.RenderArtifact{}, nil
+		}),
+		StageLimits: stagedag.Limits{MaxConcurrent: 1, MaxMemoryBytes: 1, MaxDiskBytes: 1},
+	}
+	if _, err := New(base); !errors.Is(err, ErrConfiguration) {
+		t.Fatalf("missing executor mode = %v", err)
+	}
+	base.Executor = stagedag.ExecutorFunc(func(context.Context, stagedag.Task, []stagedag.Dependency) (stagedag.StageOutput, error) {
+		return stagedag.StageOutput{}, nil
+	})
+	base.Executors = ExecutorSourceFunc(func(context.Context, renderapi.RenderJob, stagedag.Plan) (stagedag.Executor, error) {
+		return base.Executor, nil
+	})
+	if _, err := New(base); !errors.Is(err, ErrConfiguration) {
+		t.Fatalf("ambiguous executor modes = %v", err)
+	}
+}
+
 func TestDispatcherCancellationInterruptsActiveStage(t *testing.T) {
 	coordinator := testCoordinator(t)
 	job := testJob("job-cancel-stage")
@@ -274,6 +429,70 @@ func TestDispatcherPersistsFailureClassesAndArtifactIntegrityFailure(t *testing.
 			run, found, err := dispatcher.RunNext(context.Background())
 			if err != nil || !found || run.Snapshot.State != renderapi.JobFailed || run.Snapshot.FailureClass != test.wantClass {
 				t.Fatalf("failure found=%v err=%v run=%+v", found, err, run)
+			}
+		})
+	}
+}
+
+func TestDispatcherFailsClosedForTypedNilClassifiedErrors(t *testing.T) {
+	tests := []struct {
+		name      string
+		plans     PlanSource
+		executors ExecutorSource
+		wantClass renderapi.FailureClass
+	}{
+		{
+			name: "failure error",
+			plans: PlanSourceFunc(func(context.Context, renderapi.RenderJob) (stagedag.Plan, error) {
+				var failure *FailureError
+				return stagedag.Plan{}, failure
+			}),
+			wantClass: renderapi.FailureInputRepair,
+		},
+		{
+			name: "stage error",
+			plans: PlanSourceFunc(func(_ context.Context, job renderapi.RenderJob) (stagedag.Plan, error) {
+				return testPlan(t, job), nil
+			}),
+			executors: ExecutorSourceFunc(func(context.Context, renderapi.RenderJob, stagedag.Plan) (stagedag.Executor, error) {
+				return stagedag.ExecutorFunc(func(context.Context, stagedag.Task, []stagedag.Dependency) (stagedag.StageOutput, error) {
+					var failure *stagedag.StageError
+					return stagedag.StageOutput{}, failure
+				}), nil
+			}),
+			wantClass: renderapi.FailureNonRetryable,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			coordinator := testCoordinator(t)
+			job := testJob("job-typed-nil-" + strings.ReplaceAll(test.name, " ", "-"))
+			executors := test.executors
+			if executors == nil {
+				executors = ExecutorSourceFunc(func(context.Context, renderapi.RenderJob, stagedag.Plan) (stagedag.Executor, error) {
+					return stagedag.ExecutorFunc(func(context.Context, stagedag.Task, []stagedag.Dependency) (stagedag.StageOutput, error) {
+						return testOutput(t), nil
+					}), nil
+				})
+			}
+			dispatcher, err := New(Config{
+				Coordinator: coordinator, Plans: test.plans,
+				Checkpoints: &memoryCheckpointStore{values: make(map[string]stagedag.Checkpoint)},
+				Executors:   executors,
+				Artifacts: ArtifactResolverFunc(func(context.Context, renderapi.RenderJob, stagedag.Plan, stagedag.RunResult) (renderapi.RenderArtifact, error) {
+					return renderapi.RenderArtifact{}, errors.New("must not resolve")
+				}),
+				StageLimits: stagedag.Limits{MaxConcurrent: 1, MaxMemoryBytes: 8, MaxDiskBytes: 8},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, _, err := dispatcher.Submit(context.Background(), job); err != nil {
+				t.Fatal(err)
+			}
+			run, found, err := dispatcher.RunNext(context.Background())
+			if err != nil || !found || run.Snapshot.State != renderapi.JobFailed || run.Snapshot.FailureClass != test.wantClass {
+				t.Fatalf("typed nil found=%v run=%+v err=%v", found, run, err)
 			}
 		})
 	}
