@@ -103,6 +103,9 @@ func validateManifestShape(manifest Manifest, maxFiles int, maxTotalBytes int64)
 			(index > 0 && file.Path <= manifest.Files[index-1].Path) {
 			return fmt.Errorf("%w: file %d", ErrManifest, index)
 		}
+		if manifest.Platform != "windows" && file.Mode&0o022 != 0 {
+			return fmt.Errorf("%w: writable file %d", ErrManifest, index)
+		}
 		if file.SizeBytes > maxTotalBytes-total {
 			return fmt.Errorf("%w: declared file bytes", ErrLimit)
 		}

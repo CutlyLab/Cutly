@@ -18,7 +18,9 @@ before a manifest reaches case-sensitive or case-insensitive filesystems.
 
 Resolution is fail closed:
 
-1. open one absolute, non-symlink bundle root with `os.OpenRoot`;
+1. require one canonical physical absolute path (including exact Windows path
+   casing, with no symlink ancestor), reject an unsafe Unix directory mode,
+   then open it with `os.OpenRoot`;
 2. strictly decode the bounded manifest;
 3. check the target and trusted key, then verify fingerprint and signature;
 4. reject every symlink, special file, undeclared file/directory, missing entry,
@@ -26,12 +28,18 @@ Resolution is fail closed:
 5. return executable paths and independent FFmpeg/FFprobe closure fingerprints
    only after the entire closure succeeds.
 
-The directory is walked again after hashing. A caller must nevertheless keep
-the verified root host-owned and non-writable by untrusted principals: portable
-Go cannot execute directly from a retained file descriptor on every supported
-platform, so path replacement after `Resolve` remains an embedding-runtime
-isolation responsibility until the worker integration consumes retained
-descriptor/handle execution.
+The directory is walked again after hashing, every hashed file path must still
+name the same inode, and the root path/inode is checked again before
+publication. Signed Unix file modes are also rejected when a file is
+group/world writable or carries setuid/setgid/sticky bits. Windows permission
+bits do not attest ACL ownership; the embedding host must enforce a protected
+DACL. A caller must nevertheless keep every ancestor
+directory host-owned and the verified root on a read-only or code-signing-
+protected deployment boundary: portable Go cannot execute directly from a
+retained file descriptor on every supported platform, so same-owner rename or
+path replacement after `Resolve` remains an embedding-runtime isolation
+responsibility until the worker integration consumes retained descriptor/handle
+execution.
 
 `SignManifest` exists for offline release tooling. Private keys must not be
 compiled into Cutly or shipped beside a bundle. Production keys, pinned bundle

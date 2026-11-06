@@ -28,7 +28,10 @@ type bundleFixture struct {
 
 func newBundleFixture(t *testing.T) *bundleFixture {
 	t.Helper()
-	root := t.TempDir()
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	files := []struct {
 		path  string
 		data  []byte
@@ -290,6 +293,109 @@ func TestResolveRejectsRootAndManifestLinks(t *testing.T) {
 	}
 }
 
+func TestResolveRejectsLinkedAncestorAndWritableDirectories(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix permission and symlink policy")
+	}
+	t.Run("linked ancestor", func(t *testing.T) {
+		fixture := newBundleFixture(t)
+		linkParent, err := filepath.EvalSymlinks(t.TempDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+		link := filepath.Join(linkParent, "bundle-parent")
+		if err := os.Symlink(filepath.Dir(fixture.root), link); err != nil {
+			t.Skip(err)
+		}
+		linkedRoot := filepath.Join(link, filepath.Base(fixture.root))
+		if _, err := fixture.resolver.Resolve(context.Background(), linkedRoot); !errors.Is(err, ErrClosure) {
+			t.Fatalf("linked ancestor error = %v", err)
+		}
+	})
+
+	t.Run("writable root", func(t *testing.T) {
+		fixture := newBundleFixture(t)
+		if err := os.Chmod(fixture.root, 0o770); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := fixture.resolver.Resolve(context.Background(), fixture.root); !errors.Is(err, ErrClosure) {
+			t.Fatalf("writable root error = %v", err)
+		}
+	})
+
+	t.Run("writable child directory", func(t *testing.T) {
+		fixture := newBundleFixture(t)
+		if err := os.Chmod(filepath.Join(fixture.root, "bin"), 0o775); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := fixture.resolver.Resolve(context.Background(), fixture.root); !errors.Is(err, ErrClosure) {
+			t.Fatalf("writable child error = %v", err)
+		}
+	})
+}
+
+func TestVerifiedFileIdentityRejectsSameMetadataPathReplacement(t *testing.T) {
+	fixture := newBundleFixture(t)
+	root, err := os.OpenRoot(fixture.root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	_, manifestIdentity, err := readRegularFile(context.Background(), root, ManifestFileName, DefaultMaxManifestBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	verified := map[string]os.FileInfo{ManifestFileName: manifestIdentity}
+	for _, file := range fixture.manifest.Files {
+		identity, verifyErr := verifyFile(context.Background(), root, file)
+		if verifyErr != nil {
+			t.Fatal(verifyErr)
+		}
+		verified[file.Path] = identity
+	}
+	expected := fixture.manifest.Files[0]
+	absolute := filepath.Join(fixture.root, filepath.FromSlash(expected.Path))
+	raw, err := os.ReadFile(absolute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(absolute); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(absolute, raw, os.FileMode(expected.Mode)); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(absolute, os.FileMode(expected.Mode)); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyCompleteClosure(
+		context.Background(), root, ManifestFileName, fixture.manifest, DefaultMaxClosureNodes, verified,
+	); !errors.Is(err, ErrContent) {
+		t.Fatalf("replacement error = %v", err)
+	}
+}
+
+func TestResolveRejectsSpecialUnixFileMode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix mode policy")
+	}
+	fixture := newBundleFixture(t)
+	path := filepath.Join(fixture.root, "bin", "ffmpeg")
+	if err := os.Chmod(path, executableMode()|os.ModeSetuid); err != nil {
+		t.Skip(err)
+	}
+	information, err := os.Lstat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if information.Mode()&os.ModeSetuid == 0 {
+		t.Skip("filesystem did not retain setuid mode")
+	}
+	if _, err := fixture.resolver.Resolve(context.Background(), fixture.root); !errors.Is(err, ErrContent) {
+		t.Fatalf("special mode error = %v", err)
+	}
+}
+
 func TestManifestSemanticValidationAndLimits(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -309,6 +415,13 @@ func TestManifestSemanticValidationAndLimits(t *testing.T) {
 		{name: "non executable", want: ErrManifest, mutate: func(m *Manifest) {
 			if m.Platform != "windows" {
 				m.Files[0].Mode = 0o644
+			} else {
+				m.KeyID = ""
+			}
+		}},
+		{name: "group writable file", want: ErrManifest, mutate: func(m *Manifest) {
+			if m.Platform != "windows" {
+				m.Files[2].Mode = 0o664
 			} else {
 				m.KeyID = ""
 			}

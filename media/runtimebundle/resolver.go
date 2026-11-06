@@ -36,8 +36,12 @@ func (resolver *Resolver) Resolve(ctx context.Context, bundleRoot string) (Resol
 		return Resolution{}, fmt.Errorf("%w: bundle root", ErrClosure)
 	}
 	absolute := bundleRoot
+	physical, err := filepath.EvalSymlinks(absolute)
+	if err != nil || filepath.Clean(physical) != absolute {
+		return Resolution{}, errors.Join(ErrClosure, err)
+	}
 	before, err := os.Lstat(absolute)
-	if err != nil || !before.IsDir() || before.Mode()&os.ModeSymlink != 0 {
+	if err != nil || !before.IsDir() || before.Mode()&os.ModeSymlink != 0 || !secureDirectoryMode(before) {
 		return Resolution{}, errors.Join(ErrClosure, err)
 	}
 	root, err := os.OpenRoot(absolute)
@@ -50,7 +54,7 @@ func (resolver *Resolver) Resolve(ctx context.Context, bundleRoot string) (Resol
 		return Resolution{}, errors.Join(ErrClosure, err)
 	}
 
-	raw, err := readRegularFile(ctx, root, resolver.manifestName, resolver.maxManifestBytes)
+	raw, manifestIdentity, err := readRegularFile(ctx, root, resolver.manifestName, resolver.maxManifestBytes)
 	if err != nil {
 		return Resolution{}, fmt.Errorf("%w: manifest: %v", ErrClosure, err)
 	}
@@ -87,17 +91,24 @@ func (resolver *Resolver) Resolve(ctx context.Context, bundleRoot string) (Resol
 		return Resolution{}, err
 	}
 
-	if err := verifyCompleteClosure(ctx, root, resolver.manifestName, manifest, resolver.maxClosureNodes); err != nil {
+	if err := verifyCompleteClosure(ctx, root, resolver.manifestName, manifest, resolver.maxClosureNodes, nil); err != nil {
 		return Resolution{}, err
 	}
+	verifiedFiles := make(map[string]os.FileInfo, len(manifest.Files)+1)
+	verifiedFiles[resolver.manifestName] = manifestIdentity
 	for _, file := range manifest.Files {
-		if err := verifyFile(ctx, root, file); err != nil {
+		identity, err := verifyFile(ctx, root, file)
+		if err != nil {
 			return Resolution{}, err
 		}
+		verifiedFiles[file.Path] = identity
 	}
 	// Repeat the shape walk after hashing so removal/addition during verification
 	// cannot be silently accepted as the observed closure.
-	if err := verifyCompleteClosure(ctx, root, resolver.manifestName, manifest, resolver.maxClosureNodes); err != nil {
+	if err := verifyCompleteClosure(ctx, root, resolver.manifestName, manifest, resolver.maxClosureNodes, verifiedFiles); err != nil {
+		return Resolution{}, err
+	}
+	if err := verifyRootPathIdentity(absolute, before, root); err != nil {
 		return Resolution{}, err
 	}
 	ffmpegClosure, err := closureFingerprint(manifest, ToolFFmpeg)
@@ -129,6 +140,31 @@ func (resolver *Resolver) Resolve(ctx context.Context, bundleRoot string) (Resol
 	}, nil
 }
 
+func verifyRootPathIdentity(absolute string, expected os.FileInfo, root *os.Root) error {
+	physical, err := filepath.EvalSymlinks(absolute)
+	if err != nil || filepath.Clean(physical) != absolute {
+		return errors.Join(ErrClosure, err)
+	}
+	current, err := os.Lstat(absolute)
+	if err != nil || !current.IsDir() || current.Mode()&os.ModeSymlink != 0 ||
+		!secureDirectoryMode(current) || !os.SameFile(expected, current) {
+		return errors.Join(ErrClosure, err)
+	}
+	opened, err := root.Stat(".")
+	if err != nil || !opened.IsDir() || !secureDirectoryMode(opened) || !os.SameFile(expected, opened) {
+		return errors.Join(ErrClosure, err)
+	}
+	return nil
+}
+
+func secureDirectoryMode(information os.FileInfo) bool {
+	if runtime.GOOS == "windows" {
+		return true
+	}
+	return information.Mode().Perm()&0o022 == 0 &&
+		information.Mode()&(os.ModeSetuid|os.ModeSetgid|os.ModeSticky) == 0
+}
+
 func freezeManifest(manifest Manifest) (Manifest, error) {
 	canonical, err := CanonicalManifest(manifest)
 	if err != nil {
@@ -137,37 +173,37 @@ func freezeManifest(manifest Manifest) (Manifest, error) {
 	return DecodeManifest(canonical)
 }
 
-func verifyFile(ctx context.Context, root *os.Root, expected FileEntry) error {
+func verifyFile(ctx context.Context, root *os.Root, expected FileEntry) (os.FileInfo, error) {
 	if err := ctx.Err(); err != nil {
-		return err
+		return nil, err
 	}
 	before, err := root.Lstat(expected.Path)
 	if err != nil || before.Mode()&os.ModeSymlink != 0 || !before.Mode().IsRegular() ||
-		before.Size() != expected.SizeBytes || uint32(before.Mode().Perm()) != expected.Mode {
-		return fmt.Errorf("%w: file metadata %q", ErrContent, expected.Path)
+		unsafeSpecialMode(before.Mode()) || before.Size() != expected.SizeBytes || uint32(before.Mode().Perm()) != expected.Mode {
+		return nil, fmt.Errorf("%w: file metadata %q", ErrContent, expected.Path)
 	}
 	file, err := root.Open(expected.Path)
 	if err != nil {
-		return fmt.Errorf("%w: open %q", ErrContent, expected.Path)
+		return nil, fmt.Errorf("%w: open %q", ErrContent, expected.Path)
 	}
 	defer file.Close()
 	opened, err := file.Stat()
 	if err != nil || !opened.Mode().IsRegular() || !os.SameFile(before, opened) ||
-		opened.Size() != expected.SizeBytes || uint32(opened.Mode().Perm()) != expected.Mode {
-		return fmt.Errorf("%w: opened metadata %q", ErrContent, expected.Path)
+		unsafeSpecialMode(opened.Mode()) || opened.Size() != expected.SizeBytes || uint32(opened.Mode().Perm()) != expected.Mode {
+		return nil, fmt.Errorf("%w: opened metadata %q", ErrContent, expected.Path)
 	}
 	hash := sha256.New()
 	buffer := make([]byte, 64<<10)
 	var read int64
 	for {
 		if err := ctx.Err(); err != nil {
-			return err
+			return nil, err
 		}
 		count, readErr := file.Read(buffer)
 		if count > 0 {
 			read += int64(count)
 			if read > expected.SizeBytes {
-				return fmt.Errorf("%w: file grew %q", ErrContent, expected.Path)
+				return nil, fmt.Errorf("%w: file grew %q", ErrContent, expected.Path)
 			}
 			_, _ = hash.Write(buffer[:count])
 		}
@@ -175,45 +211,55 @@ func verifyFile(ctx context.Context, root *os.Root, expected FileEntry) error {
 			break
 		}
 		if readErr != nil {
-			return fmt.Errorf("%w: read %q", ErrContent, expected.Path)
+			return nil, fmt.Errorf("%w: read %q", ErrContent, expected.Path)
 		}
 	}
 	after, err := file.Stat()
 	actual := "sha256:" + hex.EncodeToString(hash.Sum(nil))
 	if err != nil || read != expected.SizeBytes || after.Size() != expected.SizeBytes || !os.SameFile(opened, after) ||
-		actual != expected.ContentHash {
-		return fmt.Errorf("%w: bytes %q", ErrContent, expected.Path)
+		unsafeSpecialMode(after.Mode()) || uint32(after.Mode().Perm()) != expected.Mode || actual != expected.ContentHash {
+		return nil, fmt.Errorf("%w: bytes %q", ErrContent, expected.Path)
 	}
-	return nil
+	return after, nil
 }
 
-func readRegularFile(ctx context.Context, root *os.Root, name string, maximum int64) ([]byte, error) {
+func unsafeSpecialMode(mode os.FileMode) bool {
+	if runtime.GOOS == "windows" {
+		return false
+	}
+	return mode&(os.ModeSetuid|os.ModeSetgid|os.ModeSticky) != 0
+}
+
+func readRegularFile(ctx context.Context, root *os.Root, name string, maximum int64) ([]byte, os.FileInfo, error) {
 	if err := ctx.Err(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	before, err := root.Lstat(name)
-	if err != nil || before.Mode()&os.ModeSymlink != 0 || !before.Mode().IsRegular() || before.Size() < 1 || before.Size() > maximum {
-		return nil, errors.Join(ErrLimit, err)
+	if err != nil || before.Mode()&os.ModeSymlink != 0 || !before.Mode().IsRegular() ||
+		unsafeSpecialMode(before.Mode()) || !secureRegularFileMode(before.Mode()) ||
+		before.Size() < 1 || before.Size() > maximum {
+		return nil, nil, errors.Join(ErrLimit, err)
 	}
 	file, err := root.Open(name)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer file.Close()
 	opened, err := file.Stat()
-	if err != nil || !opened.Mode().IsRegular() || !os.SameFile(before, opened) || opened.Size() != before.Size() {
-		return nil, ErrClosure
+	if err != nil || !opened.Mode().IsRegular() || unsafeSpecialMode(opened.Mode()) ||
+		!secureRegularFileMode(opened.Mode()) || !os.SameFile(before, opened) || opened.Size() != before.Size() {
+		return nil, nil, ErrClosure
 	}
 	raw := make([]byte, 0, int(opened.Size()))
 	buffer := make([]byte, 64<<10)
 	for {
 		if err := ctx.Err(); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		count, readErr := file.Read(buffer)
 		if count > 0 {
 			if int64(len(raw))+int64(count) > maximum {
-				return nil, ErrLimit
+				return nil, nil, ErrLimit
 			}
 			raw = append(raw, buffer[:count]...)
 		}
@@ -221,20 +267,32 @@ func readRegularFile(ctx context.Context, root *os.Root, name string, maximum in
 			break
 		}
 		if readErr != nil {
-			return nil, readErr
+			return nil, nil, readErr
 		}
 	}
 	if int64(len(raw)) != opened.Size() {
-		return nil, ErrClosure
+		return nil, nil, ErrClosure
 	}
 	after, err := file.Stat()
-	if err != nil || !os.SameFile(opened, after) || after.Size() != int64(len(raw)) {
-		return nil, ErrClosure
+	if err != nil || !os.SameFile(opened, after) || after.Size() != int64(len(raw)) ||
+		unsafeSpecialMode(after.Mode()) || !secureRegularFileMode(after.Mode()) || after.Mode().Perm() != opened.Mode().Perm() {
+		return nil, nil, ErrClosure
 	}
-	return raw, nil
+	return raw, after, nil
 }
 
-func verifyCompleteClosure(ctx context.Context, root *os.Root, manifestName string, manifest Manifest, maximumNodes int) error {
+func secureRegularFileMode(mode os.FileMode) bool {
+	return runtime.GOOS == "windows" || mode.Perm()&0o022 == 0
+}
+
+func verifyCompleteClosure(
+	ctx context.Context,
+	root *os.Root,
+	manifestName string,
+	manifest Manifest,
+	maximumNodes int,
+	verified map[string]os.FileInfo,
+) error {
 	files := make(map[string]struct{}, len(manifest.Files)+1)
 	directories := map[string]struct{}{".": {}}
 	for _, file := range manifest.Files {
@@ -250,7 +308,12 @@ func verifyCompleteClosure(ctx context.Context, root *os.Root, manifestName stri
 		return fmt.Errorf("%w: closure path nodes", ErrLimit)
 	}
 	seen := make(map[string]struct{}, len(files))
-	state := closureWalkState{files: files, directories: directories, seen: seen, maximumNodes: maximumNodes}
+	if verified != nil && len(verified) != len(files) {
+		return fmt.Errorf("%w: verified file identities", ErrClosure)
+	}
+	state := closureWalkState{
+		files: files, directories: directories, seen: seen, verified: verified, maximumNodes: maximumNodes,
+	}
 	if err := walkClosure(ctx, root, ".", &state); err != nil {
 		return err
 	}
@@ -264,6 +327,7 @@ type closureWalkState struct {
 	files        map[string]struct{}
 	directories  map[string]struct{}
 	seen         map[string]struct{}
+	verified     map[string]os.FileInfo
 	visitedNodes int
 	maximumNodes int
 }
@@ -273,7 +337,7 @@ func walkClosure(ctx context.Context, root *os.Root, directory string, state *cl
 		return err
 	}
 	before, err := root.Lstat(directory)
-	if err != nil || before.Mode()&os.ModeSymlink != 0 || !before.IsDir() {
+	if err != nil || before.Mode()&os.ModeSymlink != 0 || !before.IsDir() || !secureDirectoryMode(before) {
 		return fmt.Errorf("%w: directory %q", ErrClosure, directory)
 	}
 	handle, err := root.Open(directory)
@@ -281,7 +345,7 @@ func walkClosure(ctx context.Context, root *os.Root, directory string, state *cl
 		return fmt.Errorf("%w: open directory %q", ErrClosure, directory)
 	}
 	opened, statErr := handle.Stat()
-	if statErr != nil || !opened.IsDir() || !os.SameFile(before, opened) {
+	if statErr != nil || !opened.IsDir() || !secureDirectoryMode(opened) || !os.SameFile(before, opened) {
 		handle.Close()
 		return fmt.Errorf("%w: directory identity %q", ErrClosure, directory)
 	}
@@ -338,6 +402,14 @@ func walkClosure(ctx context.Context, root *os.Root, directory string, state *cl
 		}
 		if _, expected := state.files[relative]; !expected {
 			return fmt.Errorf("%w: extra file %q", ErrClosure, relative)
+		}
+		if state.verified != nil {
+			identity := state.verified[relative]
+			if identity == nil || unsafeSpecialMode(information.Mode()) ||
+				!secureRegularFileMode(information.Mode()) || !os.SameFile(identity, information) ||
+				identity.Size() != information.Size() || identity.Mode().Perm() != information.Mode().Perm() {
+				return fmt.Errorf("%w: file identity %q", ErrContent, relative)
+			}
 		}
 		state.seen[relative] = struct{}{}
 	}
