@@ -11,10 +11,13 @@ test("package metadata exposes the declaration entry and bundled license", async
   assert.equal(packageJSON.types, "./src/index.d.ts");
   assert.equal(packageJSON.exports["."].types, "./src/index.d.ts");
   assert.equal(packageJSON.exports["."].import, "./src/index.js");
-  assert.equal(packageJSON.license, "MIT");
+  assert.equal(packageJSON.license, "Apache-2.0");
   assert.equal(packageJSON.publishConfig.access, "public");
   assert.ok(packageJSON.files.includes("LICENSE"));
-  assert.match(await readFile(new URL("../LICENSE", import.meta.url), "utf8"), /MIT License/);
+  const packageLicense = await readFile(new URL("../LICENSE", import.meta.url), "utf8");
+  const repositoryLicense = await readFile(new URL("../../../LICENSE", import.meta.url), "utf8");
+  assert.match(packageLicense, /Apache License[\s\S]*Version 2\.0/);
+  assert.equal(packageLicense, repositoryLicense);
 });
 
 test("every runtime export has a public declaration", async () => {

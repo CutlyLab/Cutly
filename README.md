@@ -20,10 +20,12 @@ Document v1 → durable local project → RenderPlan → host-owned prepare
 - Exact supported boundary: [`KNOWN_LIMITATIONS.md`](KNOWN_LIMITATIONS.md)
 - Security reporting: [`SECURITY.md`](SECURITY.md)
 
-The source is currently developed as an isolated module in the Manyfy
-worktree and is release-configured for `github.com/CutlyLab/Cutly`. A public
-release is identified by one audited commit and the matching
-`cutly/v0.1.0-rc.1` tag; see [`RELEASING.md`](RELEASING.md).
+The source is currently developed in the `Manyfy/cutly` incubation directory,
+but that directory is the complete root tree of the public
+`github.com/CutlyLab/Cutly` repository: `go.mod`, `LICENSE`, `sdk/`, `cmd/`, and
+the target repository's `.github/` all live at that root after a reviewed
+sync. A public release is identified by one audited target-repository commit
+and the matching `v0.1.0-rc.1` tag; see [`RELEASING.md`](RELEASING.md).
 
 ## Current scope
 
@@ -222,7 +224,8 @@ npm --prefix sdk/typescript test
 npm --prefix sdk/typescript pack --dry-run
 ```
 
-The repository workflow `.github/workflows/cutly-module.yml` runs the same independent-module,
-boundary, schema, fixture, vet, race, Node 20, packed-package, portable-build,
-and real Linux/macOS FFmpeg checks. Tagged releases additionally produce
-checksums and provenance through `.github/workflows/cutly-release.yml`.
+The target repository workflow `.github/workflows/ci.yml` runs the same
+independent-module, boundary, schema, fixture, vet, race, Node 20,
+packed-package, portable-build, and real Linux/macOS FFmpeg checks. Tagged
+releases additionally produce checksums and provenance through
+`.github/workflows/release.yml`.

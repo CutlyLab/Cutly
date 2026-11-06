@@ -1,0 +1,15 @@
+.DS_Store
+
+# Go build and test output.
+/bin/
+/dist/
+*.test
+*.prof
+coverage.out
+
+# TypeScript package output.
+/sdk/typescript/node_modules/
+/sdk/typescript/*.tgz
+
+# Local Cutly daemon/project state belongs to the user, not the repository.
+/.cutly/

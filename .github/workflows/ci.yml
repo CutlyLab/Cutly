@@ -1,0 +1,177 @@
+name: Cutly CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cutly-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Module and conformance
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: false
+
+      - name: Install media integration test runtime
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+          ffmpeg -version
+          ffprobe -version
+
+      - name: Check formatting
+        shell: bash
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [[ -n "${unformatted}" ]]; then
+            echo "The following Cutly files need gofmt:"
+            echo "${unformatted}"
+            exit 1
+          fi
+
+      - name: Check module metadata
+        run: go mod tidy -diff
+
+      - name: Enforce host dependency boundary
+        run: go test -count=1 ./internal/architecture
+
+      - name: Validate protocol schemas and fixtures
+        run: go test -count=1 ./conformance/...
+
+      - name: Vet module
+        run: go vet ./...
+
+      - name: Test module with race detector
+        run: go test -race -count=1 ./...
+
+      - name: Test TypeScript SDK runtime
+        working-directory: sdk/typescript
+        shell: bash
+        run: |
+          find src -name '*.js' -print0 | xargs -0 -n1 node --check
+          npm test
+          npm pack --dry-run --cache "${RUNNER_TEMP}/cutly-npm-cache"
+
+  node-20:
+    name: Node 20 SDK compatibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: sdk/typescript
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: false
+
+      - name: Test and pack SDK
+        run: |
+          npm test
+          npm pack --dry-run --cache "${RUNNER_TEMP}/cutly-npm-cache"
+
+  package-smoke:
+    name: Install packed TypeScript SDK
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: false
+
+      - name: Pack, install and import the public package
+        shell: bash
+        run: |
+          tarball="$(npm pack --silent --pack-destination "${RUNNER_TEMP}" --cache "${RUNNER_TEMP}/cutly-npm-cache" ./sdk/typescript)"
+          smoke="${RUNNER_TEMP}/cutly-package-smoke"
+          mkdir "${smoke}"
+          cd "${smoke}"
+          npm init --yes
+          npm install --ignore-scripts --no-audit --no-fund "${RUNNER_TEMP}/${tarball}"
+          node --input-type=module -e 'import("@cutly/sdk").then((sdk) => { if (typeof sdk.CutlyClient !== "function") process.exit(1); })'
+
+  portable-build:
+    name: Build ${{ matrix.goos }}/${{ matrix.goarch }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: "386"
+          - goos: windows
+            goarch: amd64
+          - goos: freebsd
+            goarch: amd64
+          - goos: darwin
+            goarch: amd64
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Compile public and daemon surfaces
+        env:
+          CGO_ENABLED: "0"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: go test -exec=true ./agent/... ./cmd/... ./sdk/go/...
+
+  macos-render:
+    name: macOS real FFmpeg render
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Install FFmpeg when absent
+        run: brew list ffmpeg >/dev/null 2>&1 || brew install ffmpeg
+
+      - name: Run production render acceptance test
+        run: go test -count=1 -run '^TestRenderApplicationEndToEndAndOfflinePublicationRecovery$' ./cmd/cutlyd
