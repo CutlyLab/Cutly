@@ -9,7 +9,7 @@ A Chrome-free video editing SDK built on versioned documents, exact time,
 typed edits, and verifiable renders.
 
 <!-- CUTLY_LAUNCH_FILM -->
-![](videos/cutly-launch/renders/cutly-launch.mp4)
+https://github.com/user-attachments/assets/dddd4cf1-ead7-4894-86bd-3c5ed1ac3346
 <!-- /CUTLY_LAUNCH_FILM -->
 
 **[Download the 21-second Cutly launch film](videos/cutly-launch/renders/cutly-launch.mp4)**
