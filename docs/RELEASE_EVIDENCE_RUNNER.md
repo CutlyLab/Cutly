@@ -153,5 +153,17 @@ all four invocations passed with exit 0 and no retained-log truncation. Report:
 Its snapshot is `d97b6fa5daaa6cc7e644327fc957b0a51a2e074b`, dirty before the repair commit,
 so it remains local integration evidence, not clean-candidate release evidence.
 
+### Long observation in progress
+
 A complete real long profile has not yet finished; fake-clock long-profile tests do not supply
-one-hour runtime evidence.
+one-hour runtime evidence. The first local launch (`bzwhxysiv`) was deliberately canceled after
+noticing its terminal launcher had a ten-minute timeout, insufficient for the profile. It exited 1
+and retained a `canceled` report at `/tmp/cutly-rc-long-audited-20261107-95292636.json`; it is not a
+successful long observation.
+
+The replacement uses a locally built runner from `0f08c2e` (source HEAD `bf64a4f`, with unrelated
+working-tree changes reported as dirty), an independent launcher, and the runner's own 100-minute
+budget. It writes `/tmp/cutly-rc-long-20261107-95292636-v2.json`, with local `.log` and `.exit.json`
+companions. Completion is pending; the report and exit status must be inspected before claiming
+any fault-round, measurement or hour-long acceptance. No workflow dispatch or external publication
+was performed.
