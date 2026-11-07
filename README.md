@@ -8,6 +8,12 @@
 A Chrome-free video editing SDK built on versioned documents, exact time,
 typed edits, and verifiable renders.
 
+<a href="videos/cutly-launch/renders/cutly-launch.mp4">
+  <img src="videos/cutly-launch/assets/cover/cutly-launch-cover.jpg" alt="Watch the Cutly launch film — video editing for agents" width="960" />
+</a>
+
+**[▶ Watch the 21-second Cutly launch film](videos/cutly-launch/renders/cutly-launch.mp4)**
+
 [Quick Start](#quick-start) · [How It Works](#how-it-works) ·
 [SDKs](#sdks-and-tools) · [Roadmap](docs/DOCUMENT_V2_NATIVE_SDK_ROADMAP.md) ·
 [Examples](examples/) · [Limitations](KNOWN_LIMITATIONS.md)
