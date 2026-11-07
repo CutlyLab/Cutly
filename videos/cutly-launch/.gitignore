@@ -1,0 +1,11 @@
+# HyperFrames local runtime and review artifacts.
+.hyperframes/
+.thumbnails/
+.waveform-cache/
+
+# Intermediate local MusicGen output and process state.
+assets/bgm/track.wav
+assets/bgm/*.log
+audio_meta.json
+bgm_status.json
+beats/assets/bgm/track.wav.json

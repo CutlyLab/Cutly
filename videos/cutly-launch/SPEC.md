@@ -1,0 +1,16 @@
+GOAL: Make an SDK builder remember that Cutly turns typed, reviewable edits into native, evidence-bound video artifacts.
+OUTPUT: HyperFrames, 1920 x 1080, 30 fps.
+TIME: 21 seconds x 30 fps = 630 frames; music target 112 BPM, 16.07 frames per beat when available.
+LOOK: Alternate #ECE9E2 bone paper, #111315 anodized black, and #00A8E8 cyan fields; #111315 ink on light and #F5F2EB ink on dark; one cyan focus per shot. Display face Archivo Black 700 at 118-220 px with -4% tracking; body Inter 500/700 at 32-52 px; code IBM Plex Mono 500 at 30-40 px. Medium is an industrial editing bench: 2 px structural rules, square 0-12 px corners, 24 px contact shadows at 22% opacity, 1.5% deterministic print grain, no simulated glass.
+OBJECTS: A full-width film strip with 16:9 frames and sprocket marks; a verified artifact label with a real MP4/evidence vocabulary; an HTML/browser tile that physically collapses; typed transaction JSON with clip_trim and exact rational time; a connected four-stage render rail; an H.264/AAC artifact slab with a SHA-256 evidence line; the Cutly wordmark as text because no separate logo asset is present.
+MOTION: Arrivals use expo.out over 16-22 frames; camera/object carries use power2.inOut over 18 frames; exits use power3.in over 8-12 frames. Overlap secondary reveals by 5 frames. Titles land and remain still. Fast horizontal carries use data-motion-blur with a 240-degree shutter. No bounce; mechanical overshoot is limited to 1.5% scale and settles within 6 frames.
+SHOTS:
+- 000-081: artifact.mp4 film strip locks into a verified evidence bar; read VERIFIED and evidence-bound; black sweep hands to next shot.
+- 082-146: HTML/browser tile compresses while the statement YOUR PROJECT IS NOT A WEBPAGE lands; cyan field expands from the rejected tile.
+- 147-226: cyan reveal assembles CUTLY and EDIT DETERMINISTICALLY / RENDER NATIVELY; a bone panel grows from the final letter.
+- 227-338: real typed transaction fields print, clip_trim commits, and the transaction bracket widens into the next world.
+- 339-467: Document → RenderPlan → ExecutionManifest → Native Pipeline travel across one connected rail; final cyan node fills the frame.
+- 468-547: H.264/AAC MP4 and EVIDENCE emerge as one bound artifact; bone publication sheet carries forward.
+- 548-629: CUTLY lands once, followed by Built for agents and github.com/CutlyLab/Cutly; hold the final line for 2.3 seconds.
+BANNED: Dark empty voids; glow, bloom, neon, particles, gradients, glass cards, three-card feature rows, tiny floating UI, title-over-screenshot, generic browser mockups, invented dashboard controls, drifting titles, breathing loops, every scene fading upward, corner logos, decorative HUD brackets, 3D-tilted product UI.
+QA: Frame 0 must show a readable artifact and film strip; frame 72 must show VERIFIED; frame 120 must read YOUR PROJECT IS NOT A WEBPAGE; frame 185 must show CUTLY at hero scale; frame 280 must show valid typed transaction vocabulary; frame 400 must expose all four pipeline stages with the carrier on ExecutionManifest; frame 510 must show MP4 and EVIDENCE bound together; frames 575 and 620 must preserve the end-card hierarchy and readable repository URL at phone width.

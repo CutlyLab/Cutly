@@ -1,0 +1,137 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      background: #111315;
+      color: #f5f2eb;
+      font-family: Inter, sans-serif;
+    }
+    #pipe-bg,
+    #pipe-content,
+    #pipe-transition {
+      position: absolute;
+      inset: 0;
+    }
+    #pipe-bg {
+      background-color: #111315;
+      background-image:
+        linear-gradient(#292d30 2px, transparent 2px),
+        linear-gradient(90deg, #292d30 2px, transparent 2px);
+      background-size: 120px 120px;
+    }
+    #pipe-content { padding: 66px 84px 76px; }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 64px;
+    }
+    .header h2 {
+      font: 900 108px/0.9 "Archivo Black", sans-serif;
+      letter-spacing: -0.055em;
+      text-transform: uppercase;
+    }
+    .header p {
+      width: 460px;
+      text-align: right;
+      font: 500 31px/1.25 Inter, sans-serif;
+      color: #b9bec0;
+    }
+    .rail {
+      position: absolute;
+      left: 84px;
+      right: 84px;
+      top: 374px;
+      height: 492px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      border-top: 4px solid #f5f2eb;
+      border-bottom: 4px solid #f5f2eb;
+      background: #111315;
+    }
+    .node {
+      position: relative;
+      padding: 44px 34px 38px;
+      border-right: 3px solid #f5f2eb;
+      overflow: hidden;
+    }
+    .node:last-child { border-right: 0; }
+    .node .num {
+      display: block;
+      margin-bottom: 122px;
+      font: 700 28px/1 "IBM Plex Mono", monospace;
+      color: #00a8e8;
+    }
+    .node h3 {
+      font: 900 62px/0.95 "Archivo Black", sans-serif;
+      letter-spacing: -0.045em;
+      text-transform: uppercase;
+    }
+    .node p {
+      margin-top: 24px;
+      font: 500 29px/1.25 Inter, sans-serif;
+      color: #b9bec0;
+    }
+    .carrier {
+      position: absolute;
+      left: 20px;
+      top: 72px;
+      width: calc(25% - 40px);
+      height: 86px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 26px;
+      background: #00a8e8;
+      color: #111315;
+      z-index: 5;
+      font: 700 29px/1 "IBM Plex Mono", monospace;
+      text-transform: uppercase;
+    }
+    .carrier i {
+      width: 20px;
+      height: 20px;
+      background: #111315;
+    }
+    .footer {
+      position: absolute;
+      left: 84px;
+      bottom: 58px;
+      font: 700 28px/1 "IBM Plex Mono", monospace;
+      text-transform: uppercase;
+      color: #00a8e8;
+    }
+    #pipe-transition {
+      background: #00a8e8;
+      z-index: 10;
+    }
+  </style>
+  <div id="root" data-composition-id="pipeline" data-duration="4.3" data-width="1920" data-height="1080" data-motion-blur="on" data-motion-blur-shutter="240">
+    <div id="pipe-bg" class="clip" data-start="0" data-duration="4.3" data-track-index="0"></div>
+    <div id="pipe-content" class="clip" data-start="0" data-duration="4.3" data-track-index="1">
+      <div class="header"><h2 id="pipe-title">Meaning first<br />Execution frozen</h2><p>Semantic truth stays separate from host-owned runtime choices.</p></div>
+      <div class="rail" id="pipe-rail">
+        <div class="carrier" id="pipe-carrier"><span>exact identity</span><i></i></div>
+        <article class="node"><span class="num">01</span><h3>Document</h3><p>Versioned media semantics</p></article>
+        <article class="node"><span class="num">02</span><h3>Render<br />Plan</h3><p>Backend-neutral meaning</p></article>
+        <article class="node"><span class="num">03</span><h3>Execution<br />Manifest</h3><p>Runtime and provider identity</p></article>
+        <article class="node"><span class="num">04</span><h3>Native<br />Pipeline</h3><p>Pixels, PCM, encode, verify</p></article>
+      </div>
+      <div class="footer">fail closed / no silent fallback</div>
+    </div>
+    <div id="pipe-transition" class="clip" data-start="0" data-duration="4.3" data-track-index="2" data-layout-ignore></div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#pipe-title", { opacity: 0, x: -90 }, { opacity: 1, x: 0, duration: 0.6, ease: "expo.out" }, 0.04);
+    tl.fromTo("#pipe-rail", { y: 110, opacity: 1 }, { y: 0, duration: 0.64, ease: "expo.out" }, 0.2);
+    tl.fromTo("#pipe-carrier", { x: 0 }, { x: 438, duration: 0.72, ease: "power2.inOut" }, 0.86);
+    tl.to("#pipe-carrier", { x: 876, duration: 0.72, ease: "power2.inOut" }, 1.72);
+    tl.to("#pipe-carrier", { x: 1314, duration: 0.72, ease: "power2.inOut" }, 2.58);
+    tl.fromTo("#pipe-transition", { scale: 0.08, x: 1490, y: 330 }, { scale: 1.75, x: 0, y: 0, duration: 0.48, ease: "power3.in" }, 3.78);
+    window.__timelines = window.__timelines || {};
+    window.__timelines.pipeline = tl;
+  </script>
+</template>

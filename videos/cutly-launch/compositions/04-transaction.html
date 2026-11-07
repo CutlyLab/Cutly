@@ -1,0 +1,123 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      background: #ece9e2;
+      color: #111315;
+      font-family: Inter, sans-serif;
+    }
+    #tx-bg,
+    #tx-content,
+    #tx-transition {
+      position: absolute;
+      inset: 0;
+    }
+    #tx-bg { background: #ece9e2; }
+    #tx-content {
+      display: grid;
+      grid-template-columns: 500px 1fr;
+      gap: 60px;
+      padding: 72px 86px;
+    }
+    .argument {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      border-top: 4px solid #111315;
+      border-bottom: 4px solid #111315;
+      padding: 30px 0 28px;
+    }
+    .argument .index {
+      font: 700 28px/1 "IBM Plex Mono", monospace;
+      color: #007aa8;
+    }
+    .argument h2 {
+      font: 900 98px/0.88 "Archivo Black", sans-serif;
+      letter-spacing: -0.055em;
+      text-transform: uppercase;
+    }
+    .argument p {
+      font: 500 36px/1.3 Inter, sans-serif;
+      color: #34383b;
+    }
+    .code-stage {
+      position: relative;
+      overflow: hidden;
+      background: #111315;
+      color: #f5f2eb;
+      border: 4px solid #111315;
+      box-shadow: 18px 18px 0 #00a8e8;
+    }
+    .code-header {
+      height: 78px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 32px;
+      border-bottom: 2px solid #555b5e;
+      font: 700 29px/1 "IBM Plex Mono", monospace;
+      text-transform: uppercase;
+    }
+    .code-header .state { color: #00a8e8; }
+    pre {
+      padding: 38px 40px;
+      font: 500 35px/1.45 "IBM Plex Mono", monospace;
+      white-space: pre-wrap;
+    }
+    .line {
+      display: block;
+      min-height: 50px;
+    }
+    .key { color: #8ddfff; }
+    .value { color: #f5f2eb; }
+    .accent { color: #00a8e8; font-weight: 700; }
+    .commit {
+      position: absolute;
+      right: 0;
+      bottom: 0;
+      width: 430px;
+      height: 112px;
+      display: grid;
+      place-items: center;
+      background: #00a8e8;
+      color: #111315;
+      font: 900 46px/1 "Archivo Black", sans-serif;
+      letter-spacing: -0.03em;
+      text-transform: uppercase;
+    }
+    #tx-transition {
+      background: #111315;
+      z-index: 10;
+      transform-origin: right center;
+    }
+  </style>
+  <div id="root" data-composition-id="transaction" data-duration="3.8" data-width="1920" data-height="1080" data-motion-blur="on" data-motion-blur-shutter="240">
+    <div id="tx-bg" class="clip" data-start="0" data-duration="3.8" data-track-index="0"></div>
+    <div id="tx-content" class="clip" data-start="0" data-duration="3.8" data-track-index="1">
+      <section class="argument">
+        <span class="index">01 / REVIEWABLE EDIT</span>
+        <h2 id="tx-title" data-layout-allow-overflow>Agents propose<br />Systems verify</h2>
+        <p id="tx-sub">Atomic. Revision-checked. Reversible.</p>
+      </section>
+      <section class="code-stage" id="tx-code" data-layout-allow-overflow>
+        <div class="code-header"><span>transaction.v2.json</span><span class="state">ready for review</span></div>
+        <pre><span class="line" id="tx-line-1">{</span><span class="line" id="tx-line-2">  <span class="key">"id"</span>: <span class="value">"trim-intro"</span>,</span><span class="line" id="tx-line-3">  <span class="key">"expected_revision"</span>: <span class="accent">8</span>,</span><span class="line" id="tx-line-4">  <span class="key">"operations"</span>: [{</span><span class="line" id="tx-line-5">    <span class="key">"op"</span>: <span class="value">"clip_trim"</span>,</span><span class="line" id="tx-line-6">    <span class="key">"clip_id"</span>: <span class="value">"clip-video-a"</span>,</span><span class="line" id="tx-line-7">    <span class="key">"duration"</span>: { <span class="key">"value"</span>: <span class="accent">5</span>, <span class="key">"rate"</span>: <span class="accent">1</span> }</span><span class="line" id="tx-line-8">  }]</span><span class="line" id="tx-line-9">}</span></pre>
+        <div class="commit" id="tx-commit" data-layout-allow-overflow>Commit exact edit</div>
+      </section>
+    </div>
+    <div id="tx-transition" class="clip" data-start="0" data-duration="3.8" data-track-index="2" data-layout-ignore></div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#tx-title", { opacity: 0, x: -70 }, { opacity: 1, x: 0, duration: 0.56, ease: "expo.out" }, 0.08);
+    tl.fromTo("#tx-sub", { opacity: 0 }, { opacity: 1, duration: 0.2, ease: "power4.out" }, 0.46);
+    tl.fromTo("#tx-code", { x: 140, opacity: 1 }, { x: 0, duration: 0.62, ease: "expo.out" }, 0.1);
+    tl.fromTo("#tx-code .line", { opacity: 0, x: 24 }, { opacity: 1, x: 0, duration: 0.16, stagger: 0.12, ease: "power4.out" }, 0.58);
+    tl.fromTo("#tx-commit", { y: 112 }, { y: 0, duration: 0.3, ease: "power4.out" }, 2.34);
+    tl.fromTo("#tx-transition", { scaleX: 0, transformOrigin: "right center" }, { scaleX: 1, duration: 0.42, ease: "power3.in" }, 3.34);
+    window.__timelines = window.__timelines || {};
+    window.__timelines.transaction = tl;
+  </script>
+</template>

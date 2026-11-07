@@ -1,0 +1,71 @@
+<!doctype html>
+<html
+  lang="en"
+  data-resolution="landscape"
+  data-composition-variables='[
+    {"id":"accent","type":"color","label":"Accent","default":"#00A8E8"},
+    {"id":"repo","type":"string","label":"Repository","default":"github.com/CutlyLab/Cutly"}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+    <style>
+      :root {
+        --bone: #ece9e2;
+        --ink: #111315;
+        --paper-ink: #f5f2eb;
+        --accent: #00a8e8;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: var(--bone);
+      }
+      #root {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+        background: var(--bone);
+      }
+      .scene {
+        position: absolute;
+        inset: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="21"
+      data-width="1920"
+      data-height="1080"
+    >
+      <div id="hook" class="clip scene" data-composition-id="hook" data-composition-src="compositions/01-hook.html" data-start="0" data-duration="2.735" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080" data-beat="verified-result"></div>
+      <div id="tension" class="clip scene" data-composition-id="tension" data-composition-src="compositions/02-tension.html" data-start="2.735" data-duration="2.16" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080" data-beat="browser-is-not-the-project"></div>
+      <div id="reveal" class="clip scene" data-composition-id="reveal" data-composition-src="compositions/03-reveal.html" data-start="4.895" data-duration="2.67" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080" data-beat="cutly-reveal"></div>
+      <div id="transaction" class="clip scene" data-composition-id="transaction" data-composition-src="compositions/04-transaction.html" data-start="7.565" data-duration="3.75" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080" data-beat="typed-transaction"></div>
+      <div id="pipeline" class="clip scene" data-composition-id="pipeline" data-composition-src="compositions/05-pipeline.html" data-start="11.315" data-duration="4.28" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080" data-beat="native-pipeline"></div>
+      <div id="proof" class="clip scene" data-composition-id="proof" data-composition-src="compositions/06-proof.html" data-start="15.595" data-duration="2.68" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080" data-beat="artifact-and-evidence"></div>
+      <div id="end" class="clip scene" data-composition-id="end" data-composition-src="compositions/07-end.html" data-start="18.275" data-duration="2.725" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080" data-beat="end-card"></div>
+      <audio id="cutly-music" class="clip" src="assets/bgm/cutly-score.wav" data-timeline-role="music" data-start="0" data-duration="21" data-track-index="2" data-volume="1"></audio>
+      <audio id="cutly-sfx-verified" class="clip" src=".media/audio/sfx/sfx_001.mp3" data-start="1.135" data-duration="0.4" data-track-index="3" data-volume="0.72"></audio>
+      <audio id="cutly-sfx-whoosh" class="clip" src=".media/audio/sfx/sfx_002.mp3" data-start="4.355" data-duration="0.6" data-track-index="3" data-volume="0.62"></audio>
+      <audio id="cutly-sfx-impact" class="clip" src=".media/audio/sfx/sfx_003.mp3" data-start="18.275" data-duration="2.1" data-track-index="3" data-volume="0.58"></audio>
+    </div>
+    <script>
+      window.__timelines = window.__timelines || {};
+      window.__timelines.main = gsap.timeline({ paused: true });
+    </script>
+  </body>
+</html>

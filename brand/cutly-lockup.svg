@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 184" role="img" aria-labelledby="title desc">
+  <title id="title">Cutly logo</title>
+  <desc id="desc">Cutly geometric mark and custom wordmark.</desc>
+  <g transform="translate(12 12) scale(.625)">
+    <path fill="#111315" d="M208 40H104c-35.346 0-64 28.654-64 64v48c0 35.346 28.654 64 64 64h104v-48h-96c-13.255 0-24-10.745-24-24v-32c0-13.255 10.745-24 24-24h96V40Z"/>
+    <path fill="#00A8E8" d="M135 88h38l-52 80H83l52-80Z"/>
+  </g>
+  <g fill="#111315" transform="translate(190 20)">
+    <path d="M0 12h88v26H30v80h58v26H0V12Z"/>
+    <path d="M108 12h30v88c0 14 7 20 20 20s20-6 20-20V12h30v92c0 30-18 44-50 44s-50-14-50-44V12Z"/>
+    <path d="M224 12h112v28h-41v104h-30V40h-41V12Z"/>
+    <path d="M352 12h30v104h66v28h-96V12Z"/>
+    <path d="m456 12 36 55 36-55h36l-57 84v48h-30V96l-57-84h36Z"/>
+  </g>
+</svg>

@@ -1,0 +1,83 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      background: #00a8e8;
+      color: #111315;
+      font-family: Inter, sans-serif;
+    }
+    #reveal-bg,
+    #reveal-content,
+    #reveal-transition {
+      position: absolute;
+      inset: 0;
+    }
+    #reveal-bg { background: #00a8e8; }
+    #reveal-content {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 70px 86px 76px;
+    }
+    .topline {
+      display: flex;
+      justify-content: space-between;
+      border-top: 4px solid #111315;
+      padding-top: 22px;
+      font: 700 28px/1 "IBM Plex Mono", monospace;
+      text-transform: uppercase;
+    }
+    .wordmark {
+      display: flex;
+      align-items: baseline;
+      overflow: hidden;
+      font: 900 390px/0.76 "Archivo Black", sans-serif;
+      letter-spacing: -0.085em;
+      text-transform: uppercase;
+    }
+    .wordmark span {
+      display: inline-block;
+    }
+    .tagline {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      border-top: 4px solid #111315;
+      font: 700 51px/1.05 Inter, sans-serif;
+      letter-spacing: -0.035em;
+      text-transform: uppercase;
+    }
+    .tagline span {
+      padding-top: 24px;
+    }
+    .tagline span:last-child {
+      border-left: 4px solid #111315;
+      padding-left: 38px;
+    }
+    #reveal-transition {
+      left: auto;
+      width: 52%;
+      background: #ece9e2;
+      z-index: 10;
+      transform-origin: right center;
+    }
+  </style>
+  <div id="root" data-composition-id="reveal" data-duration="2.4" data-width="1920" data-height="1080" data-motion-blur="on" data-motion-blur-shutter="240">
+    <div id="reveal-bg" class="clip" data-start="0" data-duration="2.4" data-track-index="0"></div>
+    <div id="reveal-content" class="clip" data-start="0" data-duration="2.4" data-track-index="1">
+      <div class="topline"><span>video editing sdk</span><span>agent protocol v1</span></div>
+      <div class="wordmark" id="reveal-wordmark" data-layout-allow-overflow><span>C</span><span>U</span><span>T</span><span>L</span><span>Y</span></div>
+      <div class="tagline" id="reveal-tagline"><span>Edit deterministically</span><span>Render natively</span></div>
+    </div>
+    <div id="reveal-transition" class="clip" data-start="0" data-duration="2.4" data-track-index="2" data-layout-ignore></div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#reveal-wordmark span", { y: 330, opacity: 1 }, { y: 0, duration: 0.64, stagger: 0.065, ease: "expo.out" }, 0.04);
+    tl.fromTo("#reveal-tagline", { opacity: 0 }, { opacity: 1, duration: 0.22, ease: "power4.out" }, 0.68);
+    tl.fromTo("#reveal-transition", { scaleX: 0 }, { scaleX: 1, duration: 0.42, ease: "power2.inOut" }, 1.94);
+    window.__timelines = window.__timelines || {};
+    window.__timelines.reveal = tl;
+  </script>
+</template>

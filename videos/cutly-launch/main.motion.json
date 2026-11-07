@@ -1,0 +1,10 @@
+{
+  "duration": 21,
+  "assertions": [
+    { "kind": "appearsBy", "selector": "#hook-filmstrip", "bySec": 0.1 },
+    { "kind": "before", "a": "#hook-filmstrip", "b": "#tension-title" },
+    { "kind": "before", "a": "#tx-title", "b": "#pipe-title" },
+    { "kind": "staysInFrame", "selector": "#proof-artifact" },
+    { "kind": "keepsMoving", "withinSelector": "#root", "maxStaticSec": 2.5 }
+  ]
+}
