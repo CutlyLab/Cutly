@@ -4,14 +4,15 @@ Status: handoff-ready execution plan
 
 Updated: 2026-11-07
 
-Implementation branch: `codex/video-sdk-core`
+Implementation branch: `codex/m4-sdk-completion` (isolated continuation worktree)
 
 Original handoff base commit: `0a19a82` (`feat: expose host-bound reference surfaces`)
 
 ### Standalone execution baseline (2026-11-07)
 
 Implementation continues in Go; the proposed Rust rewrite is deferred. The active standalone
-branch is `codex/video-sdk-core`, starting at `f9f891a`. The original handoff SHA `0a19a82` is not
+branch began as `codex/video-sdk-core` at `f9f891a`. Work now continues in the owner-selected isolated
+worktree on `codex/m4-sdk-completion`, preserving previous implementation history. The original handoff SHA `0a19a82` is not
 present in this repository's history. Commit `cabbfbb` has the surface-bridge implementation and
 subject; this identifies the local code baseline, not a proof of commit equivalence or a rerun of
 the historical audit below.
@@ -27,11 +28,15 @@ S1 acceptance evidence is recorded in `DOCUMENT_V2_S1_EVIDENCE.md`; the active S
 `DOCUMENT_V2_S2_EVIDENCE.md`.
 
 The independent release-evidence runner is implemented and its three P2 audit findings were
-independently closed at `0f08c2e`; post-repair smoke and full repository gates passed. A real long
-restricted-RC observation is running, not accepted yet. See `RELEASE_EVIDENCE_RUNNER.md` for exact
-scope, dirty-source caveats and results. This parallel lane does not close S2, unlock S3–S6, or
-substitute for the broad mixed-media SDK lifecycle. Actual built archive inspection is the next
-independent packaging verification task; workflow text checks alone are not artifact evidence.
+independently closed at `0f08c2e`; post-repair smoke and full repository gates passed. The local long
+restricted-RC observation completed successfully (227 calls), but concurrent source changes prevent
+fixed-revision acceptance. See `RELEASE_EVIDENCE_RUNNER.md` for exact scope and source caveats.
+Archive tooling is retained but its independent acceptance is deferred to prioritize the mainline.
+This release lane does not substitute for broad mixed-media SDK acceptance.
+
+S2 independently closed at repair checkpoint `9d9f96d` with P0=0, P1=0, P2=0 and final full Go,
+race, vet, tidy and documented target-compilation gates passed. See `DOCUMENT_V2_S2_EVIDENCE.md`.
+S3 durable preparation/reconstruction is now the active next stage; S4–S6 retain their upstream gates.
 
 ## 1. Purpose and completion boundary
 
@@ -968,15 +973,15 @@ Deferred capabilities must produce stable preflight rejection. They must not be 
 
 ## 18. Next-agent start instructions
 
-1. Confirm branch `codex/video-sdk-core` and inspect staged/unstaged files; preserve unrelated work.
-   Use the standalone baseline above rather than requiring the absent historical `0a19a82`.
+1. Confirm branch `codex/m4-sdk-completion` in the isolated worktree and inspect staged/unstaged files;
+   preserve deferred archive work. Do not switch or edit the original shared checkout.
 2. Read this document, the current stage evidence and existing protocol patterns before editing.
    Manyfy work and consumer tests remain deferred by the owner.
-3. S1 is complete; continue S2 additively in `render/api`. Preserve legacy manifest/request/job,
-   output/evidence contracts and all existing canonical fixtures.
-4. Freeze concrete profiles/types, strict codecs, schemas and minimal canonical fixtures together;
-   separate structural identity verification from host-owned execution authorization.
-5. Run the full S2 exit gate and obtain independent read-only audit closure before S3.
+3. S1/S2 are complete; implement S3 durable v2 preparation and host-owned reconstruction additively.
+   Preserve legacy prepared/manifest/request/job/output/evidence APIs and every existing fixture.
+4. Freeze concrete receipt projections and record codecs with schemas and fixed fixtures; preserve
+   Document JSON number lexemes and separate structural verification from host authorization.
+5. Run full S3 exit gates and obtain independent read-only audit closure before S4.
 6. Update the status table below after each stage, including commit IDs and evidence paths.
 
 ## 19. Handoff status table
@@ -985,11 +990,11 @@ Deferred capabilities must produce stable preflight rejection. They must not be 
 | --- | --- | --- |
 | S0 Surface bridge | Complete | `0a19a82`; P0/P1/P2=0 |
 | S1 Document v2 plan | Complete | `74edd28`, `9db5e5f`, `5e64a65`; final gates passed with documented wasm subset; independent P0/P1/P2 closure in `DOCUMENT_V2_S1_EVIDENCE.md` |
-| S2 Manifest/request v2 | Implemented; independent audit blocked | `5bb222d`, `8cb6172`, `66a0b0b`, `0951ad3`; full Go/target gates passed; reviewer service terminated before final closure; see `DOCUMENT_V2_S2_EVIDENCE.md`; do not enter S3 |
-| S3 Prepared v2 | Not started | Depends on verified S1/S2 |
+| S2 Manifest/request v2 | Complete | `5bb222d`, `8cb6172`, `66a0b0b`, `0951ad3`, repairs `9d9f96d`; final full Go/target gates passed; independent P0/P1/P2=0; see `DOCUMENT_V2_S2_EVIDENCE.md` |
+| S3 Prepared v2 | In progress: design | S1/S2 prerequisites accepted; durable snapshots, receipt projections and authorized restart reconstruction next |
 | S4 Provider bundle | Not started | Depends on restart-safe S3 |
 | S5 Assembler/Evidence v2 | Not started | Depends on real S4 providers |
 | S6 Production runtime/cache | Not started | Depends on S3-S5 |
-| S7a Mutation/project core | Complete | `ea396d3`: typed core, durable store, schemas/fixtures, final full/race/vet/cross-target gates and independent reviews; see `DOCUMENT_V2_S7A_EVIDENCE.md`; S2 remains blocked |
+| S7a Mutation/project core | Complete | `ea396d3`: typed core, durable store, schemas/fixtures, final full/race/vet/cross-target gates and independent reviews; see `DOCUMENT_V2_S7A_EVIDENCE.md`; public S7 still depends on S6 |
 | S7 Public SDK/CLI/Agent | Not started | Depends on S6 and audited S7a |
 | S8 Player/UI/release | Not started | Depends on S6/S7 and parallel release lane |
