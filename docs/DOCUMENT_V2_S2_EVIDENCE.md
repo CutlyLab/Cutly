@@ -136,3 +136,31 @@ These implementation gates do not substitute for the blocked independent stage a
 | Legacy fixture preservation | Passed | No modified/deleted legacy fixture relative to `f9f891a` |
 | Independent read-only audit | Blocked before final closure | Reviewer API termination; earlier P2 implementation repair awaits independent recheck; do not enter S3 |
 | Manyfy consumer acceptance | Deferred by owner | Not part of this execution scope |
+
+## Priority and independent-review handoff
+
+The owner has prioritized S2 review closure over further archive/release-tool expansion. Existing
+archive work is retained but its all-target acceptance and independent review are deferred. This
+handoff is a checklist of missing evidence, not a replacement review or permission to bypass the
+service restriction recorded above.
+
+The outstanding independent review must cover:
+
+1. Reproduce and recheck the original P2 described above against the repaired source-range/domain/
+   resource-closure implementation at `8cb6172`. Record the concrete cases and results, including
+   legitimate zero-tick disabled-domain resource closure; a hash-only check is insufficient.
+2. Review the host-owned provider policy at `5bb222d` and host authorization integration at
+   `66a0b0b`. Distinguish structural verification from authorization and local executable
+   measurement from permission to launch a mutable executable path.
+3. Complete the requirements assessment for the additive manifest/request contracts: exact
+   Document/Plan bindings, enabled/disabled program identities, resource closure, clock ranges,
+   intermediate/output formats, strict codecs, immutable ownership and failure-zero behavior.
+4. Record every verified finding and its repair/retest disposition. Re-run relevant gates against
+   the final candidate; retain the actual revision, commands, results and platform limitations.
+5. Explicitly state whether the independent stage review is complete with no outstanding
+   P0/P1/P2. Only then update the acceptance ledger and permit S3 to begin.
+
+The service-side review interruption cannot be resolved by a new test pass, this checklist, a
+renamed/rephrased retry, or a replacement agent. Closure requires an allowed review resumption or
+an actual independent human review result. No such result has yet been received. S3–S6 remain gated;
+Manyfy remains deferred and publishing/default-switch authorization remains separate.
