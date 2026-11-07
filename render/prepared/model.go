@@ -25,6 +25,9 @@ type Options struct {
 	MaxEntries        int
 	MaxScratchEntries int
 	MaxRecordBytes    int
+	// MaxRecordBytesV2 independently bounds document-v2 records. Zero selects
+	// MaxRecordBytesV2 (160 MiB); explicit values may only lower that ceiling.
+	MaxRecordBytesV2 int
 }
 
 // Key is the complete immutable identity of one prepared environment.

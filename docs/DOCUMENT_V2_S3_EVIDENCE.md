@@ -136,8 +136,21 @@ durability. The temporary `/tmp/s3-storage-independent-overlay.json` instruments
 reproduces both branches while holding the original descriptor to prevent inode-number reuse. Repair
 must sync the actual verified retained committed record and marker before claiming durable success,
 including the idempotent retry path, or reject replacement. Implementation and independent recheck
-have reached implementation freeze; independent recheck is pending. None of these interim results
-constitutes S3 acceptance.
+are now independently complete for this storage defect. Reviewer `a91a0421285b64f18` re-ran the
+instrumented replacement and idempotent retry cases three times each on Darwin and native Linux
+aarch64 and confirmed both actual committed inodes receive file Sync. No verified P0/P1/P2 remains
+in the assigned storage slice. This does not close the separate codec review or constitute S3 acceptance.
+
+Audited repair SHA-256:
+
+- `storage_v2_unix.go`: `284c6bc6d85db835c670c267733252490770601a511b19446dab9fc2991dc32a`
+- `store_v2_test.go`: `40c5e3218a001ba8c0149a17a862d0e33a676d8264a6935df19e3a16f9f07d0f`
+
+The independent reviewer also passed repaired full prepared normal/race/vet, Darwin storage race
+three times, Linux aarch64 storage ten times, Windows/amd64 and FreeBSD/amd64 cross-builds, and
+fresh-store startup stress on both native platforms. These tests do not simulate actual power loss.
+The original Darwin ENOENT was not independently reproduced, so its kernel cause remains unproven.
+Crash-leftover scratch remains bounded/fail-closed rather than automatically scavenged.
 
 Parent verification after codec repair:
 

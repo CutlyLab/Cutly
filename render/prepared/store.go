@@ -39,6 +39,10 @@ type Store struct {
 	maxScratchEntries int
 	maxRecordBytes    int
 	fault             func(string) error
+	maxRecordBytesV2  int
+	rootIdentityV2    os.FileInfo
+	identitiesMuV2    sync.Mutex
+	identitiesV2      map[string]os.FileInfo
 }
 
 var (
@@ -70,6 +74,13 @@ func New(root string, options Options) (*Store, error) {
 		maximumRecord < 1024 || maximumRecord > MaxRecordBytes {
 		return nil, fmt.Errorf("%w: invalid entry, scratch or record limit", ErrConfiguration)
 	}
+	maximumRecordV2 := options.MaxRecordBytesV2
+	if maximumRecordV2 == 0 {
+		maximumRecordV2 = MaxRecordBytesV2
+	}
+	if maximumRecordV2 < 1024 || maximumRecordV2 > MaxRecordBytesV2 {
+		return nil, fmt.Errorf("%w: invalid v2 record limit", ErrConfiguration)
+	}
 	parent := filepath.Dir(root)
 	if err := requireDirectory(parent); err != nil {
 		return nil, fmt.Errorf("%w: root parent: %v", ErrConfiguration, err)
@@ -96,6 +107,13 @@ func New(root string, options Options) (*Store, error) {
 	if err := errors.Join(syncDirectory(root), syncDirectory(parent)); err != nil {
 		return nil, fmt.Errorf("%w: sync root: %v", ErrConfiguration, err)
 	}
+	identityV2, err := os.Lstat(root)
+	if err != nil {
+		return nil, err
+	}
+	store.maxRecordBytesV2 = maximumRecordV2
+	store.rootIdentityV2 = identityV2
+	store.identitiesV2 = make(map[string]os.FileInfo)
 	return store, nil
 }
 
