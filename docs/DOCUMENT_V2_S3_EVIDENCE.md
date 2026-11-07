@@ -72,4 +72,46 @@ which it immediately stopped without using any child review results. All conclus
 from its direct inspection and checks. The overlay cases are not yet all permanent regressions.
 
 These checks do not accept the environment codec, durable store, concrete inspectors,
-reconstruction factory or the whole S3 stage.
+reconstruction factory or the whole S3 stage. The authorization slice is committed at `8dab14d`.
+
+## Native WAV observation prerequisite
+
+`render/wavsource.Inspect` returns the exact existing native ProbeManifest without a synthetic
+Document, live Provider or external IO. It checks expected content hash and size before WAV decode,
+reuses the existing private probe projection/build/options functions, and leaves the original
+Compile implementation and fixture bytes unchanged. Expected identities still require independent
+host authorization; the returned observation retains no resource bytes for future execution.
+
+Parent task `bxwqzlgtt` passed package normal/race/vet. Independent reviewer
+`a3a86eeaed4f2d6fa` reported no verified P0/P1/P2 in this two-file slice. Its temporary overlay
+`/tmp/wavinspect-review.kiU9eP/overlay.json` verified stereo parity, all 24 observed cancellation/panic
+checkpoints, limits, oversized chunk rejection, concurrent ownership and existing fixture stability:
+
+```sh
+go test -overlay /tmp/wavinspect-review.kiU9eP/overlay.json ./render/wavsource -run 'TestAuditInspect|TestInspect|TestDocumentPreflightAndCanonicalFixtures|TestCanonicalWAVSourceVectors' -count=1 -v
+go test -race -overlay /tmp/wavinspect-review.kiU9eP/overlay.json ./render/wavsource -run 'TestAuditInspect|TestInspect|TestDocumentPreflightAndCanonicalFixtures|TestCanonicalWAVSourceVectors' -count=1
+go vet -overlay /tmp/wavinspect-review.kiU9eP/overlay.json ./render/wavsource
+GOOS=linux GOARCH=386 CGO_ENABLED=0 go test -overlay /tmp/wavinspect-review.kiU9eP/overlay.json ./render/wavsource -c -o /tmp/wavinspect-review.kiU9eP/wavsource-linux-386.test
+```
+
+All passed. Linux/386 was compile-only. No GiB-scale runtime/OOM or external IO evidence is claimed.
+Audited SHA-256: `inspect.go` = `8326d2f2dc19359919e2ec36f2d7e4e6e35b8ccf8094e4de9fd354d2513aa473`,
+`inspect_test.go` = `19b435e646adbb074dcdae4e7d12ef68767e3b2c5d46042670e0c23795580ef0`.
+This does not complete PNG/font projections or restart reconstruction.
+
+## Portable codec and storage integration (pending)
+
+The initial gap record schema/canonical corpus passed in `bvdh63gm5`. The previous attempt
+`bcpz3ca91` hit a transient compile error in an actively edited storage file; that error was fixed
+before the passing rerun. Added metadata-number vectors still require final synchronized checks.
+
+Independent codec review reproduced a P2 preallocation defect: a single 20 MiB RawMessage subtree
+composed of individually bounded strings reached typed shape allocation before the inherited 1 MiB
+RawMessage limit rejected it. Measured total allocation was about 445 MB. Repair and independent
+recheck are pending; final rejection alone does not satisfy early admission.
+
+Storage tests initially failed when corruption setup tried to overwrite intentionally read-only
+records; tests now explicitly make those records writable before hostile modification. Concurrent
+lock creation also exposed an ENOENT race under Darwin. The storage implementer reports bounded,
+anchored retry and passing stress tests; independent storage review remains pending. None of these
+interim results constitutes S3 acceptance.
