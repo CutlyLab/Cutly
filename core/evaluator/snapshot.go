@@ -27,6 +27,8 @@ type SnapshotAsset struct {
 	Kind                             documentv2.AssetKind
 	ContentHash                      string
 	TextProfile                      string
+	TextBindingHash                  string
+	TextFill                         documentv2.ColorRGBA16
 	TextViewport                     documentv2.RasterViewport
 	TextFontAssetID                  documentv2.ID
 	TextFontAssetIndex               int
@@ -103,10 +105,13 @@ type snapshotTextLayoutInputEnvelope struct {
 }
 
 type SnapshotClip struct {
-	ID       documentv2.ID
-	Index    int
-	AssetID  documentv2.ID
-	Disabled bool
+	ID              documentv2.ID
+	Index           int
+	AssetID         documentv2.ID
+	Disabled        bool
+	TimelineRange   documentv2.TimeRange
+	SourceRange     documentv2.TimeRange
+	HasTextFillLane bool
 }
 
 type SnapshotTrack struct {
@@ -206,30 +211,82 @@ func CompileSnapshot(
 	if documentv2.HasErrorDiagnostics(diagnostics) {
 		return nil, nil, diagnostics
 	}
-	canonical, err := documentv2.CanonicalJSON(document)
-	if err != nil {
-		return nil, nil, append(diagnostics, compileDiagnostic(err))
+	frozen, snapshot, diagnostics := freezeSnapshotDocument(ctx, document, limits, diagnostics)
+	if snapshot == nil || documentv2.HasErrorDiagnostics(diagnostics) {
+		return nil, nil, diagnostics
 	}
-	if uint64(len(canonical)) > limits.MaxCanonicalDocumentBytes {
-		return nil, nil, append(diagnostics, compileDiagnostic(ErrCanonicalDocumentLimit))
-	}
-	if err := ctx.Err(); err != nil {
-		return nil, nil, append(diagnostics, compileDiagnostic(err))
-	}
-	frozen, err := documentv2.Decode(canonical)
-	if err != nil {
-		return nil, nil, append(diagnostics, compileDiagnostic(err))
-	}
-	hash := canonicalDocumentHash(canonical)
-	snapshot, err := buildFrozenSnapshot(ctx, frozen, hash, uint64(len(canonical)))
-	if err != nil {
-		return nil, nil, append(diagnostics, compileDiagnostic(err))
-	}
+	hash := snapshot.DocumentHash()
 	program, diagnostics := compileFrozen(ctx, frozen, hash, diagnostics)
 	if program == nil || documentv2.HasErrorDiagnostics(diagnostics) {
 		return nil, nil, diagnostics
 	}
 	return program, snapshot, diagnostics
+}
+
+// FreezeSnapshot validates and freezes one Document v2 source graph without claiming that any
+// rendering backend implements the document's required capabilities. It publishes no evaluator
+// Program: callers receive only compact, defensive source/scope metadata plus the existing opaque
+// text-source binding capability. Limits are enforced before validation or canonical allocation,
+// and every failure or cancellation returns a nil snapshot.
+func FreezeSnapshot(
+	ctx context.Context,
+	document documentv2.Document,
+	limits SnapshotLimits,
+) (*FrozenSnapshot, []documentv2.Diagnostic) {
+	if ctx == nil || limits.MaxCanonicalDocumentBytes == 0 || limits.MaxDocumentNodes == 0 {
+		err := fmt.Errorf("%w: invalid compile context or byte limit", ErrCanonicalDocumentLimit)
+		return nil, []documentv2.Diagnostic{compileDiagnostic(err)}
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, []documentv2.Diagnostic{compileDiagnostic(err)}
+	}
+	if err := preflightSnapshotDocument(ctx, document, limits); err != nil {
+		return nil, []documentv2.Diagnostic{compileDiagnostic(err)}
+	}
+	diagnostics := documentv2.Validate(document)
+	if documentv2.HasErrorDiagnostics(diagnostics) {
+		return nil, diagnostics
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, append(diagnostics, compileDiagnostic(err))
+	}
+	_, snapshot, diagnostics := freezeSnapshotDocument(ctx, document, limits, diagnostics)
+	if snapshot == nil || documentv2.HasErrorDiagnostics(diagnostics) {
+		return nil, diagnostics
+	}
+	return snapshot, diagnostics
+}
+
+// freezeSnapshotDocument performs the canonical allocation shared by CompileSnapshot and
+// FreezeSnapshot. Callers must run the conservative preflight and their appropriate semantic gate
+// first: capability-aware PreflightCapabilities for CompileSnapshot, plain Validate for
+// FreezeSnapshot.
+func freezeSnapshotDocument(
+	ctx context.Context,
+	document documentv2.Document,
+	limits SnapshotLimits,
+	diagnostics []documentv2.Diagnostic,
+) (documentv2.Document, *FrozenSnapshot, []documentv2.Diagnostic) {
+	canonical, err := documentv2.CanonicalJSON(document)
+	if err != nil {
+		return documentv2.Document{}, nil, append(diagnostics, compileDiagnostic(err))
+	}
+	if uint64(len(canonical)) > limits.MaxCanonicalDocumentBytes {
+		return documentv2.Document{}, nil, append(diagnostics, compileDiagnostic(ErrCanonicalDocumentLimit))
+	}
+	if err := ctx.Err(); err != nil {
+		return documentv2.Document{}, nil, append(diagnostics, compileDiagnostic(err))
+	}
+	frozen, err := documentv2.Decode(canonical)
+	if err != nil {
+		return documentv2.Document{}, nil, append(diagnostics, compileDiagnostic(err))
+	}
+	hash := canonicalDocumentHash(canonical)
+	snapshot, err := buildFrozenSnapshot(ctx, frozen, hash, uint64(len(canonical)))
+	if err != nil {
+		return documentv2.Document{}, nil, append(diagnostics, compileDiagnostic(err))
+	}
+	return frozen, snapshot, diagnostics
 }
 
 func buildFrozenSnapshot(ctx context.Context, frozen documentv2.Document, hash string, canonicalSize uint64) (*FrozenSnapshot, error) {
@@ -275,6 +332,7 @@ func buildFrozenSnapshot(ctx context.Context, frozen documentv2.Document, hash s
 				return nil, err
 			}
 			entry.TextProfile = asset.Text.Profile
+			entry.TextFill = asset.Text.Fill
 			entry.TextFontAssetID = asset.Text.FontAssetID
 			fontIndex, exists := assetIndexes[asset.Text.FontAssetID]
 			if !exists || fontIndex < 0 || fontIndex >= len(frozen.Assets) || frozen.Assets[fontIndex].Kind != documentv2.AssetKindFont {
@@ -317,6 +375,7 @@ func buildFrozenSnapshot(ctx context.Context, frozen documentv2.Document, hash s
 			if err != nil {
 				return nil, err
 			}
+			entry.TextBindingHash = record.bindingHash
 			if result.textSourceSlots == nil || result.textSourceSlots[index] != 0 ||
 				len(result.textSources) >= cap(result.textSources) || len(result.textSources) >= len(result.assets) {
 				return nil, errors.New("evaluator: frozen text source slot invariant failed")
@@ -367,7 +426,18 @@ func buildFrozenSnapshot(ctx context.Context, frozen documentv2.Document, hash s
 				if err := checkpoint(); err != nil {
 					return nil, err
 				}
-				trackEntry.Clips[clipIndex] = SnapshotClip{ID: clip.ID, Index: clipIndex, AssetID: clip.AssetID, Disabled: clip.Disabled}
+				hasTextFillLane := false
+				for _, lane := range clip.KeyframeLanes {
+					if lane.Target == documentv2.KeyframeTargetTextFill {
+						hasTextFillLane = true
+						break
+					}
+				}
+				trackEntry.Clips[clipIndex] = SnapshotClip{
+					ID: clip.ID, Index: clipIndex, AssetID: clip.AssetID, Disabled: clip.Disabled,
+					TimelineRange: clip.TimelineRange, SourceRange: clip.SourceRange,
+					HasTextFillLane: hasTextFillLane,
+				}
 			}
 			entry.Tracks[trackIndex] = trackEntry
 		}
