@@ -14,6 +14,7 @@ var (
 	ErrVisualCompile       = errors.New("referencevisual: visual compositor compile failed")
 	ErrNativeSourceCompile = errors.New("referencevisual: native PNG source compile failed")
 	ErrExpressionCompile   = errors.New("referencevisual: expression source compile failed")
+	ErrTextSourceCompile   = errors.New("referencevisual: text source compile failed")
 	ErrProgramUnavailable  = errors.New("referencevisual: compiled program is unavailable")
 	ErrRenderFailed        = errors.New("referencevisual: visual render failed")
 	ErrColorFailed         = errors.New("referencevisual: output color conversion failed")
@@ -32,6 +33,7 @@ const (
 	CodeVisualCompile       ErrorCode = "REFERENCE_VISUAL_V1.VISUAL_COMPILE_FAILED"
 	CodeNativeSourceCompile ErrorCode = "REFERENCE_VISUAL_V1.NATIVE_SOURCE_COMPILE_FAILED"
 	CodeExpressionCompile   ErrorCode = "REFERENCE_VISUAL_V1.EXPRESSION_COMPILE_FAILED"
+	CodeTextSourceCompile   ErrorCode = "REFERENCE_VISUAL_V2.TEXT_SOURCE_COMPILE_FAILED"
 	CodeProgramUnavailable  ErrorCode = "REFERENCE_VISUAL_V1.PROGRAM_UNAVAILABLE"
 	CodeRenderFailed        ErrorCode = "REFERENCE_VISUAL_V1.RENDER_FAILED"
 	CodeColorFailed         ErrorCode = "REFERENCE_VISUAL_V1.COLOR_FAILED"

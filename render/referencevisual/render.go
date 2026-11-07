@@ -16,6 +16,7 @@ import (
 	"github.com/CutlyLab/Cutly/render/nativepngsource"
 	"github.com/CutlyLab/Cutly/render/pngencode"
 	"github.com/CutlyLab/Cutly/render/rastercompositor"
+	"github.com/CutlyLab/Cutly/render/textlayer"
 	"github.com/CutlyLab/Cutly/render/visualcompositor"
 )
 
@@ -32,8 +33,9 @@ type StageBinding struct {
 	PNGArtifactHash    string `json:"png_artifact_hash"`
 }
 
-// Result is the complete unsigned receipt for one mixed image/vector PNG export. Runtime-owned
-// Surface, Frame and Artifact values remain immutable and are omitted by dependency JSON tags.
+// Result is the complete unsigned receipt for one v1 image/vector or v2 image/vector/Text PNG
+// export. Runtime-owned Surface, Frame and Artifact values remain immutable and are omitted by
+// dependency JSON tags.
 type Result struct {
 	SchemaVersion    int                     `json:"schema_version"`
 	Profile          string                  `json:"profile"`
@@ -95,13 +97,18 @@ func (program *Program) RenderFrame(ctx context.Context, timelineID documentv2.I
 }
 
 func (program *Program) providers() visualcompositor.Providers {
-	return visualcompositor.Providers{Native: program.native, Expression: program.expression, ExpressionHandle: program.expression}
+	return visualcompositor.Providers{
+		Native: program.native, Expression: program.expression, ExpressionHandle: program.expression, Text: program.text,
+	}
 }
 
 func (program *Program) validateRuntime(ctx context.Context) error {
 	if program == nil || program.visual == nil || program.native == nil || program.expression == nil ||
 		program.documentHash == "" || program.manifest.DocumentHash != program.documentHash {
 		return pipelineError(CodeProgramUnavailable, "program", ErrProgramUnavailable)
+	}
+	if (program.v2 && program.text == nil) || (!program.v2 && program.text != nil) {
+		return pipelineError(CodeProgramUnavailable, "program/text", ErrProgramUnavailable)
 	}
 	if ctx == nil {
 		return pipelineError(CodeContextInvalid, "context", ErrContextInvalid)
@@ -116,8 +123,8 @@ func (program *Program) validateRuntime(ctx context.Context) error {
 }
 
 func (program *Program) runtimeInvariant() bool {
-	normalized, expectedVisual, err := normalizeConfig(program.config)
-	if err != nil || normalized != program.config || program.visual.DocumentHash() != program.documentHash ||
+	normalized, expectedVisual, err := normalizeConfigMode(program.config, program.v2)
+	if err != nil || !equalConfig(normalized, program.config) || program.visual.DocumentHash() != program.documentHash ||
 		program.visual.Config() != expectedVisual || program.native.DocumentHash() != program.documentHash ||
 		program.expression.DocumentHash() != program.documentHash || program.native.Config().Limits != program.config.NativeLimits ||
 		program.expression.Config().Limits != program.config.ExpressionLimits {
@@ -126,10 +133,24 @@ func (program *Program) runtimeInvariant() bool {
 	nativeManifest := program.native.Manifest()
 	expressionManifest := program.expression.Manifest()
 	if !equalNativeManifest(nativeManifest, program.manifest.NativePNG) ||
-		!equalExpressionManifest(expressionManifest, program.manifest.Expression) || !validCombinedManifest(program.manifest, program.config) {
+		!equalExpressionManifest(expressionManifest, program.manifest.Expression) ||
+		!validCombinedManifestMode(program.manifest, program.config, program.v2) {
 		return false
 	}
+	if program.v2 {
+		if program.config.TextConfig == nil || program.manifest.Text == nil || program.text.DocumentHash() != program.documentHash ||
+			program.text.Config() != *program.config.TextConfig || !equalTextManifest(program.text.Manifest(), *program.manifest.Text) {
+			return false
+		}
+	}
 	return true
+}
+
+func (program *Program) profile() string {
+	if program != nil && program.v2 {
+		return ProfileV2
+	}
+	return ProfileV1
 }
 
 func (program *Program) finish(ctx context.Context, visual visualcompositor.Result) (Result, error) {
@@ -167,7 +188,7 @@ func (program *Program) finish(ctx context.Context, visual visualcompositor.Resu
 		return Result{}, err
 	}
 	result := Result{
-		SchemaVersion: ResultSchemaVersion, Profile: ProfileV1, DocumentHash: program.documentHash,
+		SchemaVersion: ResultSchemaVersion, Profile: program.profile(), DocumentHash: program.documentHash,
 		BuildFingerprint: program.config.BuildFingerprint, TimelineID: visual.TimelineID, TimelineTime: visual.TimelineTime,
 		SourceManifest: cloneSourceManifest(program.manifest), Visual: visual, Output: output, PNG: png, StageBinding: binding,
 	}
@@ -261,6 +282,13 @@ func (program *Program) validateSerializedSourcesAgainstManifest(sources []visua
 	for _, asset := range program.manifest.Expression.Assets {
 		expressionAssets[asset.AssetID] = asset
 	}
+	textAssets := make(map[documentv2.ID]textlayer.AssetReceipt)
+	if program.manifest.Text != nil {
+		textAssets = make(map[documentv2.ID]textlayer.AssetReceipt, len(program.manifest.Text.Assets))
+		for _, asset := range program.manifest.Text.Assets {
+			textAssets[asset.AssetID] = asset
+		}
+	}
 	profiles := nativepngsource.ImageSourceProfiles()
 	for index, source := range sources {
 		path := fmt.Sprintf("serialized/visual/sources/%d", index)
@@ -306,6 +334,27 @@ func (program *Program) validateSerializedSourcesAgainstManifest(sources []visua
 				receipt.RasterReceipt != asset.RasterReceipt || receipt.SurfaceIdentity != asset.SurfaceIdentity {
 				return pipelineError(CodeStageMismatch, path+"/expression_manifest", ErrStageMismatch)
 			}
+		case visualcompositor.SourceKindText:
+			if !program.v2 || program.manifest.Text == nil || source.Text == nil {
+				return pipelineError(CodeStageMismatch, path+"/text", ErrStageMismatch)
+			}
+			receipt := source.Text
+			request := receipt.Request
+			asset, ok := textAssets[request.AssetID]
+			if !ok || receipt.ContractVersion != textlayer.ContractVersion || request.ContractVersion != textlayer.ContractVersion ||
+				request.DocumentHash != program.documentHash || request.AssetIndex != asset.AssetIndex || request.AssetKind != documentv2.AssetKindText ||
+				request.FrozenTextBindingHashProfile != asset.FrozenTextBindingHashProfile || request.FrozenTextBindingHash != asset.FrozenTextBindingHash ||
+				request.TextSemanticHashProfile != asset.TextSemanticHashProfile || request.TextSemanticHash != asset.TextSemanticHash ||
+				request.LayoutInputHashProfile != asset.LayoutInputHashProfile || request.LayoutInputHash != asset.LayoutInputHash ||
+				request.FontAssetID != asset.FontAssetID || request.FontAssetIndex != asset.FontAssetIndex ||
+				request.FontContentHashProfile != asset.FontContentHashProfile || request.FontContentHash != asset.FontContentHash ||
+				request.RasterViewport != asset.RasterViewport || request.SourceProfile != program.manifest.Text.SourceProfile ||
+				request.SelectionProfile != program.manifest.Text.SelectionProfile || request.TextProfile != program.manifest.Text.TextProfile ||
+				request.EvaluatorProfile != program.manifest.Text.EvaluatorProfile || request.RasterProfile != program.manifest.Text.RasterProfile ||
+				request.PaintProfile != program.manifest.Text.PaintProfile || request.SurfaceProfile != program.manifest.Text.SurfaceProfile ||
+				receipt.Assembly != asset.Assembly || receipt.Raster != asset.Raster || receipt.SurfaceIdentity != asset.SurfaceIdentity {
+				return pipelineError(CodeStageMismatch, path+"/text_manifest", ErrStageMismatch)
+			}
 		default:
 			return pipelineError(CodeStageMismatch, path+"/kind", ErrStageMismatch)
 		}
@@ -344,7 +393,12 @@ func (program *Program) validateVisualLive(ctx context.Context, value visualcomp
 	if err := contextError(ctx, "visual/pixel_hash"); err != nil {
 		return err
 	}
-	actualHash, err := value.Surface.CanonicalHash()
+	actualHash, err := value.Surface.CanonicalHashContext(ctx)
+	if err != nil {
+		if canceled := contextError(ctx, "visual/pixel_hash"); canceled != nil {
+			return canceled
+		}
+	}
 	if err != nil || actualHash != value.PixelHash {
 		return pipelineError(CodeStageMismatch, "visual/pixel_hash", errors.Join(ErrStageMismatch, err))
 	}
@@ -406,6 +460,19 @@ func (program *Program) replaySource(ctx context.Context, receipt visualcomposit
 			return pipelineError(CodeStageMismatch, path+"/expression_handle/replay", ErrStageMismatch)
 		}
 		return validateReplaySurface(ctx, frame.Surface, int(frame.SurfaceIdentity.WidthPixels), int(frame.SurfaceIdentity.HeightPixels), frame.SurfaceIdentity.PixelHash, path+"/expression_handle/surface")
+	case visualcompositor.SourceKindText:
+		if !program.v2 || program.text == nil || receipt.Text == nil {
+			return pipelineError(CodeStageMismatch, path+"/text", ErrStageMismatch)
+		}
+		frame, err := program.text.Frame(ctx, receipt.Text.Request)
+		if err != nil {
+			return classifyReplay(path, err)
+		}
+		if frame.Receipt != *receipt.Text {
+			return pipelineError(CodeStageMismatch, path+"/text/replay", ErrStageMismatch)
+		}
+		identity := frame.Receipt.SurfaceIdentity
+		return validateReplaySurface(ctx, frame.Surface, int(identity.WidthPixels), int(identity.HeightPixels), identity.PixelHash, path+"/text/surface")
 	default:
 		return pipelineError(CodeStageMismatch, path+"/kind", ErrStageMismatch)
 	}
@@ -418,7 +485,12 @@ func validateReplaySurface(ctx context.Context, surface *cpucompositor.Surface, 
 	if err := contextError(ctx, path+"/pixel_hash"); err != nil {
 		return err
 	}
-	hash, err := surface.CanonicalHash()
+	hash, err := surface.CanonicalHashContext(ctx)
+	if err != nil {
+		if canceled := contextError(ctx, path+"/pixel_hash"); canceled != nil {
+			return canceled
+		}
+	}
 	if err != nil || hash != expectedHash {
 		return pipelineError(CodeStageMismatch, path+"/pixel_hash", errors.Join(ErrStageMismatch, err))
 	}
@@ -497,7 +569,7 @@ func (program *Program) validateSerializedPNG(output color.OutputResult, value p
 }
 
 func (program *Program) validateResult(value Result) error {
-	if value.SchemaVersion != ResultSchemaVersion || value.Profile != ProfileV1 || value.DocumentHash != program.documentHash ||
+	if value.SchemaVersion != ResultSchemaVersion || value.Profile != program.profile() || value.DocumentHash != program.documentHash ||
 		value.BuildFingerprint != program.config.BuildFingerprint || value.TimelineID != value.Visual.TimelineID ||
 		value.TimelineTime != value.Visual.TimelineTime || value.SourceManifest.DocumentHash != program.documentHash ||
 		value.StageBinding.Profile != StageBindingProfileV1 || value.StageBinding.VisualPixelHash != value.Visual.PixelHash ||
@@ -545,7 +617,7 @@ func classifyRenderDependency(path string, err error) error {
 
 func classifyReplay(path string, err error) error {
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) ||
-		errors.Is(err, nativepngsource.ErrCanceled) || errors.Is(err, expressionlayer.ErrCanceled) {
+		errors.Is(err, nativepngsource.ErrCanceled) || errors.Is(err, expressionlayer.ErrCanceled) || errors.Is(err, textlayer.ErrCanceled) {
 		return pipelineError(CodeCanceled, path+"/replay", errors.Join(ErrCanceled, err))
 	}
 	return pipelineError(CodeStageMismatch, path+"/replay", errors.Join(ErrStageMismatch, err))

@@ -8,7 +8,9 @@ import (
 	"math"
 
 	"github.com/CutlyLab/Cutly/core/documentv2"
+	"github.com/CutlyLab/Cutly/core/evaluator"
 	"github.com/CutlyLab/Cutly/core/videoedit"
+	"github.com/CutlyLab/Cutly/font/sfntglyf"
 	"github.com/CutlyLab/Cutly/media/color"
 	"github.com/CutlyLab/Cutly/media/pngdecode"
 	"github.com/CutlyLab/Cutly/render/cpucompositor"
@@ -17,6 +19,8 @@ import (
 	"github.com/CutlyLab/Cutly/render/nativepngsource"
 	"github.com/CutlyLab/Cutly/render/pngencode"
 	"github.com/CutlyLab/Cutly/render/rastercompositor"
+	"github.com/CutlyLab/Cutly/render/textassembly"
+	"github.com/CutlyLab/Cutly/render/textlayer"
 	"github.com/CutlyLab/Cutly/render/vectorraster"
 	"github.com/CutlyLab/Cutly/render/visualcompositor"
 )
@@ -57,11 +61,28 @@ type Config struct {
 	Height           int                     `json:"height"`
 	NativeLimits     nativepngsource.Limits  `json:"native_limits"`
 	ExpressionLimits expressionlayer.Limits  `json:"expression_limits"`
+	TextConfig       *textlayer.Config       `json:"text_config,omitempty"`
 	CompositorLimits visualcompositor.Limits `json:"compositor_limits"`
 	OutputLimits     color.OutputLimits      `json:"output_limits"`
 	PNGLimits        pngencode.Limits        `json:"png_limits"`
 	PipelineLimits   PipelineLimits          `json:"pipeline_limits"`
 	BuildFingerprint string                  `json:"build_fingerprint,omitempty"`
+}
+
+func defaultTextConfigV2() textlayer.Config {
+	result := textlayer.DefaultConfig()
+	// The standalone provider deliberately exposes a larger hard/default envelope. The assembled
+	// pipeline narrows it so native, expression and Text compiles have one finite aggregate budget.
+	result.Limits.MaxCompileWorkingBytes = 2 << 30
+	return result
+}
+
+func defaultPipelineLimitsV2() PipelineLimits {
+	return PipelineLimits{
+		MaxRetainedSourceBytes: 2 << 30,
+		MaxCompileWorkingBytes: 4 << 30,
+		MaxRuntimeWorkingBytes: DefaultMaxRuntimeWorkingBytes,
+	}
 }
 
 func DefaultConfig(width, height int) Config {
@@ -73,9 +94,19 @@ func DefaultConfig(width, height int) Config {
 	}
 }
 
-// SourceManifest binds both provider caches to the same frozen document and declares the
+// DefaultConfigV2 enables the additive pinned-font static Text provider while preserving every
+// v1 native image/vector/output default. DefaultConfig intentionally remains Text-free.
+func DefaultConfigV2(width, height int) Config {
+	result := DefaultConfig(width, height)
+	textConfig := defaultTextConfigV2()
+	result.TextConfig = &textConfig
+	result.PipelineLimits = defaultPipelineLimitsV2()
+	return result
+}
+
+// SourceManifest binds every enabled provider cache to the same frozen document and declares the
 // transition-aware expression extension that is intentionally absent from the frozen v1
-// expression manifest.
+// expression manifest. Text fields are nil/omitted in v1 and mandatory, even when empty, in v2.
 type SourceManifest struct {
 	SchemaVersion                   int                      `json:"schema_version"`
 	Profile                         string                   `json:"profile"`
@@ -87,6 +118,10 @@ type SourceManifest struct {
 	VectorTransitionScopeProfile    string                   `json:"vector_transition_scope_profile"`
 	NativeRetainedSurfaceBytes      uint64                   `json:"native_retained_surface_bytes"`
 	ExpressionRetainedSurfaceBytes  uint64                   `json:"expression_retained_surface_bytes"`
+	Text                            *textlayer.Manifest      `json:"text,omitempty"`
+	TextProviderProfile             string                   `json:"text_provider_profile,omitempty"`
+	TextContractVersion             int                      `json:"text_contract_version,omitempty"`
+	TextRetainedSurfaceBytes        uint64                   `json:"text_retained_surface_bytes,omitempty"`
 	TotalRetainedSurfaceBytes       uint64                   `json:"total_retained_surface_bytes"`
 }
 
@@ -97,18 +132,43 @@ type Program struct {
 	visual       *visualcompositor.Program
 	native       *nativepngsource.Provider
 	expression   *expressionlayer.Provider
+	text         *textlayer.Provider
+	v2           bool
 	manifest     SourceManifest
 	diagnostics  []documentv2.Diagnostic
 }
 
 func Compile(ctx context.Context, document documentv2.Document, bindings []Binding, config Config) (*Program, []documentv2.Diagnostic, error) {
+	return compile(ctx, document, bindings, nil, config, false)
+}
+
+// CompileV2 adds the pinned-font static Text path. Font bindings remain explicit document-scoped
+// authorization edges and are borrowed, together with their ShapeProviders, only until return.
+func CompileV2(
+	ctx context.Context,
+	document documentv2.Document,
+	pngBindings []Binding,
+	fontBindings []textlayer.FontBinding,
+	config Config,
+) (*Program, []documentv2.Diagnostic, error) {
+	return compile(ctx, document, pngBindings, fontBindings, config, true)
+}
+
+func compile(
+	ctx context.Context,
+	document documentv2.Document,
+	bindings []Binding,
+	fontBindings []textlayer.FontBinding,
+	config Config,
+	v2 bool,
+) (*Program, []documentv2.Diagnostic, error) {
 	if ctx == nil {
 		return nil, nil, pipelineError(CodeContextInvalid, "context", ErrContextInvalid)
 	}
 	if err := contextError(ctx, "context"); err != nil {
 		return nil, nil, err
 	}
-	normalized, visualConfig, err := normalizeConfig(config)
+	normalized, visualConfig, err := normalizeConfigMode(config, v2)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -131,7 +191,7 @@ func Compile(ctx context.Context, document documentv2.Document, bindings []Bindi
 	}
 	normalized.CompositorLimits = actualVisualConfig.Limits
 	visualConfig = actualVisualConfig
-	if err := validateAggregateLimits(normalized); err != nil {
+	if err := validateAggregateLimitsMode(normalized, v2); err != nil {
 		return nil, diagnostics, err
 	}
 	if err := contextError(ctx, "document"); err != nil {
@@ -141,7 +201,7 @@ func Compile(ctx context.Context, document documentv2.Document, bindings []Bindi
 	if err != nil {
 		return nil, diagnostics, pipelineError(CodeDocumentInvalid, "document", errors.Join(ErrDocumentInvalid, err))
 	}
-	canonicalLimit := minimumCanonicalLimit(normalized)
+	canonicalLimit := minimumCanonicalLimitMode(normalized, v2)
 	if uint64(len(canonical)) > canonicalLimit {
 		return nil, diagnostics, pipelineError(CodeResourceLimit, "document/canonical_bytes", ErrResourceLimit)
 	}
@@ -179,6 +239,13 @@ func Compile(ctx context.Context, document documentv2.Document, bindings []Bindi
 	if err != nil {
 		return nil, diagnostics, classifyExpressionCompile(err)
 	}
+	var text *textlayer.Provider
+	if v2 {
+		text, err = textlayer.Compile(ctx, frozen, fontBindings, *normalized.TextConfig)
+		if err != nil {
+			return nil, diagnostics, classifyTextCompile(err)
+		}
+	}
 	if err := contextError(ctx, "compile/manifests"); err != nil {
 		return nil, diagnostics, err
 	}
@@ -186,10 +253,19 @@ func Compile(ctx context.Context, document documentv2.Document, bindings []Bindi
 	expressionConfig := expression.Config()
 	nativeManifest := native.Manifest()
 	expressionManifest := expression.Manifest()
+	var textManifest *textlayer.Manifest
+	if text != nil {
+		manifest := text.Manifest()
+		textManifest = &manifest
+	}
 	manifestsValid := native.DocumentHash() == documentHash && expression.DocumentHash() == documentHash &&
 		nativeConfig.Limits == normalized.NativeLimits && expressionConfig.Limits == normalized.ExpressionLimits &&
 		validNativeManifest(ctx, nativeManifest, frozen, normalized.NativeLimits) &&
 		validExpressionManifest(ctx, expressionManifest, frozen, normalized.ExpressionLimits)
+	if v2 {
+		manifestsValid = manifestsValid && text != nil && textManifest != nil && text.DocumentHash() == documentHash &&
+			text.Config() == *normalized.TextConfig && validTextManifest(ctx, *textManifest, frozen, normalized.TextConfig.Limits)
+	}
 	if err := contextError(ctx, "compile/source_manifests"); err != nil {
 		return nil, diagnostics, err
 	}
@@ -198,12 +274,20 @@ func Compile(ctx context.Context, document documentv2.Document, bindings []Bindi
 	}
 	nativeRetained, nativeOK := nativeRetainedBytes(nativeManifest)
 	expressionRetained, expressionOK := expressionRetainedBytes(expressionManifest)
-	actualRetained, ok := checkedAdd(nativeRetained, expressionRetained)
-	if !nativeOK || !expressionOK || !ok || actualRetained > normalized.PipelineLimits.MaxRetainedSourceBytes {
+	textRetained, textOK := uint64(0), true
+	if textManifest != nil {
+		textRetained, textOK = textRetainedBytes(*textManifest)
+	}
+	actualRetained, ok := checkedSum(nativeRetained, expressionRetained, textRetained)
+	if !nativeOK || !expressionOK || !textOK || !ok || actualRetained > normalized.PipelineLimits.MaxRetainedSourceBytes {
 		return nil, diagnostics, pipelineError(CodeResourceLimit, "compile/retained_source_bytes", ErrResourceLimit)
 	}
+	manifestProfile := ManifestProfileV1
+	if v2 {
+		manifestProfile = ManifestProfileV2
+	}
 	manifest := SourceManifest{
-		SchemaVersion: ManifestSchemaVersion, Profile: ManifestProfileV1, DocumentHash: documentHash,
+		SchemaVersion: ManifestSchemaVersion, Profile: manifestProfile, DocumentHash: documentHash,
 		NativePNG: cloneNativeManifest(nativeManifest), Expression: cloneExpressionManifest(expressionManifest),
 		ExpressionHandleProfile:         expressionlayer.TransitionHandleProfileV2,
 		ExpressionHandleContractVersion: expressionlayer.TransitionHandleContractVersion,
@@ -211,7 +295,14 @@ func Compile(ctx context.Context, document documentv2.Document, bindings []Bindi
 		NativeRetainedSurfaceBytes:      nativeRetained, ExpressionRetainedSurfaceBytes: expressionRetained,
 		TotalRetainedSurfaceBytes: actualRetained,
 	}
-	if !validCombinedManifest(manifest, normalized) {
+	if textManifest != nil {
+		cloned := cloneTextManifest(*textManifest)
+		manifest.Text = &cloned
+		manifest.TextProviderProfile = textlayer.ProfileV1
+		manifest.TextContractVersion = textlayer.ContractVersion
+		manifest.TextRetainedSurfaceBytes = textRetained
+	}
+	if !validCombinedManifestMode(manifest, normalized, v2) {
 		return nil, diagnostics, pipelineError(CodeStageMismatch, "compile/source_manifest", ErrStageMismatch)
 	}
 	if err := contextError(ctx, "compile/publish"); err != nil {
@@ -219,7 +310,7 @@ func Compile(ctx context.Context, document documentv2.Document, bindings []Bindi
 	}
 	program := &Program{
 		documentHash: documentHash, config: normalized, visual: visual, native: native, expression: expression,
-		manifest: cloneSourceManifest(manifest), diagnostics: cloneDiagnostics(diagnostics),
+		text: text, v2: v2, manifest: cloneSourceManifest(manifest), diagnostics: cloneDiagnostics(diagnostics),
 	}
 	if err := contextError(ctx, "compile/publish"); err != nil {
 		return nil, diagnostics, err
@@ -228,6 +319,10 @@ func Compile(ctx context.Context, document documentv2.Document, bindings []Bindi
 }
 
 func normalizeConfig(value Config) (Config, visualcompositor.Config, error) {
+	return normalizeConfigMode(value, false)
+}
+
+func normalizeConfigMode(value Config, v2 bool) (Config, visualcompositor.Config, error) {
 	result := value
 	if result.Width <= 0 || result.Height <= 0 {
 		return Config{}, visualcompositor.Config{}, pipelineError(CodeConfigInvalid, "config/dimensions", ErrConfigInvalid)
@@ -241,6 +336,15 @@ func normalizeConfig(value Config) (Config, visualcompositor.Config, error) {
 		result.ExpressionLimits = expressionlayer.DefaultLimits()
 	} else {
 		result.ExpressionLimits = fillExpressionDefaults(result.ExpressionLimits)
+	}
+	if v2 {
+		textConfig := defaultTextConfigV2()
+		if result.TextConfig != nil {
+			textConfig = fillTextDefaults(*result.TextConfig)
+		}
+		result.TextConfig = &textConfig
+	} else if result.TextConfig != nil {
+		return Config{}, visualcompositor.Config{}, pipelineError(CodeConfigInvalid, "config/text_config", ErrConfigInvalid)
 	}
 	if result.CompositorLimits == (visualcompositor.Limits{}) {
 		result.CompositorLimits = visualcompositor.DefaultLimits()
@@ -262,9 +366,16 @@ func normalizeConfig(value Config) (Config, visualcompositor.Config, error) {
 		result.PNGLimits = fillPNGDefaults(result.PNGLimits)
 	}
 	if result.PipelineLimits == (PipelineLimits{}) {
-		result.PipelineLimits = DefaultPipelineLimits()
+		if v2 {
+			result.PipelineLimits = defaultPipelineLimitsV2()
+		} else {
+			result.PipelineLimits = DefaultPipelineLimits()
+		}
 	} else {
 		defaults := DefaultPipelineLimits()
+		if v2 {
+			defaults = defaultPipelineLimitsV2()
+		}
 		if result.PipelineLimits.MaxRetainedSourceBytes == 0 {
 			result.PipelineLimits.MaxRetainedSourceBytes = defaults.MaxRetainedSourceBytes
 		}
@@ -278,6 +389,9 @@ func normalizeConfig(value Config) (Config, visualcompositor.Config, error) {
 	if err := validateProviderLimits(result.NativeLimits, result.ExpressionLimits); err != nil {
 		return Config{}, visualcompositor.Config{}, err
 	}
+	if v2 && !validTextProviderLimits(result.TextConfig.Limits) {
+		return Config{}, visualcompositor.Config{}, pipelineError(CodeConfigInvalid, "config/text_config/limits", ErrConfigInvalid)
+	}
 	if err := validateOutputAndPNG(result); err != nil {
 		return Config{}, visualcompositor.Config{}, err
 	}
@@ -288,11 +402,17 @@ func normalizeConfig(value Config) (Config, visualcompositor.Config, error) {
 	if result.ExpressionLimits.MaxCanonicalDocumentBytes < visualLimits.MaxCanonicalDocumentBytes {
 		visualLimits.MaxCanonicalDocumentBytes = result.ExpressionLimits.MaxCanonicalDocumentBytes
 	}
+	if v2 && result.TextConfig.Limits.MaxCanonicalDocumentBytes < visualLimits.MaxCanonicalDocumentBytes {
+		visualLimits.MaxCanonicalDocumentBytes = result.TextConfig.Limits.MaxCanonicalDocumentBytes
+	}
 	if result.NativeLimits.MaxDocumentNodes < visualLimits.MaxDocumentNodes {
 		visualLimits.MaxDocumentNodes = result.NativeLimits.MaxDocumentNodes
 	}
 	if result.ExpressionLimits.MaxDocumentNodes < visualLimits.MaxDocumentNodes {
 		visualLimits.MaxDocumentNodes = result.ExpressionLimits.MaxDocumentNodes
+	}
+	if v2 && result.TextConfig.Limits.MaxDocumentNodes < visualLimits.MaxDocumentNodes {
+		visualLimits.MaxDocumentNodes = result.TextConfig.Limits.MaxDocumentNodes
 	}
 	if result.NativeLimits.MaxTracksPerTimeline < visualLimits.MaxTracksPerTimeline {
 		visualLimits.MaxTracksPerTimeline = result.NativeLimits.MaxTracksPerTimeline
@@ -300,10 +420,13 @@ func normalizeConfig(value Config) (Config, visualcompositor.Config, error) {
 	if result.ExpressionLimits.MaxTracksPerTimeline < visualLimits.MaxTracksPerTimeline {
 		visualLimits.MaxTracksPerTimeline = result.ExpressionLimits.MaxTracksPerTimeline
 	}
+	if v2 && result.TextConfig.Limits.MaxTracksPerTimeline < visualLimits.MaxTracksPerTimeline {
+		visualLimits.MaxTracksPerTimeline = result.TextConfig.Limits.MaxTracksPerTimeline
+	}
 	result.CompositorLimits = visualLimits
 	visualConfig := visualcompositor.Config{
 		Width: result.Width, Height: result.Height, Limits: visualLimits,
-		Source:           visualcompositor.SourceCapabilities{Image: true, VectorExpression: true},
+		Source:           visualcompositor.SourceCapabilities{Image: true, VectorExpression: true, StaticTextV2: v2},
 		NativeProfiles:   rastercompositor.SourceProfiles{Image: nativepngsource.ImageSourceProfiles()},
 		BuildFingerprint: result.BuildFingerprint,
 	}
@@ -313,10 +436,55 @@ func normalizeConfig(value Config) (Config, visualcompositor.Config, error) {
 		}
 		return Config{}, visualcompositor.Config{}, pipelineError(CodeConfigInvalid, "config/compositor_limits", errors.Join(ErrConfigInvalid, err))
 	}
-	if err := validateAggregateLimits(result); err != nil {
+	if err := validateAggregateLimitsMode(result, v2); err != nil {
 		return Config{}, visualcompositor.Config{}, err
 	}
 	return result, visualConfig, nil
+}
+
+func fillTextDefaults(value textlayer.Config) textlayer.Config {
+	defaults := defaultTextConfigV2()
+	if value.Limits == (textlayer.Limits{}) {
+		return defaults
+	}
+	limits := &value.Limits
+	if limits.MaxBindings == 0 {
+		limits.MaxBindings = defaults.Limits.MaxBindings
+	}
+	if limits.MaxClipScopes == 0 {
+		limits.MaxClipScopes = defaults.Limits.MaxClipScopes
+	}
+	if limits.MaxTextAssets == 0 {
+		limits.MaxTextAssets = defaults.Limits.MaxTextAssets
+	}
+	if limits.MaxFontAssets == 0 {
+		limits.MaxFontAssets = defaults.Limits.MaxFontAssets
+	}
+	if limits.MaxDocumentNodes == 0 {
+		limits.MaxDocumentNodes = defaults.Limits.MaxDocumentNodes
+	}
+	if limits.MaxTracksPerTimeline == 0 {
+		limits.MaxTracksPerTimeline = defaults.Limits.MaxTracksPerTimeline
+	}
+	if limits.MaxCanonicalDocumentBytes == 0 {
+		limits.MaxCanonicalDocumentBytes = defaults.Limits.MaxCanonicalDocumentBytes
+	}
+	if limits.MaxTotalStaticSurfaceBytes == 0 {
+		limits.MaxTotalStaticSurfaceBytes = defaults.Limits.MaxTotalStaticSurfaceBytes
+	}
+	if limits.MaxCompileWorkingBytes == 0 {
+		limits.MaxCompileWorkingBytes = defaults.Limits.MaxCompileWorkingBytes
+	}
+	if limits.FrozenText == (evaluator.FrozenTextSourceLimits{}) {
+		limits.FrozenText = defaults.Limits.FrozenText
+	}
+	if limits.Assembly == (textassembly.Limits{}) {
+		limits.Assembly = defaults.Limits.Assembly
+	}
+	if limits.Raster == (textassembly.RasterLimits{}) {
+		limits.Raster = defaults.Limits.Raster
+	}
+	return value
 }
 
 func validateProviderLimits(native nativepngsource.Limits, expression expressionlayer.Limits) error {
@@ -345,6 +513,18 @@ func validateProviderLimits(native nativepngsource.Limits, expression expression
 		return pipelineError(CodeConfigInvalid, "config/expression_limits", ErrConfigInvalid)
 	}
 	return nil
+}
+
+func validTextProviderLimits(limits textlayer.Limits) bool {
+	return limits.MaxBindings > 0 && limits.MaxBindings <= textlayer.HardMaxBindings &&
+		limits.MaxClipScopes > 0 && limits.MaxClipScopes <= textlayer.HardMaxClipScopes &&
+		limits.MaxTextAssets > 0 && limits.MaxTextAssets <= textlayer.HardMaxTextAssets &&
+		limits.MaxFontAssets > 0 && limits.MaxFontAssets <= textlayer.HardMaxFontAssets &&
+		limits.MaxDocumentNodes > 0 && limits.MaxDocumentNodes <= textlayer.HardMaxDocumentNodes &&
+		limits.MaxTracksPerTimeline > 0 && limits.MaxTracksPerTimeline <= textlayer.HardMaxTracksPerTimeline &&
+		limits.MaxCanonicalDocumentBytes > 0 && limits.MaxCanonicalDocumentBytes <= textlayer.HardMaxCanonicalDocumentBytes &&
+		limits.MaxTotalStaticSurfaceBytes >= cpucompositor.BytesPerPixel && limits.MaxTotalStaticSurfaceBytes <= textlayer.HardMaxTotalSurfaceBytes &&
+		limits.MaxCompileWorkingBytes > 0 && limits.MaxCompileWorkingBytes <= textlayer.HardMaxCompileWorkingBytes
 }
 
 func fillNativeDefaults(value nativepngsource.Limits) nativepngsource.Limits {
@@ -452,22 +632,36 @@ func preflightBindings(ctx context.Context, bindings []Binding, limits nativepng
 }
 
 func validateAggregateLimits(config Config) error {
+	return validateAggregateLimitsMode(config, false)
+}
+
+func validateAggregateLimitsMode(config Config, v2 bool) error {
 	pipeline := config.PipelineLimits
 	if pipeline.MaxRetainedSourceBytes == 0 || pipeline.MaxCompileWorkingBytes == 0 || pipeline.MaxRuntimeWorkingBytes == 0 ||
 		pipeline.MaxRetainedSourceBytes > HardMaxPipelineBytes || pipeline.MaxCompileWorkingBytes > HardMaxPipelineBytes || pipeline.MaxRuntimeWorkingBytes > HardMaxPipelineBytes {
 		return pipelineError(CodeConfigInvalid, "config/pipeline_limits", ErrConfigInvalid)
 	}
-	retained, ok := checkedAdd(config.NativeLimits.MaxRetainedBytes, config.ExpressionLimits.MaxRetainedBytes)
+	textRetained := uint64(0)
+	if v2 {
+		if config.TextConfig == nil {
+			return pipelineError(CodeConfigInvalid, "config/text_config", ErrConfigInvalid)
+		}
+		textRetained = config.TextConfig.Limits.MaxTotalStaticSurfaceBytes
+	}
+	retained, ok := checkedSum(config.NativeLimits.MaxRetainedBytes, config.ExpressionLimits.MaxRetainedBytes, textRetained)
 	if !ok || retained > pipeline.MaxRetainedSourceBytes {
 		return pipelineError(CodeResourceLimit, "config/pipeline_limits/retained", ErrResourceLimit)
 	}
-	canonical := minimumCanonicalLimit(config)
+	canonical := minimumCanonicalLimitMode(config, v2)
 	nodes := uint64(config.CompositorLimits.MaxDocumentNodes)
 	if uint64(config.NativeLimits.MaxDocumentNodes) < nodes {
 		nodes = uint64(config.NativeLimits.MaxDocumentNodes)
 	}
 	if uint64(config.ExpressionLimits.MaxDocumentNodes) < nodes {
 		nodes = uint64(config.ExpressionLimits.MaxDocumentNodes)
+	}
+	if v2 && uint64(config.TextConfig.Limits.MaxDocumentNodes) < nodes {
+		nodes = uint64(config.TextConfig.Limits.MaxDocumentNodes)
 	}
 	metadata, ok := checkedMul(nodes, metadataBytesPerDocumentNode)
 	if !ok {
@@ -484,6 +678,20 @@ func validateAggregateLimits(config Config) error {
 	compilePeak, ok := checkedSum(retained, transient, canonicalWorking, metadata)
 	if !ok || compilePeak > pipeline.MaxCompileWorkingBytes {
 		return pipelineError(CodeResourceLimit, "config/pipeline_limits/compile", ErrResourceLimit)
+	}
+	if v2 {
+		// textlayer's MaxCompileWorkingBytes already includes its canonical snapshot, Text cached
+		// surfaces and worst sequential bind/assembly/raster stage. Native and expression caches and
+		// wrapper metadata remain live while that final provider compiles.
+		textCompilePeak, textOK := checkedSum(
+			config.NativeLimits.MaxRetainedBytes,
+			config.ExpressionLimits.MaxRetainedBytes,
+			config.TextConfig.Limits.MaxCompileWorkingBytes,
+			metadata,
+		)
+		if !textOK || textCompilePeak > pipeline.MaxCompileWorkingBytes {
+			return pipelineError(CodeResourceLimit, "config/pipeline_limits/text_compile", ErrResourceLimit)
+		}
 	}
 	frameBytes, outputBytes, artifactBytes, rowBytes, ok := configuredRuntimeSizes(config)
 	if !ok {
@@ -583,12 +791,19 @@ func validateOutputAndPNG(config Config) error {
 }
 
 func minimumCanonicalLimit(config Config) uint64 {
+	return minimumCanonicalLimitMode(config, false)
+}
+
+func minimumCanonicalLimitMode(config Config, v2 bool) uint64 {
 	result := config.NativeLimits.MaxCanonicalDocumentBytes
 	if config.ExpressionLimits.MaxCanonicalDocumentBytes < result {
 		result = config.ExpressionLimits.MaxCanonicalDocumentBytes
 	}
 	if config.CompositorLimits.MaxCanonicalDocumentBytes < result {
 		result = config.CompositorLimits.MaxCanonicalDocumentBytes
+	}
+	if v2 && config.TextConfig != nil && config.TextConfig.Limits.MaxCanonicalDocumentBytes < result {
+		result = config.TextConfig.Limits.MaxCanonicalDocumentBytes
 	}
 	return result
 }
@@ -603,7 +818,7 @@ func (program *Program) Config() Config {
 	if program == nil {
 		return Config{}
 	}
-	return program.config
+	return cloneConfig(program.config)
 }
 func (program *Program) Diagnostics() []documentv2.Diagnostic {
 	if program == nil {
@@ -621,7 +836,30 @@ func (program *Program) SourceManifest() SourceManifest {
 func cloneSourceManifest(value SourceManifest) SourceManifest {
 	value.NativePNG = cloneNativeManifest(value.NativePNG)
 	value.Expression = cloneExpressionManifest(value.Expression)
+	if value.Text != nil {
+		cloned := cloneTextManifest(*value.Text)
+		value.Text = &cloned
+	}
 	return value
+}
+
+func cloneConfig(value Config) Config {
+	if value.TextConfig != nil {
+		cloned := *value.TextConfig
+		value.TextConfig = &cloned
+	}
+	return value
+}
+
+func equalConfig(left, right Config) bool {
+	if (left.TextConfig == nil) != (right.TextConfig == nil) {
+		return false
+	}
+	if left.TextConfig != nil && *left.TextConfig != *right.TextConfig {
+		return false
+	}
+	left.TextConfig, right.TextConfig = nil, nil
+	return left == right
 }
 func cloneNativeManifest(value nativepngsource.Manifest) nativepngsource.Manifest {
 	value.Assets = append([]nativepngsource.AssetReceipt(nil), value.Assets...)
@@ -629,6 +867,11 @@ func cloneNativeManifest(value nativepngsource.Manifest) nativepngsource.Manifes
 }
 func cloneExpressionManifest(value expressionlayer.Manifest) expressionlayer.Manifest {
 	value.Assets = append([]expressionlayer.AssetReceipt(nil), value.Assets...)
+	return value
+}
+
+func cloneTextManifest(value textlayer.Manifest) textlayer.Manifest {
+	value.Assets = append([]textlayer.AssetReceipt(nil), value.Assets...)
 	return value
 }
 
@@ -748,15 +991,39 @@ func expressionRetainedBytes(value expressionlayer.Manifest) (uint64, bool) {
 	return result, true
 }
 
+func textRetainedBytes(value textlayer.Manifest) (uint64, bool) {
+	var result uint64
+	for _, asset := range value.Assets {
+		var ok bool
+		result, ok = checkedAdd(result, asset.SurfaceBytes)
+		if !ok {
+			return 0, false
+		}
+	}
+	return result, true
+}
+
 func validCombinedManifest(value SourceManifest, config Config) bool {
+	return validCombinedManifestMode(value, config, false)
+}
+
+func validCombinedManifestMode(value SourceManifest, config Config, v2 bool) bool {
 	nativeRetained, nativeOK := nativeRetainedBytes(value.NativePNG)
 	expressionRetained, expressionOK := expressionRetainedBytes(value.Expression)
-	retained, retainedOK := checkedAdd(nativeRetained, expressionRetained)
-	if !nativeOK || !expressionOK || !retainedOK || retained > config.PipelineLimits.MaxRetainedSourceBytes {
+	textRetained, textOK := uint64(0), true
+	if value.Text != nil {
+		textRetained, textOK = textRetainedBytes(*value.Text)
+	}
+	retained, retainedOK := checkedSum(nativeRetained, expressionRetained, textRetained)
+	if !nativeOK || !expressionOK || !textOK || !retainedOK || retained > config.PipelineLimits.MaxRetainedSourceBytes {
 		return false
 	}
-	seenIDs := make(map[documentv2.ID]struct{}, len(value.NativePNG.Assets)+len(value.Expression.Assets))
-	seenIndexes := make(map[int]struct{}, len(value.NativePNG.Assets)+len(value.Expression.Assets))
+	textAssets := 0
+	if value.Text != nil {
+		textAssets = len(value.Text.Assets)
+	}
+	seenIDs := make(map[documentv2.ID]struct{}, len(value.NativePNG.Assets)+len(value.Expression.Assets)+textAssets)
+	seenIndexes := make(map[int]struct{}, len(value.NativePNG.Assets)+len(value.Expression.Assets)+textAssets)
 	for _, asset := range value.NativePNG.Assets {
 		if _, duplicate := seenIDs[asset.AssetID]; duplicate {
 			return false
@@ -777,7 +1044,27 @@ func validCombinedManifest(value SourceManifest, config Config) bool {
 		seenIDs[asset.AssetID] = struct{}{}
 		seenIndexes[asset.AssetIndex] = struct{}{}
 	}
-	return value.SchemaVersion == ManifestSchemaVersion && value.Profile == ManifestProfileV1 && canonicalSHA256(value.DocumentHash) &&
+	if value.Text != nil {
+		for _, asset := range value.Text.Assets {
+			if _, duplicate := seenIDs[asset.AssetID]; duplicate {
+				return false
+			}
+			if _, duplicate := seenIndexes[asset.AssetIndex]; duplicate {
+				return false
+			}
+			seenIDs[asset.AssetID] = struct{}{}
+			seenIndexes[asset.AssetIndex] = struct{}{}
+		}
+	}
+	expectedProfile := ManifestProfileV1
+	textFieldsValid := value.Text == nil && value.TextProviderProfile == "" && value.TextContractVersion == 0 && value.TextRetainedSurfaceBytes == 0
+	if v2 {
+		expectedProfile = ManifestProfileV2
+		textFieldsValid = value.Text != nil && value.Text.DocumentHash == value.DocumentHash &&
+			value.TextProviderProfile == textlayer.ProfileV1 && value.TextContractVersion == textlayer.ContractVersion &&
+			value.TextRetainedSurfaceBytes == textRetained
+	}
+	return textFieldsValid && value.SchemaVersion == ManifestSchemaVersion && value.Profile == expectedProfile && canonicalSHA256(value.DocumentHash) &&
 		value.NativePNG.DocumentHash == value.DocumentHash && value.Expression.DocumentHash == value.DocumentHash &&
 		value.ExpressionHandleProfile == expressionlayer.TransitionHandleProfileV2 &&
 		value.ExpressionHandleContractVersion == expressionlayer.TransitionHandleContractVersion &&
@@ -790,11 +1077,16 @@ func equalSourceManifest(left, right SourceManifest) bool {
 	if left.SchemaVersion != right.SchemaVersion || left.Profile != right.Profile || left.DocumentHash != right.DocumentHash ||
 		left.ExpressionHandleProfile != right.ExpressionHandleProfile || left.ExpressionHandleContractVersion != right.ExpressionHandleContractVersion ||
 		left.VectorTransitionScopeProfile != right.VectorTransitionScopeProfile || left.NativeRetainedSurfaceBytes != right.NativeRetainedSurfaceBytes ||
-		left.ExpressionRetainedSurfaceBytes != right.ExpressionRetainedSurfaceBytes || left.TotalRetainedSurfaceBytes != right.TotalRetainedSurfaceBytes ||
+		left.ExpressionRetainedSurfaceBytes != right.ExpressionRetainedSurfaceBytes || left.TextProviderProfile != right.TextProviderProfile ||
+		left.TextContractVersion != right.TextContractVersion || left.TextRetainedSurfaceBytes != right.TextRetainedSurfaceBytes ||
+		left.TotalRetainedSurfaceBytes != right.TotalRetainedSurfaceBytes ||
 		!equalNativeManifest(left.NativePNG, right.NativePNG) || !equalExpressionManifest(left.Expression, right.Expression) {
 		return false
 	}
-	return true
+	if (left.Text == nil) != (right.Text == nil) {
+		return false
+	}
+	return left.Text == nil || equalTextManifest(*left.Text, *right.Text)
 }
 
 func equalNativeManifest(left, right nativepngsource.Manifest) bool {
@@ -814,6 +1106,22 @@ func equalExpressionManifest(left, right expressionlayer.Manifest) bool {
 	}
 	for i := range left.Assets {
 		if left.Assets[i] != right.Assets[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func equalTextManifest(left, right textlayer.Manifest) bool {
+	if left.SchemaVersion != right.SchemaVersion || left.Profile != right.Profile || left.ContractVersion != right.ContractVersion ||
+		left.DocumentHash != right.DocumentHash || left.SourceProfile != right.SourceProfile || left.SelectionProfile != right.SelectionProfile ||
+		left.TextProfile != right.TextProfile || left.EvaluatorProfile != right.EvaluatorProfile || left.RasterProfile != right.RasterProfile ||
+		left.PaintProfile != right.PaintProfile || left.SurfaceProfile != right.SurfaceProfile || left.PixelHashProfile != right.PixelHashProfile ||
+		left.RetainedSurfaceBytes != right.RetainedSurfaceBytes || len(left.Assets) != len(right.Assets) {
+		return false
+	}
+	for index := range left.Assets {
+		if left.Assets[index] != right.Assets[index] {
 			return false
 		}
 	}
@@ -961,6 +1269,95 @@ func validExpressionManifest(ctx context.Context, value expressionlayer.Manifest
 	return true
 }
 
+func validTextManifest(ctx context.Context, value textlayer.Manifest, document documentv2.Document, limits textlayer.Limits) bool {
+	if ctx == nil || value.SchemaVersion != textlayer.ManifestSchemaVersion || value.Profile != textlayer.ProfileV1 ||
+		value.ContractVersion != textlayer.ContractVersion || !canonicalSHA256(value.DocumentHash) ||
+		value.SourceProfile != textlayer.SourceProfileV1 || value.SelectionProfile != textlayer.SelectionProfileV1 ||
+		value.TextProfile != documentv2.TextProfilePinnedFontViewportPXV2 ||
+		value.EvaluatorProfile != documentv2.EvaluatorTextPinnedFontViewportPXV2 ||
+		value.RasterProfile != documentv2.TextRasterProfileSupersample8x8V1 ||
+		value.PaintProfile != color.ProfileRGBA16SRGBPaintV1 || value.SurfaceProfile != cpucompositor.SurfaceProfileV1 ||
+		value.PixelHashProfile != textlayer.SurfaceHashProfileV1 || len(value.Assets) > limits.MaxTextAssets {
+		return false
+	}
+	snapshot, diagnostics := evaluator.FreezeSnapshot(ctx, document, evaluator.SnapshotLimits{
+		MaxCanonicalDocumentBytes: limits.MaxCanonicalDocumentBytes,
+		MaxDocumentNodes:          uint64(limits.MaxDocumentNodes),
+	})
+	if snapshot == nil || documentv2.HasErrorDiagnostics(diagnostics) || snapshot.DocumentHash() != value.DocumentHash {
+		return false
+	}
+	frozenAssets := make(map[documentv2.ID]evaluator.SnapshotAsset, len(snapshot.Assets()))
+	for _, asset := range snapshot.Assets() {
+		frozenAssets[asset.ID] = asset
+	}
+	required := enabledAssets(document, documentv2.TrackKindText, documentv2.AssetKindText)
+	if len(required) != len(value.Assets) {
+		return false
+	}
+	assetIndexes := make(map[documentv2.ID]int, len(document.Assets))
+	assets := make(map[documentv2.ID]documentv2.Asset, len(document.Assets))
+	for index, asset := range document.Assets {
+		assetIndexes[asset.ID] = index
+		assets[asset.ID] = asset
+	}
+	seenIndexes := make(map[int]struct{}, len(value.Assets))
+	previous := ""
+	var retained uint64
+	for index, receipt := range value.Assets {
+		if index&255 == 0 && ctx.Err() != nil {
+			return false
+		}
+		asset, ok := required[receipt.AssetID]
+		_, duplicateIndex := seenIndexes[receipt.AssetIndex]
+		if !ok || string(receipt.AssetID) <= previous || duplicateIndex || receipt.AssetKind != documentv2.AssetKindText ||
+			receipt.AssetIndex < 0 || receipt.AssetIndex >= len(document.Assets) || document.Assets[receipt.AssetIndex].ID != receipt.AssetID ||
+			asset.Text == nil || asset.Text.Viewport == nil || asset.Text.Profile != documentv2.TextProfilePinnedFontViewportPXV2 ||
+			receipt.RasterViewport != *asset.Text.Viewport || receipt.FontAssetID != asset.Text.FontAssetID ||
+			receipt.FontAssetIndex != assetIndexes[asset.Text.FontAssetID] || receipt.FrozenTextBindingHashProfile != evaluator.FrozenTextSourceBindingHashProfileV1 ||
+			receipt.TextSemanticHashProfile != documentv2.TextSemanticHashProfileV1 || receipt.LayoutInputHashProfile != documentv2.TextLayoutInputHashProfileV1 ||
+			receipt.FontContentHashProfile != sfntglyf.ContentHashProfileV1 || !canonicalSHA256(receipt.FrozenTextBindingHash) ||
+			!canonicalSHA256(receipt.TextSemanticHash) || !canonicalSHA256(receipt.LayoutInputHash) || !canonicalSHA256(receipt.FontContentHash) {
+			return false
+		}
+		font, fontExists := assets[receipt.FontAssetID]
+		frozenAsset, frozenExists := frozenAssets[receipt.AssetID]
+		pixels, pixelsOK := checkedMul(uint64(receipt.RasterViewport.WidthPixels), uint64(receipt.RasterViewport.HeightPixels))
+		surfaceBytes, surfaceOK := checkedMul(pixels, cpucompositor.BytesPerPixel)
+		assembly := receipt.Assembly
+		raster := receipt.Raster
+		identity := receipt.SurfaceIdentity
+		if !fontExists || !frozenExists || font.Kind != documentv2.AssetKindFont || font.ContentHash != receipt.FontContentHash ||
+			!pixelsOK || !surfaceOK || receipt.RasterViewport.WidthPixels == 0 || receipt.RasterViewport.HeightPixels == 0 ||
+			receipt.SurfaceBytes != surfaceBytes || identity.WidthPixels != receipt.RasterViewport.WidthPixels ||
+			identity.HeightPixels != receipt.RasterViewport.HeightPixels || identity.PixelHashProfile != textlayer.SurfaceHashProfileV1 ||
+			!canonicalSHA256(identity.PixelHash) || identity.SurfaceProfile != cpucompositor.SurfaceProfileV1 ||
+			assembly.SchemaVersion != textassembly.SchemaVersion || assembly.Profile != textassembly.ReceiptProfileV1 ||
+			assembly.DocumentHash != value.DocumentHash || assembly.TextAssetID != string(receipt.AssetID) ||
+			assembly.TextAssetIndex != uint64(receipt.AssetIndex) || assembly.FontAssetID != string(receipt.FontAssetID) ||
+			assembly.FontAssetIndex != uint64(receipt.FontAssetIndex) || assembly.FontContentHash != receipt.FontContentHash ||
+			assembly.FrozenTextBindingHash != receipt.FrozenTextBindingHash || assembly.TextSemanticHash != receipt.TextSemanticHash ||
+			assembly.LayoutInputHash != receipt.LayoutInputHash || assembly.WidthPixels != receipt.RasterViewport.WidthPixels ||
+			assembly.HeightPixels != receipt.RasterViewport.HeightPixels || assembly.FillR != asset.Text.Fill.R ||
+			assembly.FillG != asset.Text.Fill.G || assembly.FillB != asset.Text.Fill.B || assembly.FillA != asset.Text.Fill.A ||
+			assembly.AssemblyHashProfile != textassembly.AssemblyHashProfileV1 || !canonicalSHA256(assembly.AssemblyHash) ||
+			raster.SchemaVersion != textassembly.SchemaVersion || raster.Profile != textassembly.RasterReceiptProfileV1 ||
+			raster.AssemblyHashProfile != textassembly.AssemblyHashProfileV1 || raster.AssemblyHash != assembly.AssemblyHash ||
+			raster.WidthPixels != receipt.RasterViewport.WidthPixels || raster.HeightPixels != receipt.RasterViewport.HeightPixels ||
+			raster.PixelHash != identity.PixelHash || raster.RetainedBytes == 0 ||
+			!validTextAssetReceiptDeep(receipt, frozenAsset, asset, limits) {
+			return false
+		}
+		retained, ok = checkedAdd(retained, surfaceBytes)
+		if !ok || retained > limits.MaxTotalStaticSurfaceBytes {
+			return false
+		}
+		seenIndexes[receipt.AssetIndex] = struct{}{}
+		previous = string(receipt.AssetID)
+	}
+	return retained == value.RetainedSurfaceBytes
+}
+
 func validExpressionAssetReceipt(value expressionlayer.AssetReceipt, limits vectorraster.Limits) bool {
 	identity := value.SurfaceIdentity
 	raster := value.RasterReceipt
@@ -1065,4 +1462,20 @@ func classifyExpressionCompile(err error) error {
 		return pipelineError(CodeDocumentInvalid, "expression", errors.Join(ErrDocumentInvalid, err))
 	}
 	return pipelineError(CodeExpressionCompile, "expression", errors.Join(ErrExpressionCompile, err))
+}
+
+func classifyTextCompile(err error) error {
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, textlayer.ErrCanceled) {
+		return pipelineError(CodeCanceled, "text", errors.Join(ErrCanceled, err))
+	}
+	if errors.Is(err, textlayer.ErrResourceLimit) {
+		return pipelineError(CodeResourceLimit, "text", errors.Join(ErrResourceLimit, err))
+	}
+	if errors.Is(err, textlayer.ErrConfigInvalid) {
+		return pipelineError(CodeConfigInvalid, "text", errors.Join(ErrConfigInvalid, err))
+	}
+	if errors.Is(err, textlayer.ErrDocumentInvalid) || errors.Is(err, textlayer.ErrProfileUnsupported) {
+		return pipelineError(CodeDocumentInvalid, "text", errors.Join(ErrDocumentInvalid, err))
+	}
+	return pipelineError(CodeTextSourceCompile, "text", errors.Join(ErrTextSourceCompile, err))
 }
