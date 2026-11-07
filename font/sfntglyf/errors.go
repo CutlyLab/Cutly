@@ -28,6 +28,10 @@ var (
 	ErrOutlineSetInputInvalid = errors.New("sfntglyf: outline-set input is invalid")
 	ErrOutlineSetCoordinate   = errors.New("sfntglyf: outline-set coordinate is not representable")
 	ErrLayoutGraphInvalid     = errors.New("sfntglyf: OpenType layout graph is invalid")
+	ErrShapeProviderInvalid   = errors.New("sfntglyf: shape provider binding is invalid")
+	ErrShapeInputInvalid      = errors.New("sfntglyf: shape input is invalid")
+	ErrShapeMissingGlyph      = errors.New("sfntglyf: shape input has a missing glyph")
+	ErrShapeInvariant         = errors.New("sfntglyf: shape provider invariant failed")
 	ErrResourceLimit          = errors.New("sfntglyf: resource limit exceeded")
 	ErrAllocationFailed       = errors.New("sfntglyf: allocation failed")
 	ErrInvariantFailed        = errors.New("sfntglyf: internal invariant failed")
@@ -66,6 +70,12 @@ const (
 	CodeLayoutGraphLimits       ErrorCode = "FONT.OPENTYPE_LAYOUT_GRAPH_V1.LIMITS_INVALID"
 	CodeLayoutGraphResource     ErrorCode = "FONT.OPENTYPE_LAYOUT_GRAPH_V1.RESOURCE_LIMIT"
 	CodeLayoutGraphInvariant    ErrorCode = "FONT.OPENTYPE_LAYOUT_GRAPH_V1.INVARIANT_FAILED"
+	CodeShapeProviderInvalid    ErrorCode = "FONT.GO_TEXT_SHAPE_V1.PROVIDER_INVALID"
+	CodeShapeInputInvalid       ErrorCode = "FONT.GO_TEXT_SHAPE_V1.INPUT_INVALID"
+	CodeShapeMissingGlyph       ErrorCode = "FONT.GO_TEXT_SHAPE_V1.MISSING_GLYPH"
+	CodeShapeLimitsInvalid      ErrorCode = "FONT.GO_TEXT_SHAPE_V1.LIMITS_INVALID"
+	CodeShapeResourceLimit      ErrorCode = "FONT.GO_TEXT_SHAPE_V1.RESOURCE_LIMIT"
+	CodeShapeInvariant          ErrorCode = "FONT.GO_TEXT_SHAPE_V1.INVARIANT_FAILED"
 	CodeResourceLimit           ErrorCode = "FONT.SFNT_GLYF_CORE_V1.RESOURCE_LIMIT"
 	CodeAllocationFailed        ErrorCode = "FONT.SFNT_GLYF_CORE_V1.ALLOCATION_FAILED"
 	CodeInvariantFailed         ErrorCode = "FONT.SFNT_GLYF_CORE_V1.INVARIANT_FAILED"

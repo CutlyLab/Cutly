@@ -2,8 +2,8 @@
   "spdxVersion": "SPDX-2.3",
   "dataLicense": "CC0-1.0",
   "SPDXID": "SPDXRef-DOCUMENT",
-  "name": "Cutly T1b0 dependency and text-shape candidate closure",
-  "documentNamespace": "https://github.com/CutlyLab/Cutly/deps/sbom/t1b0-v2",
+  "name": "Cutly dependency and linked text-shape provider closure",
+  "documentNamespace": "https://github.com/CutlyLab/Cutly/deps/sbom/text-shape-provider-v1",
   "creationInfo": {
     "created": "2026-11-06T00:00:00Z",
     "creators": [
@@ -25,7 +25,7 @@
     {
       "SPDXID": "SPDXRef-Package-Cutly",
       "name": "github.com/CutlyLab/Cutly",
-      "versionInfo": "unreleased-t1b0",
+      "versionInfo": "unreleased-m2-shape-provider",
       "downloadLocation": "NOASSERTION",
       "filesAnalyzed": false,
       "licenseConcluded": "NOASSERTION",
@@ -100,7 +100,7 @@
           "referenceLocator": "h1:XZPUooClHY0Vf/rFyUyuPRNEkawARaFzLMQcXLSEyPk="
         }
       ],
-      "comment": "closure=candidate_production; reachability=production_import; linked_package_count=8 in the prospective selected-package graph. Candidate only: absent from cutly/go.mod and not currently linked into a Cutly binary."
+      "comment": "closure=current_production; reachability=production_import; linked_package_count=8. Imported by Cutly's pinned shape-only static-glyf provider; this does not advertise final Text render capability."
     },
     {
       "SPDXID": "SPDXRef-Package-XImage",
@@ -123,7 +123,7 @@
           "referenceLocator": "h1:HseQ7c2OpPKTPVzNjG5fwJsOTCiiwS4QdsYi5XU6H68="
         }
       ],
-      "comment": "closure=candidate_production_transitive; reachability=production_import; linked_package_count=3 in the prospective selected-package graph. Candidate only and not currently linked. Upstream LICENSE and PATENTS bytes are locked."
+      "comment": "closure=current_production_transitive; reachability=production_import; linked_package_count=3. Linked transitively through go-text font parsing. Upstream LICENSE and PATENTS bytes are locked."
     },
     {
       "SPDXID": "SPDXRef-Package-GoTextUtils",
@@ -146,7 +146,7 @@
           "referenceLocator": "h1:8FGo2It5K75XkavhTiCKExUfVaVDS1feBnLCru5qeoY="
         }
       ],
-      "comment": "closure=candidate_test_generate; reachability=module_graph_only; linked_package_count=0. Upstream test/generation requirement only; not in the prospective production package closure and not currently linked."
+      "comment": "closure=current_module_graph_only; reachability=upstream_test_generate; linked_package_count=0. Upstream test/generation requirement only; no package is linked into the Cutly provider."
     },
     {
       "SPDXID": "SPDXRef-Package-XText",
@@ -169,7 +169,7 @@
           "referenceLocator": "h1:zyQAAkrwaneQ066sspRyJaG9VNi/YJ1NfzcGB3hZ/qo="
         }
       ],
-      "comment": "closure=candidate_module_graph_transitive; reachability=module_graph_only; linked_package_count=0. Selected by prospective MVS through x/image's go.mod, but no x/text package is in the selected production import closure and nothing is currently linked. Upstream LICENSE and PATENTS bytes are locked."
+      "comment": "closure=current_module_graph_only; reachability=module_graph_only; linked_package_count=0. Selected by current MVS through x/image's go.mod, but no x/text package is in the production import closure. Upstream LICENSE and PATENTS bytes are locked."
     },
     {
       "SPDXID": "SPDXRef-Package-HarfBuzz",
@@ -185,6 +185,12 @@
   ],
   "relationships": [
     {
+      "spdxElementId": "SPDXRef-Package-Cutly",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-GoTextTypesetting",
+      "comment": "Current direct production dependency for Cutly's linked shape-only static-glyf provider; this edge does not advertise final Text render capability."
+    },
+    {
       "spdxElementId": "SPDXRef-Package-JSONSchemaGo",
       "relationshipType": "TEST_DEPENDENCY_OF",
       "relatedSpdxElement": "SPDXRef-Package-Cutly"
@@ -199,13 +205,13 @@
       "spdxElementId": "SPDXRef-Package-GoTextTypesetting",
       "relationshipType": "DEPENDS_ON",
       "relatedSpdxElement": "SPDXRef-Package-XImage",
-      "comment": "Prospective selected-package relationship only; both modules remain candidate-only in Cutly T1b0."
+      "comment": "Current selected-package relationship used by Cutly's linked shape-only provider."
     },
     {
       "spdxElementId": "SPDXRef-Package-XImage",
       "relationshipType": "DEPENDS_ON",
       "relatedSpdxElement": "SPDXRef-Package-XText",
-      "comment": "Prospective MVS-only relationship from x/image's go.mod. The selected x/image packages do not import x/text, linked_package_count is zero, and neither module is currently linked into Cutly."
+      "comment": "Current MVS-only relationship from x/image's go.mod. The selected x/image packages do not import x/text, so x/text linked_package_count remains zero."
     },
     {
       "spdxElementId": "SPDXRef-Package-GoTextUtils",
@@ -224,7 +230,7 @@
       "annotationDate": "2026-11-06T00:00:00Z",
       "annotationType": "OTHER",
       "annotator": "Tool: Cutly dependency-lock v1",
-      "comment": "Candidate packages are intentionally listed for supply-chain review but are not current dependencies or capabilities. dependency-lock.json is the normative current/candidate and reachability classifier."
+      "comment": "The pinned go-text and x/image packages are current shape-provider dependencies. This SBOM does not assert final Text render capability; dependency-lock.json is the normative reachability classifier."
     }
   ]
 }

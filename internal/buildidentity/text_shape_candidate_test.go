@@ -15,11 +15,11 @@ import (
 )
 
 const (
-	textShapeLockFixtureSHA256 = "sha256:c6e2694cbe0c728a7e7ea1bc9afb0b7a9ec5c480b2ad4676fd323db7d95629bf"
-	textShapeFingerprintV1     = "sha256:9f5a05770986197c45ce082b580cefd2562ec55ce5dced8eca043dac9bdf6b08"
+	textShapeLockFixtureSHA256 = "sha256:a9849651ab22762151b07162d47eab94b1a96e49ce94248ed534fcfd88b1b8c3"
+	textShapeFingerprintV1     = "sha256:e2f3967156b6030da45e94771b910a79ac9ebe3618f320217ca35a4825de0ee2"
 )
 
-func TestTextShapeCandidateCanonicalLockAndFingerprint(t *testing.T) {
+func TestTextShapeProviderDependencyLockCanonicalAndFingerprint(t *testing.T) {
 	canonical := TextShapeCandidateCanonicalJSON()
 	root := cutlyModuleRoot(t)
 	fixture, err := os.ReadFile(filepath.Join(root, "deps", "dependency-lock.json"))
@@ -38,7 +38,7 @@ func TestTextShapeCandidateCanonicalLockAndFingerprint(t *testing.T) {
 		t.Fatalf("dependency lock hash=%s want=%s", got, textShapeLockFixtureSHA256)
 	}
 	if got := TextShapeCandidateFingerprint(); got != textShapeFingerprintV1 {
-		t.Fatalf("candidate fingerprint=%s want=%s", got, textShapeFingerprintV1)
+		t.Fatalf("shape-provider fingerprint=%s want=%s", got, textShapeFingerprintV1)
 	}
 	verified, err := VerifyTextShapeDependencyLock(fixture)
 	if err != nil || verified != textShapeFingerprintV1 {
@@ -46,23 +46,26 @@ func TestTextShapeCandidateCanonicalLockAndFingerprint(t *testing.T) {
 	}
 }
 
-func TestTextShapeCandidateRemainsClosedAndDefensive(t *testing.T) {
+func TestTextShapeProviderDependencyIdentityRemainsClosedAndDefensive(t *testing.T) {
 	first := TextShapeCandidate()
 	if first.SchemaVersion != TextShapeCandidateSchemaVersion || first.Profile != TextShapeCandidateProfileV1 ||
 		first.Status != TextShapeCandidateStatus || first.ProviderProfile != TextShapeProviderProfileV1 ||
 		first.FingerprintProfile != TextShapeFingerprintProfileV1 || first.CutlyGoDirective != "1.25.0" ||
-		first.RequiredCGOEnabled || first.ImportedByCutly || first.CapabilityAdvertised {
-		t.Fatalf("candidate identity is not closed: %+v", first)
+		first.RequiredCGOEnabled || !first.ImportedByCutly || first.CapabilityAdvertised {
+		t.Fatalf("shape-provider identity is not closed: %+v", first)
 	}
 	if len(first.Modules) != 6 || len(first.EmbeddedSources) != 1 {
-		t.Fatalf("candidate closure counts modules=%d embedded=%d", len(first.Modules), len(first.EmbeddedSources))
+		t.Fatalf("shape-provider closure counts modules=%d embedded=%d", len(first.Modules), len(first.EmbeddedSources))
 	}
 	if !slices.Equal(first.ProspectiveGraphTargets, []string{"js/wasm", "linux/amd64", "windows/amd64"}) ||
 		!slices.Equal(first.SelectedPackageRoots, []string{
 			"github.com/go-text/typesetting/font",
+			"github.com/go-text/typesetting/font/opentype",
+			"github.com/go-text/typesetting/font/opentype/tables",
 			"github.com/go-text/typesetting/harfbuzz",
+			"github.com/go-text/typesetting/language",
 		}) || len(first.ProductionPackageClosure) != 11 {
-		t.Fatalf("candidate package graph drift: %+v", first)
+		t.Fatalf("shape-provider package graph drift: %+v", first)
 	}
 	first.ProspectiveGraphTargets[0] = "tampered"
 	first.SelectedPackageRoots[0] = "tampered"
@@ -77,15 +80,18 @@ func TestTextShapeCandidateRemainsClosedAndDefensive(t *testing.T) {
 		second.Modules[0].Version != "v0.4.2" ||
 		second.Modules[3].SupplementalNotices[0].SHA256 != "sha256:96f408bfae65bf137fc2525d3ecb030271c50c1e90799f87abf8846d8dd505cc" ||
 		second.EmbeddedSources[0].Commit != "5a31dd02f0b32de12336f72db9297bfe94cf0da1" {
-		t.Fatalf("candidate descriptor shared mutable storage: %+v", second)
+		t.Fatalf("shape-provider descriptor shared mutable storage: %+v", second)
 	}
 }
 
-func TestTextShapeCandidatePackageAndModuleReachabilityFrozen(t *testing.T) {
+func TestTextShapeProviderPackageAndModuleReachabilityFrozen(t *testing.T) {
 	descriptor := TextShapeCandidate()
 	wantRoots := []string{
 		"github.com/go-text/typesetting/font",
+		"github.com/go-text/typesetting/font/opentype",
+		"github.com/go-text/typesetting/font/opentype/tables",
 		"github.com/go-text/typesetting/harfbuzz",
+		"github.com/go-text/typesetting/language",
 	}
 	wantClosure := []string{
 		"github.com/go-text/typesetting/font",
@@ -105,7 +111,7 @@ func TestTextShapeCandidatePackageAndModuleReachabilityFrozen(t *testing.T) {
 	}
 	if !slices.IsSorted(descriptor.ProductionPackageClosure) ||
 		!slices.Equal(descriptor.ProductionPackageClosure, wantClosure) {
-		t.Fatalf("candidate production package closure=%v want sorted %v", descriptor.ProductionPackageClosure, wantClosure)
+		t.Fatalf("shape-provider production package closure=%v want sorted %v", descriptor.ProductionPackageClosure, wantClosure)
 	}
 	if !slices.Equal(descriptor.ProspectiveGraphTargets, []string{"js/wasm", "linux/amd64", "windows/amd64"}) ||
 		descriptor.RequiredCGOEnabled {
@@ -120,10 +126,10 @@ func TestTextShapeCandidatePackageAndModuleReachabilityFrozen(t *testing.T) {
 	wantModules := map[string]classification{
 		"github.com/google/jsonschema-go":      {"current_test", "test_import", 1},
 		"github.com/google/go-cmp":             {"current_module_graph_only", "upstream_test", 0},
-		"github.com/go-text/typesetting":       {"candidate_production", "production_import", 8},
-		"golang.org/x/image":                   {"candidate_production_transitive", "production_import", 3},
-		"github.com/go-text/typesetting-utils": {"candidate_test_generate", "module_graph_only", 0},
-		"golang.org/x/text":                    {"candidate_module_graph_transitive", "module_graph_only", 0},
+		"github.com/go-text/typesetting":       {"current_production", "production_import", 8},
+		"golang.org/x/image":                   {"current_production_transitive", "production_import", 3},
+		"github.com/go-text/typesetting-utils": {"current_module_graph_only", "upstream_test_generate", 0},
+		"golang.org/x/text":                    {"current_module_graph_only", "module_graph_only", 0},
 	}
 	if len(descriptor.Modules) != len(wantModules) {
 		t.Fatalf("module count=%d want=%d", len(descriptor.Modules), len(wantModules))
@@ -249,7 +255,7 @@ func TestTextShapeUpstreamLegalBytesAreExact(t *testing.T) {
 	}
 }
 
-func TestTextShapeSBOMClassifiesCurrentAndCandidatePackages(t *testing.T) {
+func TestTextShapeProviderSBOMReachabilityAndRootProductionEdge(t *testing.T) {
 	root := cutlyModuleRoot(t)
 	descriptor := TextShapeCandidate()
 	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(descriptor.SBOMPath)))
@@ -259,8 +265,9 @@ func TestTextShapeSBOMClassifiesCurrentAndCandidatePackages(t *testing.T) {
 	var sbom struct {
 		SPDXVersion string `json:"spdxVersion"`
 		Packages    []struct {
-			Name    string `json:"name"`
-			Comment string `json:"comment"`
+			Name        string `json:"name"`
+			VersionInfo string `json:"versionInfo"`
+			Comment     string `json:"comment"`
 		} `json:"packages"`
 		Relationships []struct {
 			SPDXElementID    string `json:"spdxElementId"`
@@ -276,33 +283,48 @@ func TestTextShapeSBOMClassifiesCurrentAndCandidatePackages(t *testing.T) {
 		t.Fatalf("SBOM profile=%q want=%q", sbom.SPDXVersion, descriptor.SBOMProfile)
 	}
 	comments := make(map[string]string, len(sbom.Packages))
+	versions := make(map[string]string, len(sbom.Packages))
 	for _, value := range sbom.Packages {
 		comments[value.Name] = value.Comment
+		versions[value.Name] = value.VersionInfo
+	}
+	if versions["github.com/CutlyLab/Cutly"] != "unreleased-m2-shape-provider" {
+		t.Fatalf("SBOM Cutly shape-stage version=%q", versions["github.com/CutlyLab/Cutly"])
 	}
 	if !strings.Contains(comments["github.com/google/jsonschema-go"], "closure=current_test; reachability=test_import; linked_package_count=1") ||
 		!strings.Contains(comments["github.com/google/go-cmp"], "closure=current_module_graph_only; reachability=upstream_test; linked_package_count=0") ||
-		!strings.Contains(comments["github.com/go-text/typesetting"], "closure=candidate_production; reachability=production_import; linked_package_count=8") ||
-		!strings.Contains(comments["golang.org/x/image"], "closure=candidate_production_transitive; reachability=production_import; linked_package_count=3") ||
-		!strings.Contains(comments["github.com/go-text/typesetting-utils"], "closure=candidate_test_generate; reachability=module_graph_only; linked_package_count=0") ||
-		!strings.Contains(comments["golang.org/x/text"], "closure=candidate_module_graph_transitive; reachability=module_graph_only; linked_package_count=0") {
-		t.Fatalf("SBOM current/candidate classification drift: %+v", comments)
+		!strings.Contains(comments["github.com/go-text/typesetting"], "closure=current_production; reachability=production_import; linked_package_count=8") ||
+		!strings.Contains(comments["golang.org/x/image"], "closure=current_production_transitive; reachability=production_import; linked_package_count=3") ||
+		!strings.Contains(comments["github.com/go-text/typesetting-utils"], "closure=current_module_graph_only; reachability=upstream_test_generate; linked_package_count=0") ||
+		!strings.Contains(comments["golang.org/x/text"], "closure=current_module_graph_only; reachability=module_graph_only; linked_package_count=0") {
+		t.Fatalf("SBOM provider reachability classification drift: %+v", comments)
 	}
-	foundMVSOnly := false
+	foundRootProduction, foundMVSOnly := false, false
 	for _, relationship := range sbom.Relationships {
+		if relationship.SPDXElementID == "SPDXRef-Package-Cutly" &&
+			relationship.RelationshipType == "DEPENDS_ON" &&
+			relationship.RelatedElement == "SPDXRef-Package-GoTextTypesetting" &&
+			strings.Contains(relationship.Comment, "direct production dependency") &&
+			strings.Contains(relationship.Comment, "does not advertise final Text render capability") {
+			foundRootProduction = true
+		}
 		if relationship.SPDXElementID == "SPDXRef-Package-XImage" &&
 			relationship.RelationshipType == "DEPENDS_ON" &&
 			relationship.RelatedElement == "SPDXRef-Package-XText" &&
 			strings.Contains(relationship.Comment, "MVS-only") &&
-			strings.Contains(relationship.Comment, "neither module is currently linked") {
+			strings.Contains(relationship.Comment, "x/text linked_package_count remains zero") {
 			foundMVSOnly = true
 		}
+	}
+	if !foundRootProduction {
+		t.Fatalf("SBOM lacks Cutly -> go-text production relationship: %+v", sbom.Relationships)
 	}
 	if !foundMVSOnly {
 		t.Fatalf("SBOM lacks explicit x/image -> x/text MVS-only relationship: %+v", sbom.Relationships)
 	}
 }
 
-func TestTextShapeCandidateIsNotInCurrentGoModule(t *testing.T) {
+func TestTextShapeProviderDependenciesArePinnedInCurrentGoModule(t *testing.T) {
 	root := cutlyModuleRoot(t)
 	goMod, err := os.ReadFile(filepath.Join(root, "go.mod"))
 	if err != nil {
@@ -313,20 +335,21 @@ func TestTextShapeCandidateIsNotInCurrentGoModule(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !bytes.Contains(goMod, []byte("github.com/google/jsonschema-go v0.4.2")) ||
+		!bytes.Contains(goMod, []byte("github.com/go-text/typesetting v0.3.5")) ||
+		!bytes.Contains(goMod, []byte("golang.org/x/image v0.23.0 // indirect")) ||
 		!bytes.Contains(goSum, []byte("github.com/google/go-cmp v0.7.0")) {
 		t.Fatal("current Cutly module graph no longer matches the compiled dependency lock")
 	}
 	descriptor := TextShapeCandidate()
 	assertLockedFileHash(t, root, "go.mod", descriptor.CutlyGoModSHA256)
 	assertLockedFileHash(t, root, "go.sum", descriptor.CutlyGoSumSHA256)
-	for _, forbidden := range []string{
+	for _, required := range []string{
 		"github.com/go-text/typesetting",
 		"github.com/go-text/typesetting-utils",
 		"golang.org/x/image",
-		"golang.org/x/text",
 	} {
-		if bytes.Contains(goMod, []byte(forbidden)) || bytes.Contains(goSum, []byte(forbidden)) {
-			t.Fatalf("candidate dependency %q was added before provider acceptance", forbidden)
+		if !bytes.Contains(goSum, []byte(required)) {
+			t.Fatalf("linked provider dependency %q is absent from go.sum", required)
 		}
 	}
 }

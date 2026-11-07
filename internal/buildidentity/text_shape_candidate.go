@@ -19,7 +19,7 @@ const (
 	TextShapeCandidateProfileV1     = "cutly.build-identity.text-shape-candidate.v1"
 	TextShapeProviderProfileV1      = "cutly.shape.go-text-harfbuzz-static-glyf.v1"
 	TextShapeFingerprintProfileV1   = "cutly.hash.sha256.text-shape-dependency-lock-json.v1"
-	TextShapeCandidateStatus        = "candidate_only_not_linked"
+	TextShapeCandidateStatus        = "linked_shape_provider_not_text_render_capability"
 )
 
 var (
@@ -35,9 +35,9 @@ type SupplementalNoticeIdentity struct {
 	SHA256 string `json:"sha256"`
 }
 
-// GoModuleIdentity freezes one module in either the current Cutly test graph or the prospective
-// text-shaping graph. LinkedPackageCount is scoped by Closure: for candidate closures it counts
-// packages in the prospective selected-package graph, not packages currently linked into Cutly.
+// GoModuleIdentity freezes one module in the current Cutly test, production, or MVS graph.
+// LinkedPackageCount counts external packages reachable from Cutly's selected package roots for
+// the recorded closure; module-graph-only requirements have count zero.
 type GoModuleIdentity struct {
 	Role                string                       `json:"role"`
 	Closure             string                       `json:"closure"`
@@ -72,9 +72,9 @@ type EmbeddedSourceIdentity struct {
 	NoticeSHA256   string `json:"notice_sha256"`
 }
 
-// TextShapeCandidateDescriptor is a source/dependency lock, not a capability descriptor. In
-// particular, CapabilityAdvertised and ImportedByCutly are frozen false until the strict font
-// parser, shape adapter, document binding, live validation, and conformance corpus exist.
+// TextShapeCandidateDescriptor is the legacy-named host-owned source/dependency lock for the
+// linked shape-only provider, not a Text render capability descriptor. CapabilityAdvertised stays
+// false until document binding, rasterization, paint, and the complete Text gate exist.
 type TextShapeCandidateDescriptor struct {
 	SchemaVersion            int                      `json:"schema_version"`
 	Profile                  string                   `json:"profile"`
@@ -115,14 +115,20 @@ var textShapeCandidateV1 = TextShapeCandidateDescriptor{
 	FingerprintProfile:      TextShapeFingerprintProfileV1,
 	FingerprintSemantics:    "SHA-256 over u64be(len(fingerprint_profile)) || exact fingerprint-profile UTF-8 bytes || u64be(len(canonical_descriptor)) || the exact minified encoding/json bytes of this map-free ordered descriptor; encode as lowercase hex with the sha256: prefix.",
 	CutlyGoDirective:        "1.25.0",
-	CutlyGoModSHA256:        "sha256:f20f4d5b630a2f46f0b219f14016b800070ac0bfd160e5579ab3c1e71e8e9b41",
-	CutlyGoSumSHA256:        "sha256:b61db8beac67f229108e1b53bb521046f9a9a2dd7e01a9435711c8956bd001fa",
+	CutlyGoModSHA256:        "sha256:1f0dce67b6e7acd380f5ec82b19c2f579ebba1f967c89d5cc80bc0ba44d690a3",
+	CutlyGoSumSHA256:        "sha256:5e005275891e9a3c81d2add959d38e72e888627396d067cd1226405ea50f18be",
 	RequiredCGOEnabled:      false,
-	ImportedByCutly:         false,
+	ImportedByCutly:         true,
 	CapabilityAdvertised:    false,
 	NoticeManifestPath:      "deps/THIRD_PARTY_NOTICES.md",
 	ProspectiveGraphTargets: []string{"js/wasm", "linux/amd64", "windows/amd64"},
-	SelectedPackageRoots:    []string{"github.com/go-text/typesetting/font", "github.com/go-text/typesetting/harfbuzz"},
+	SelectedPackageRoots: []string{
+		"github.com/go-text/typesetting/font",
+		"github.com/go-text/typesetting/font/opentype",
+		"github.com/go-text/typesetting/font/opentype/tables",
+		"github.com/go-text/typesetting/harfbuzz",
+		"github.com/go-text/typesetting/language",
+	},
 	ProductionPackageClosure: []string{
 		"github.com/go-text/typesetting/font",
 		"github.com/go-text/typesetting/font/cff",
@@ -136,17 +142,17 @@ var textShapeCandidateV1 = TextShapeCandidateDescriptor{
 		"golang.org/x/image/tiff",
 		"golang.org/x/image/tiff/lzw",
 	},
-	PackageClosureSemantics:  "The selected roots and strictly sorted external package closure were resolved prospectively for CGO_ENABLED=0 on linux/amd64, windows/amd64, and js/wasm and were identical for those targets. linked_package_count is scoped to this prospective closure for candidate modules and does not mean the packages are currently linked into Cutly. Module-graph-only requirements have count zero. The production provider must re-resolve and refreeze its actual package and module graphs for its exact toolchain, targets, build tags, and imports before advertising capability.",
-	NoticeManifestSHA256:     "sha256:063600087dcb1af630fcd28ad42f08d4018db3b102d6c1bfccf6b31de19fd15d",
+	PackageClosureSemantics:  "The selected roots are Cutly's exact direct external production imports for the shape-only provider. The strictly sorted external package closure was resolved with CGO_ENABLED=0 and is identical on linux/amd64, windows/amd64, and js/wasm. linked_package_count is the actual selected production-package count for linked modules; module-graph-only requirements have count zero. Any toolchain, target, build-tag, import, or version change must re-resolve and refreeze this closure before release.",
+	NoticeManifestSHA256:     "sha256:55e2bbf7760b5f88b5ff7b9cec62bad8de2138a0dcbb39b1b9f40dc1f3a3be0d",
 	SBOMProfile:              "SPDX-2.3",
 	SBOMPath:                 "deps/sbom.spdx.json",
-	SBOMSHA256:               "sha256:a95bd7bb95f2ae3df6f1ea1770ad13cd2437737ad418852ef8b8fbc7e1871809",
-	SBOMSemantics:            "The deterministic SPDX-2.3 source SBOM records the current Cutly test/module graph and candidate-only text-shape production/module graph separately. Package comments mirror closure, reachability, and linked_package_count, while dependency-lock.json is normative. Candidate presence is review evidence, not an assertion that it is currently imported, linked, shipped, or capability-ready.",
-	DependencySemantics:      "This lock records the complete current Cutly Go module graph as current_test or current_module_graph_only, binds the exact go.mod and go.sum bytes, and freezes the prospective pure-Go shaping package and MVS module graphs without adding them to cutly/go.mod or a production binary. candidate_production and candidate_production_transitive contain packages reachable from the selected font/harfbuzz roots; candidate_test_generate and candidate_module_graph_transitive are module-graph-only with no selected packages. Module sums and origins were resolved through the Go module proxy. Any current dependency change must explicitly refreeze both module-file hashes and this descriptor. A production provider must re-audit the actually imported package graph and may not silently upgrade any version, sum, commit, build tag, or embedded HarfBuzz base.",
-	BuildBindingSemantics:    "cutly_go_directive is the go directive in this source module, not evidence of the toolchain that built a binary. The dependency fingerprint is platform-independent and covers this complete canonical descriptor. It deliberately does not claim an actual Go toolchain, GOOS, GOARCH, build tags, or executable digest. A production provider receipt must combine this fingerprint with host-owned source, exact toolchain and target/build evidence; documents, Agents and render requests may not supply or override it.",
+	SBOMSHA256:               "sha256:4af62e59d68bef2cc298d3c337437d763e02f60810a610ec972f9e9dec0e7af2",
+	SBOMSemantics:            "The deterministic SPDX-2.3 source SBOM records Cutly's current test, linked shape-provider production, and module-graph-only dependencies separately. Package comments mirror closure, reachability, and linked_package_count, while dependency-lock.json is normative. Dependency presence proves supply-chain identity only and does not advertise final Text render capability.",
+	DependencySemantics:      "This lock records the complete current Cutly Go module graph, binds the exact go.mod and go.sum bytes, and freezes the linked pure-Go shaping package closure and MVS module graph. current_production and current_production_transitive contain packages reachable from the selected provider imports; current_module_graph_only entries have no selected packages. Module sums and origins were resolved through the Go module proxy. Any dependency change must explicitly refreeze both module-file hashes and this descriptor; no version, sum, commit, build tag, or embedded HarfBuzz base may silently drift.",
+	BuildBindingSemantics:    "cutly_go_directive is the go directive in this source module, not evidence of the toolchain that built a binary. The dependency fingerprint is platform-independent and covers this complete canonical descriptor. Each ShapeProvider receipt combines this compiled fingerprint with the receipt-exact live LayoutGraph, OutlineSet, and font content hashes; documents, Agents and render requests cannot supply or override it. Executable digest and signing remain release concerns.",
 	LicenseSemantics:         "Cutly preserves MIT for the current jsonschema-go test import and BSD-3-Clause for its go-cmp module-graph-only upstream test requirement, selects BSD-3-Clause for the dual-licensed go-text modules, preserves BSD-3-Clause plus the upstream PATENTS grant for golang.org/x/image and golang.org/x/text, and preserves the separate MIT notice for the embedded HarfBuzz port. Primary and supplemental notice paths and exact checked-in upstream byte hashes are part of this lock.",
-	CapabilitySemantics:      "This T1b0 record is supply-chain evidence only. It cannot advertise cutly.text.pinned-font-viewport-px.v2 or prove font parsing, cmap validation, GSUB/GPOS execution, RTL traversal canonicalization, outline extraction, layout, rasterization, cancellation, or live document/font binding.",
-	ExcludedResponsibilities: "Downloading modules at runtime, resolving floating tags, trusting system fonts, accepting a caller-provided fingerprint, executing shaping, parsing hostile fonts, emitting a text surface, signing receipts, and enabling any backend capability are outside this candidate lock.",
+	CapabilitySemantics:      "This lock supports a linked, pinned static-glyf ShapeProvider that privately parses the already validated font lineage, executes go-text HarfBuzz shaping, rejects missing glyphs, and normalizes RTL records. It still cannot advertise cutly.text.pinned-font-viewport-px.v2 or prove document assembly, outline rasterization, paint, compositing, encoding, or final backend capability.",
+	ExcludedResponsibilities: "Downloading modules at runtime, resolving floating tags, trusting system fonts, accepting a caller-provided fingerprint, font fallback, document assembly, rasterization, emitting a text surface, signing receipts, and enabling final Text/backend capability are outside this dependency lock.",
 	Modules: []GoModuleIdentity{
 		{
 			Role: "schema_validation_test", Closure: "current_test",
@@ -173,7 +179,7 @@ var textShapeCandidateV1 = TextShapeCandidateDescriptor{
 			NoticeSHA256: "sha256:17b5d209ba8f9684257ecfcff87df6ceda6194143a8fbd074f29727cff6f0c40",
 		},
 		{
-			Role: "shape_runtime_candidate", Closure: "candidate_production",
+			Role: "shape_runtime", Closure: "current_production",
 			Reachability: "production_import", LinkedPackageCount: 8,
 			ModulePath: "github.com/go-text/typesetting", Version: "v0.3.5",
 			ModuleSum: "h1:XZPUooClHY0Vf/rFyUyuPRNEkawARaFzLMQcXLSEyPk=",
@@ -185,7 +191,7 @@ var textShapeCandidateV1 = TextShapeCandidateDescriptor{
 			NoticeSHA256: "sha256:6b1bf94c77d7faa0ce94f8745595bfaf4c404f8b3873f5c2ce55ca15f8e44eca",
 		},
 		{
-			Role: "shape_runtime_candidate_transitive", Closure: "candidate_production_transitive",
+			Role: "shape_runtime_transitive", Closure: "current_production_transitive",
 			Reachability: "production_import", LinkedPackageCount: 3,
 			ModulePath: "golang.org/x/image", Version: "v0.23.0",
 			ModuleSum: "h1:HseQ7c2OpPKTPVzNjG5fwJsOTCiiwS4QdsYi5XU6H68=",
@@ -201,8 +207,8 @@ var textShapeCandidateV1 = TextShapeCandidateDescriptor{
 			}},
 		},
 		{
-			Role: "shape_upstream_test_generate", Closure: "candidate_test_generate",
-			Reachability: "module_graph_only", LinkedPackageCount: 0,
+			Role: "shape_upstream_test_generate", Closure: "current_module_graph_only",
+			Reachability: "upstream_test_generate", LinkedPackageCount: 0,
 			ModulePath: "github.com/go-text/typesetting-utils",
 			Version:    "v0.0.0-20260419141703-4ffe8874dabc",
 			ModuleSum:  "h1:8FGo2It5K75XkavhTiCKExUfVaVDS1feBnLCru5qeoY=",
@@ -214,7 +220,7 @@ var textShapeCandidateV1 = TextShapeCandidateDescriptor{
 			NoticeSHA256: "sha256:a1e5b69b12756927cfe3b3a373df05a55c1aaa69c6b259e06d8746257cb17d06",
 		},
 		{
-			Role: "shape_module_graph_transitive", Closure: "candidate_module_graph_transitive",
+			Role: "shape_module_graph_transitive", Closure: "current_module_graph_only",
 			Reachability: "module_graph_only", LinkedPackageCount: 0,
 			ModulePath: "golang.org/x/text", Version: "v0.21.0",
 			ModuleSum: "h1:zyQAAkrwaneQ066sspRyJaG9VNi/YJ1NfzcGB3hZ/qo=",
