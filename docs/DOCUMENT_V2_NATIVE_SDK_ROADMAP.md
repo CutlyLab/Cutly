@@ -23,7 +23,8 @@ explicitly deferred, not passed, and must be tracked separately from standalone 
 
 Begin with S1 and preserve the stage dependency gates. Save independently reviewable, tested
 boundaries as local commits; no push, package publication, tag, or daemon default switch is implied.
-Current implementation and acceptance evidence is recorded in `DOCUMENT_V2_S1_EVIDENCE.md`.
+S1 acceptance evidence is recorded in `DOCUMENT_V2_S1_EVIDENCE.md`; the active S2 ledger is
+`DOCUMENT_V2_S2_EVIDENCE.md`.
 
 ## 1. Purpose and completion boundary
 
@@ -960,12 +961,15 @@ Deferred capabilities must produce stable preflight rejection. They must not be 
 
 ## 18. Next-agent start instructions
 
-1. Confirm the branch contains `0a19a82` and the worktree has no unexpected staged files.
-2. Read this document, the owner complete plan and the existing protocol patterns before editing.
-3. Start with S1 only: create `core/renderplanv2` additively; do not alter RenderPlan v3.
-4. First freeze the profile/type/schema and a minimal canonical fixture, then implement Resolve and
-   verification against that contract.
-5. Commit in the S1 sequence, run the full S1 exit gate and obtain a read-only audit before S2.
+1. Confirm branch `codex/video-sdk-core` and inspect staged/unstaged files; preserve unrelated work.
+   Use the standalone baseline above rather than requiring the absent historical `0a19a82`.
+2. Read this document, the current stage evidence and existing protocol patterns before editing.
+   Manyfy work and consumer tests remain deferred by the owner.
+3. S1 is complete; continue S2 additively in `render/api`. Preserve legacy manifest/request/job,
+   output/evidence contracts and all existing canonical fixtures.
+4. Freeze concrete profiles/types, strict codecs, schemas and minimal canonical fixtures together;
+   separate structural identity verification from host-owned execution authorization.
+5. Run the full S2 exit gate and obtain independent read-only audit closure before S3.
 6. Update the status table below after each stage, including commit IDs and evidence paths.
 
 ## 19. Handoff status table
@@ -974,7 +978,7 @@ Deferred capabilities must produce stable preflight rejection. They must not be 
 | --- | --- | --- |
 | S0 Surface bridge | Complete | `0a19a82`; P0/P1/P2=0 |
 | S1 Document v2 plan | Complete | `74edd28`, `9db5e5f`, `5e64a65`; final gates passed with documented wasm subset; independent P0/P1/P2 closure in `DOCUMENT_V2_S1_EVIDENCE.md` |
-| S2 Manifest/request v2 | Not started | Depends on verified S1 |
+| S2 Manifest/request v2 | In progress: contract design | S1 exit recorded in `99fccaf`; see `DOCUMENT_V2_S2_EVIDENCE.md`; S3 remains gated on S2 audit closure |
 | S3 Prepared v2 | Not started | Depends on verified S1/S2 |
 | S4 Provider bundle | Not started | Depends on restart-safe S3 |
 | S5 Assembler/Evidence v2 | Not started | Depends on real S4 providers |
