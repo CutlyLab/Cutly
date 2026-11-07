@@ -182,8 +182,12 @@ func DecodeExecutionManifestV2(raw []byte) (ExecutionManifestV2, error) {
 	if err := strictRawV2(raw, &m, MaxManifestBytesV2); err != nil {
 		return ExecutionManifestV2{}, err
 	}
-	if _, err := VerifyExecutionManifestV2(m); err != nil {
+	canonical, err := CanonicalExecutionManifestV2(m)
+	if err != nil {
 		return ExecutionManifestV2{}, err
+	}
+	if !bytes.Equal(raw, canonical) {
+		return ExecutionManifestV2{}, invalidV2("noncanonical typed manifest")
 	}
 	return m, nil
 }
@@ -262,8 +266,12 @@ func DecodeRenderRequestV2(raw []byte) (RenderRequestV2, error) {
 	if err := strictRawV2(raw, &r, MaxRequestBytesV2); err != nil {
 		return RenderRequestV2{}, err
 	}
-	if _, err := VerifyRenderRequestV2(r); err != nil {
+	canonical, err := CanonicalRenderRequestV2(r)
+	if err != nil {
 		return RenderRequestV2{}, err
+	}
+	if !bytes.Equal(raw, canonical) {
+		return RenderRequestV2{}, fmt.Errorf("%w: noncanonical typed request", ErrRenderRequestInvalidV2)
 	}
 	return r, nil
 }
