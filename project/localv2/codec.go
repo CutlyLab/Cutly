@@ -28,7 +28,7 @@ func canonical(value any, maximum uint64) ([]byte, error) {
 	if uint64(len(raw)) > maximum {
 		return nil, ErrLimit
 	}
-	if err := scan(raw); err != nil {
+	if err := scan(raw, value); err != nil {
 		return nil, err
 	}
 	if err := wirejson.Validate(raw); err != nil {
@@ -156,7 +156,7 @@ func decodeCanonical(raw []byte, target any, maximum uint64) error {
 	if uint64(len(raw)) > maximum {
 		return ErrLimit
 	}
-	if err := scan(raw); err != nil {
+	if err := scan(raw, target); err != nil {
 		return err
 	}
 	if err := wirejson.Decode(raw, target); err != nil {

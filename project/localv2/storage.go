@@ -554,6 +554,13 @@ func (x *session) load(ctx context.Context) error {
 	if !exists || digest(docRaw) != state.DocumentHash {
 		return ErrConflict
 	}
+	currentSnapshot, err := x.object(ctx, "documents", state.DocumentHash, x.service.limits.MaxDocumentBytes)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(currentSnapshot, docRaw) {
+		return ErrInvalid
+	}
 	doc, err := decodeDocument(docRaw, x.service.limits.MaxDocumentBytes)
 	if err != nil {
 		return err

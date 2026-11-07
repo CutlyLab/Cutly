@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"reflect"
 	"unicode/utf8"
+
+	"github.com/CutlyLab/Cutly/core/transactionv2"
 )
 
 // Scan the wire before shape decoding allocates whole arrays/maps. Generic
@@ -65,7 +68,26 @@ func unpairedSurrogate(raw []byte) bool {
 	return false
 }
 
-func scan(raw []byte) error {
+// Array limits apply only to typed model paths, never coincidental names in
+// open metadata. JSON pointer paths through arrays use a literal * component.
+func scan(raw []byte, model any) error {
+	t := reflect.TypeOf(model)
+	for t != nil && t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+	caps := map[string]uint64{}
+	switch t {
+	case reflect.TypeOf(transactionv2.Transaction{}):
+		caps["/operations"] = DefaultLimits().MaxOperations
+	case reflect.TypeOf(PlanRecord{}):
+		caps["/transaction/operations"] = DefaultLimits().MaxOperations
+		caps["/inverse/operations"] = DefaultLimits().MaxOperations
+	case reflect.TypeOf(CommitRecord{}):
+		caps["/inverse/operations"] = DefaultLimits().MaxOperations
+	case reflect.TypeOf(diskState{}):
+		caps["/plans"] = DefaultLimits().MaxPlans
+		caps["/history"] = DefaultLimits().MaxHistory
+	}
 	if !utf8.Valid(raw) || unpairedSurrogate(raw) {
 		return ErrInvalid
 	}
@@ -73,7 +95,7 @@ func scan(raw []byte) error {
 	decoder.UseNumber()
 	nodes := 0
 	var value func(int, string) error
-	value = func(depth int, key string) error {
+	value = func(depth int, path string) error {
 		nodes++
 		if depth > 64 || nodes > 2_000_000 {
 			return ErrLimit
@@ -96,7 +118,7 @@ func scan(raw []byte) error {
 				if !ok {
 					return ErrInvalid
 				}
-				if err := value(depth+1, s); err != nil {
+				if err := value(depth+1, path+"/"+s); err != nil {
 					return err
 				}
 			}
@@ -108,13 +130,8 @@ func scan(raw []byte) error {
 		}
 		if delimiter == '[' {
 			maximum := uint64(2_000_000)
-			switch key {
-			case "operations":
-				maximum = DefaultLimits().MaxOperations
-			case "plans":
-				maximum = DefaultLimits().MaxPlans
-			case "history":
-				maximum = DefaultLimits().MaxHistory
+			if cap, ok := caps[path]; ok {
+				maximum = cap
 			}
 			var count uint64
 			for decoder.More() {
@@ -122,7 +139,7 @@ func scan(raw []byte) error {
 				if count > maximum {
 					return ErrLimit
 				}
-				if err := value(depth+1, ""); err != nil {
+				if err := value(depth+1, path+"/*"); err != nil {
 					return err
 				}
 			}
