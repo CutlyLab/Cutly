@@ -52,7 +52,7 @@ jobs:
           go vet ./...
           go test -race -count=1 ./...
           npm --prefix sdk/typescript test
-          npm --prefix sdk/typescript pack --dry-run --cache "${RUNNER_TEMP}/cutly-npm-cache"
+          npm --prefix sdk/typescript run pack:check -- --cache "${RUNNER_TEMP}/cutly-npm-cache"
 
   build:
     name: Build ${{ matrix.goos }}/${{ matrix.goarch }}

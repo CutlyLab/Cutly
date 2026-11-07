@@ -48,7 +48,7 @@ go mod tidy -diff
 go vet ./...
 go test -race -count=1 ./...
 npm --prefix sdk/typescript test
-npm --prefix sdk/typescript pack --dry-run
+npm --prefix sdk/typescript run pack:check
 ```
 
 The full race suite includes the production HTTP mux and public Go SDK path:

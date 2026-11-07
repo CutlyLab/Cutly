@@ -60,7 +60,7 @@ Do not tag the incubation repository.
    go vet ./...
    go test -race -count=1 ./...
    npm --prefix sdk/typescript test
-   npm --prefix sdk/typescript pack --dry-run
+   npm --prefix sdk/typescript run pack:check
    ```
 
 4. Create and push the exact root-module tag, for example

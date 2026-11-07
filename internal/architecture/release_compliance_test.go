@@ -15,6 +15,9 @@ func TestCommandArchivesIncludeDependencyRecords(t *testing.T) {
 		t.Fatal(err)
 	}
 	workflow := string(raw)
+	if !strings.Contains(workflow, `npm --prefix sdk/typescript run pack:check`) {
+		t.Error("release verification must run the package-local dry-run script")
+	}
 	for _, line := range []string{
 		`mkdir -p "${output}/deps/licenses"`,
 		`cp deps/THIRD_PARTY_NOTICES.md deps/sbom.spdx.json deps/dependency-lock.json "${output}/deps/"`,
