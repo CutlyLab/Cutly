@@ -203,6 +203,35 @@ The existing visual compile entry uses whole-Document capability preflight and r
 A mixed restart proof must not solve this by pruning the Document or using separate Documents. The
 additive domain-scoped evaluator will validate and hash the full original Document while compiling
 only the checked selected domain, retaining original indexes and exact requested-range guards.
-Legacy global capability checks and fixtures remain unchanged. Downstream native domain compile
+Legacy global capability checks and fixtures remain unchanged. The evaluator implementation is
+frozen with focused normal/race/vet gates passing. Independent reviewer `a91a0421285b64f18`
+accepted this evaluator slice with no verified P0/P1/P2. An independent exact `big.Rat` overlap
+oracle covered both domains across 84 negative/fractional scopes, omitted closures and exclusive
+endpoints; overlay normal three times and race once passed. Evaluator/documentv2/conformance/
+visualcompositor/audiograph normal, evaluator/documentv2/conformance race, vet and domain tests ten
+times also passed. Optional extracted legacy-baseline parity was skipped after a worktree command
+guard refusal; compatibility evidence is the direct nil-scope refactor diff and existing fixtures,
+not execution of an extracted baseline.
+
+Audited SHA-256: `domain_snapshot.go` =
+`04a76cba3cdc84b90ca7d2d7ca3e2382a0ccbea9d0b53b8c207d6bd494438a16`,
+`domain_snapshot_test.go` = `3939157f3d6215d9a0c84239872a89a07d3204a6a1ee10c5255df89ada9bf41f`,
+`program.go` = `165cddefd2ce25285013d92b823ced89cf896bdf64ab71edaa00b4f5b3cabb04`.
+It requires exact same-domain positive-overlap clip closure, rejects transitions on the selected
+timeline, bounds admission across the full Document/scope/offered-capabilities inputs, and returns
+no unrestricted evaluator Program. It does not perform resource IO or claim hard cancellation
+latency inside synchronous validation/canonicalization.
+
+Downstream native domain compile
 entries, the host-owned reconstruction factory, explicit semantic/native identity bridge and a real
 same-Document PNG/vector/pinned-text/WAV subprocess restart proof remain to be implemented and audited.
+
+## Current integration gates
+
+After the resource ownership repair and evaluator implementation freeze, task `b26sb68lz` passed
+`go test ./... -count=1`, `go test -race ./... -count=1`, `go vet ./...`, `go mod tidy -diff` and
+`git diff --check`. Task `bsoheo0th` passed Linux/amd64, Linux/386 and Windows/amd64 full-package
+compile-only checks plus the documented js/wasm protocol/core subset with the new resource package.
+These are current-worktree integration results, including preserved deferred archive changes and the
+not-yet-audited evaluator slice, not fixed-clean-revision release or S3 exit evidence. No real 32-bit,
+Windows or wasm execution is claimed. The accepted resource slice is committed at `1f33036`.

@@ -991,7 +991,7 @@ Deferred capabilities must produce stable preflight rejection. They must not be 
 | S0 Surface bridge | Complete | `0a19a82`; P0/P1/P2=0 |
 | S1 Document v2 plan | Complete | `74edd28`, `9db5e5f`, `5e64a65`; final gates passed with documented wasm subset; independent P0/P1/P2 closure in `DOCUMENT_V2_S1_EVIDENCE.md` |
 | S2 Manifest/request v2 | Complete | `5bb222d`, `8cb6172`, `66a0b0b`, `0951ad3`, repairs `9d9f96d`; final full Go/target gates passed; independent P0/P1/P2=0; see `DOCUMENT_V2_S2_EVIDENCE.md` |
-| S3 Prepared v2 | In progress: implementation | Job-free authorization `8dab14d` and WAV observation `1859d5c` independently accepted; portable codec/schema checkpoint `3f98f91` tested but independent repair closure pending; storage slice independently accepted after committed-inode fsync repair; concrete receipts and restart reconstruction unfinished. See `DOCUMENT_V2_S3_EVIDENCE.md` |
+| S3 Prepared v2 | In progress: implementation | Job-free authorization `8dab14d` and WAV observation `1859d5c` independently accepted; portable codec/schema checkpoint `3f98f91` tested but independent repair closure pending; storage `6b14835` and concrete resource receipts `1f33036` independently accepted after fsync/ownership repairs; domain evaluator independently accepted; native domain compiler integration and mixed restart reconstruction unfinished. See `DOCUMENT_V2_S3_EVIDENCE.md` |
 | S4 Provider bundle | Not started | Depends on restart-safe S3 |
 | S5 Assembler/Evidence v2 | Not started | Depends on real S4 providers |
 | S6 Production runtime/cache | Not started | Depends on S3-S5 |
