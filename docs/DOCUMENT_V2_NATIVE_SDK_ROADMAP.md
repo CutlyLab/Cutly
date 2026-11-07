@@ -714,7 +714,7 @@ root, symlink/integrity rejection, exclusive lock, revision/hash CAS, journaled 
 publication, idempotent replay, crash recovery, immutable history and persisted inverse. Reuse
 hardened primitives where appropriate, but do not alias v1 records whose wire semantics differ.
 
-Add `schemas/cutly.transaction.document-v2.v2.schema.json` and any versioned project
+Add `schemas/cutly.document-v2-transaction.v2.schema.json` and any versioned project
 plan/commit/history schemas with unique `$id` values. Register valid instances offline and freeze
 valid, invalid and canonical fixtures plus hashes. Test every operation and inverse, multi-operation
 atomicity, stable IDs, stale revision, duplicate ID/idempotency conflict, invalid property type,
@@ -983,6 +983,6 @@ Deferred capabilities must produce stable preflight rejection. They must not be 
 | S4 Provider bundle | Not started | Depends on restart-safe S3 |
 | S5 Assembler/Evidence v2 | Not started | Depends on real S4 providers |
 | S6 Production runtime/cache | Not started | Depends on S3-S5 |
-| S7a Mutation/project core | In progress: independent edit/project lane | See `DOCUMENT_V2_S7A_EVIDENCE.md`; does not waive blocked S2 audit; required before public edit APIs |
+| S7a Mutation/project core | Complete | `ea396d3`: typed core, durable store, schemas/fixtures, final full/race/vet/cross-target gates and independent reviews; see `DOCUMENT_V2_S7A_EVIDENCE.md`; S2 remains blocked |
 | S7 Public SDK/CLI/Agent | Not started | Depends on S6 and audited S7a |
 | S8 Player/UI/release | Not started | Depends on S6/S7 and parallel release lane |

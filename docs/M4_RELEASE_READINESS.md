@@ -10,7 +10,8 @@ The active broad M4 implementation is tracked in
 [`DOCUMENT_V2_NATIVE_SDK_ROADMAP.md`](DOCUMENT_V2_NATIVE_SDK_ROADMAP.md), not by the
 restricted RC matrix below. As of 2026-11-07, S1 is accepted, S2 implementation has
 passed local gates but lacks final independent audit closure, and the independent
-S7a mutation/project lane is in progress. S3–S8 broad runtime/product acceptance
+S7a mutation/project prerequisite is complete and independently reviewed at `ea396d3`
+(see `DOCUMENT_V2_S7A_EVIDENCE.md`). S3–S8 broad runtime/product acceptance
 is not complete. Manyfy integration remains explicitly deferred by the owner.
 
 Release automation in source is not execution evidence. The signed-runtime
