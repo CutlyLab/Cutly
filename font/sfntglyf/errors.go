@@ -32,6 +32,8 @@ var (
 	ErrShapeInputInvalid      = errors.New("sfntglyf: shape input is invalid")
 	ErrShapeMissingGlyph      = errors.New("sfntglyf: shape input has a missing glyph")
 	ErrShapeInvariant         = errors.New("sfntglyf: shape provider invariant failed")
+	ErrLayoutSourceInvalid    = errors.New("sfntglyf: layout source binding is invalid")
+	ErrLayoutSourceInvariant  = errors.New("sfntglyf: layout source invariant failed")
 	ErrResourceLimit          = errors.New("sfntglyf: resource limit exceeded")
 	ErrAllocationFailed       = errors.New("sfntglyf: allocation failed")
 	ErrInvariantFailed        = errors.New("sfntglyf: internal invariant failed")
@@ -76,6 +78,10 @@ const (
 	CodeShapeLimitsInvalid      ErrorCode = "FONT.GO_TEXT_SHAPE_V1.LIMITS_INVALID"
 	CodeShapeResourceLimit      ErrorCode = "FONT.GO_TEXT_SHAPE_V1.RESOURCE_LIMIT"
 	CodeShapeInvariant          ErrorCode = "FONT.GO_TEXT_SHAPE_V1.INVARIANT_FAILED"
+	CodeLayoutSourceInvalid     ErrorCode = "FONT.STATIC_GLYF_LAYOUT_SOURCE_V1.INVALID"
+	CodeLayoutSourceLimits      ErrorCode = "FONT.STATIC_GLYF_LAYOUT_SOURCE_V1.LIMITS_INVALID"
+	CodeLayoutSourceResource    ErrorCode = "FONT.STATIC_GLYF_LAYOUT_SOURCE_V1.RESOURCE_LIMIT"
+	CodeLayoutSourceInvariant   ErrorCode = "FONT.STATIC_GLYF_LAYOUT_SOURCE_V1.INVARIANT_FAILED"
 	CodeResourceLimit           ErrorCode = "FONT.SFNT_GLYF_CORE_V1.RESOURCE_LIMIT"
 	CodeAllocationFailed        ErrorCode = "FONT.SFNT_GLYF_CORE_V1.ALLOCATION_FAILED"
 	CodeInvariantFailed         ErrorCode = "FONT.SFNT_GLYF_CORE_V1.INVARIANT_FAILED"
