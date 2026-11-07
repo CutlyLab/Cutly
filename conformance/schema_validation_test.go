@@ -81,6 +81,10 @@ func TestSchemasCompileAndValidateInstances(t *testing.T) {
 		"cutly.document.v1.schema.json":                       "conformance/fixtures/document-v1.valid.json",
 		"cutly.document.v2.schema.json":                       "conformance/fixtures/document-v2.valid.json",
 		"cutly.transaction.v1.schema.json":                    "conformance/fixtures/transaction-v1.valid.json",
+		"cutly.document-v2-transaction.v2.schema.json":        "conformance/fixtures/document-v2-transaction-numbers.valid.json",
+		"cutly.project-plan.document-v2.v2.schema.json":       "conformance/fixtures/document-v2-project-plan.valid.json",
+		"cutly.project-commit.document-v2.v2.schema.json":     "conformance/fixtures/document-v2-project-commit.valid.json",
+		"cutly.project-history.document-v2.v2.schema.json":    "conformance/fixtures/document-v2-project-history.valid.json",
 		"cutly.render-plan.v2.schema.json":                    "conformance/fixtures/render-plan-v2.valid.json",
 		"cutly.render-plan.v3.schema.json":                    "conformance/fixtures/render-plan-v3.valid.json",
 		"cutly.document-v2-render-plan.v1.schema.json":        "conformance/fixtures/document-v2-render-plan-gap.valid.json",
@@ -112,6 +116,15 @@ func TestSchemasCompileAndValidateInstances(t *testing.T) {
 		}
 		if name == "cutly.document.v2.schema.json" {
 			testDocumentV2OptionalZeroParity(t, resolved[name], raw)
+		}
+
+		if name == "cutly.project-history.document-v2.v2.schema.json" {
+			// History is an array of closed commit records, not an object envelope.
+			// The project-specific test exercises its record-level hostile corpus.
+			if err := resolved[name].Validate(map[string]any{"__cutly_unknown_field": true}); err == nil {
+				t.Fatal("project history schema accepted an object envelope")
+			}
+			continue
 		}
 
 		object, ok := instance.(map[string]any)
@@ -432,7 +445,7 @@ func mutateCriticalSchemaInvalid(t *testing.T, name string, value map[string]any
 		value["assets"].([]any)[0].(map[string]any)["content_hash"] = "sha256:invalid"
 	case "cutly.document.v2.schema.json":
 		value["assets"].([]any)[4].(map[string]any)["text"].(map[string]any)["fill"].(map[string]any)["r"] = 0.5
-	case "cutly.transaction.v1.schema.json":
+	case "cutly.transaction.v1.schema.json", "cutly.document-v2-transaction.v2.schema.json", "cutly.project-plan.document-v2.v2.schema.json", "cutly.project-commit.document-v2.v2.schema.json":
 		value["schema_version"] = int64(999)
 	case "cutly.render-plan.v2.schema.json":
 		value["schema_version"] = int64(3)

@@ -14,7 +14,19 @@ violates a stronger v2 invariant receives stable diagnostics and no partial resu
 for example, URI-only fonts that cannot satisfy v2 font pinning and track/asset combinations that
 v1 did not constrain. Representable unknown properties use a digest-bound legacy envelope and
 remain capability-gated rather than being silently dropped.
-- `cutly.transaction.v1.schema.json` describes the seven currently implemented typed operations.
+- `cutly.transaction.v1.schema.json` describes the seven legacy typed operations.
+- `cutly.document-v2-transaction.v2.schema.json` describes the additive 32-kind typed editing
+  union in `core/transactionv2`. Its `cutly.transaction.document-v2.number-preserving.v2` profile
+  preserves authored JSON number tokens in metadata, annotations and extensions; do not run it
+  through the integer-only canonicalizer. Decode accepts exact canonical bytes only. Typed
+  inverses carry target-postimage predicates; revision/hash CAS and final Document validation
+  remain core checks, not schema claims.
+- `cutly.project-plan.document-v2.v2.schema.json`, `cutly.project-commit.document-v2.v2.schema.json`
+  and `cutly.project-history.document-v2.v2.schema.json` describe additive local v2 project records
+  and a bounded history page. Record codecs verify intrinsic bindings; the project service must
+  additionally recompute candidates/inverses and verify the persisted history chain. These records
+  do not authorize actions merely because their hashes match. The independent S7a audit remains
+  required before public SDK/Agent edit integration.
 - `cutly.render-plan.v3.schema.json` describes the current backend-neutral semantic plan, including
   composition clocks, compiled tick ranges, required capabilities and URI-free resources.
 - `cutly.render-plan.v2.schema.json` is retained only as a legacy wire reference. Execution code
