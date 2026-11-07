@@ -158,6 +158,51 @@ Parent verification after codec repair:
 - `bsn3r392o`: full prepared/preparev2/wavsource normal/race/vet passed after the storage fsync repair;
   Linux/386 and Windows/amd64 prepared compile-only checks and diff check passed.
 
-The portable codec, schema and new fixed gap/number fixtures are a tested implementation checkpoint,
-not independent codec acceptance. Existing fixture paths were not modified. Storage, concrete
-resource projections and reconstruction remain separate unfinished boundaries. S3 stays open.
+The portable codec, schema and new fixed gap/number fixtures are a tested implementation checkpoint
+at `3f98f91`, not independent codec acceptance. Existing fixture paths were not modified. The
+independently accepted storage slice is committed at `6b14835`. Concrete resource projections and
+reconstruction remain separate unfinished boundaries. S3 stays open.
+
+## Concrete resource inspection projections (slice independently accepted)
+
+New `render/resourceidentityv2` separates independently authorized expected bindings, actual opaque
+native inspections, and decoded wire identity claims. PNG and font wrappers prehash admitted bytes
+before native decoding/parsing. Static receipts bind pinned descriptor fingerprints and complete
+portable PNG or sfnt/glyf core facts; audio reuses `wavsource.Inspect` and `probe.Fingerprint` without
+inventing a new probe format. Font core inspection is explicitly not outline or shaping authority.
+Live surfaces/fonts, host limits and locator permissions are not serialized. Native font workload
+counters use fixed byte/count arithmetic rather than architecture-dependent allocation measurements.
+
+The implementer passed package normal/race/vet. New schema/fixed corpus uses existing native PNG and
+font vectors without changing their source bytes; its author passed conformance and resource package
+normal tests. Independent resource-only review is in progress. Parent task `bzhet8sh7` failed before
+running tests because active evaluator prerequisite edits temporarily referenced `DomainScope` before
+its type file existed; it provides no successful resource gate evidence. The synchronized rerun
+`b39c5e2jv` passed resource/conformance normal/race/vet, resource Linux/386 and js/wasm compile-only
+checks, and diff check. These gates preceded independent ownership-defect closure.
+
+Independent resource review found a P1 ownership defect: `Surface()` and `Font()` returned pointers
+to the actual retained exported structs. An external caller could assign a replacement or zero value
+through that pointer, changing the native resource while `Check` still accepted the old fingerprint.
+Private struct fields do not prevent whole-struct assignment. The reviewer reproduced both cases
+using external-package tests. The implementation now returns owned struct-header copies over private
+immutable storage, with permanent external-package replacement/zero/concurrent regression tests.
+Its focused normal/race/vet gates passed. Independent reviewer `a3a86eeaed4f2d6fa` inverted the
+external-package reproduction and verified the repair, closing this P1 with no remaining verified
+P0/P1/P2 in the resource slice. Audited `model.go` SHA-256:
+`6860e3624634ad1387af1a7a7725170db14281d9313a19b84bde11348fefa1dd`.
+
+Independent checks also passed cancellation/panic exhaustion across all 91 PNG and 237 font observed
+context checkpoints, 8 MiB wrong-hash allocation-before-parser tests, package normal/race/vet,
+targeted schema/corpus/inventory tests, and Linux/386 compile-only checks. These accept only the
+resource identity/inspection boundary, not locator authority, font shaping or restart reconstruction.
+
+## Mixed-document reconstruction prerequisite (in progress)
+
+The existing visual compile entry uses whole-Document capability preflight and rejects authored audio.
+A mixed restart proof must not solve this by pruning the Document or using separate Documents. The
+additive domain-scoped evaluator will validate and hash the full original Document while compiling
+only the checked selected domain, retaining original indexes and exact requested-range guards.
+Legacy global capability checks and fixtures remain unchanged. Downstream native domain compile
+entries, the host-owned reconstruction factory, explicit semantic/native identity bridge and a real
+same-Document PNG/vector/pinned-text/WAV subprocess restart proof remain to be implemented and audited.

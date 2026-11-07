@@ -91,6 +91,7 @@ func TestSchemasCompileAndValidateInstances(t *testing.T) {
 		"cutly.document-v2-execution-manifest.v2.schema.json":   "conformance/fixtures/document-v2-execution-gap-silence.valid.json",
 		"cutly.document-v2-render-request.v2.schema.json":       "conformance/fixtures/document-v2-render-request-fractional.valid.json",
 		"cutly.prepared-environment.document-v2.v2.schema.json": "conformance/fixtures/document-v2-prepared-numbers.valid.json",
+		"cutly.resource-inspection.document-v2.v2.schema.json":  "conformance/fixtures/document-v2-resource-inspection-png.valid.json",
 		"cutly.probe-manifest.v1.schema.json":                   "media/probe/testdata/probe-manifest-v1.valid.json",
 		"cutly.media-runtime-bundle.v1.schema.json":             "conformance/fixtures/media-runtime-bundle-v1.valid.json",
 		"cutly.execution-manifest.v1.schema.json":               "render/api/testdata/execution-manifest-v1.valid.json",
@@ -460,6 +461,8 @@ func mutateCriticalSchemaInvalid(t *testing.T, name string, value map[string]any
 		value["execution_manifest"].(map[string]any)["output"].(map[string]any)["frame_clock"] = nil
 	case "cutly.prepared-environment.document-v2.v2.schema.json":
 		value["document"] = nil
+	case "cutly.resource-inspection.document-v2.v2.schema.json":
+		value["png"] = nil
 	case "cutly.probe-manifest.v1.schema.json":
 		value["resource"].(map[string]any)["content_hash"] = "sha256:invalid"
 	case "cutly.media-runtime-bundle.v1.schema.json":
