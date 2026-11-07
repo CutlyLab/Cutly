@@ -136,10 +136,12 @@ type SnapshotTimeline struct {
 // FrozenSnapshot is a compact read-only discovery index. Its fields are private and every slice
 // accessor returns a defensive deep copy, so callers cannot mutate Program through aliases.
 type FrozenSnapshot struct {
-	documentHash  string
-	canonicalSize uint64
-	assets        []SnapshotAsset
-	timelines     []SnapshotTimeline
+	documentHash    string
+	canonicalSize   uint64
+	assets          []SnapshotAsset
+	textSourceSlots []int
+	textSources     []frozenTextSourceRecord
+	timelines       []SnapshotTimeline
 }
 
 func (value *FrozenSnapshot) DocumentHash() string {
@@ -231,7 +233,11 @@ func CompileSnapshot(
 }
 
 func buildFrozenSnapshot(ctx context.Context, frozen documentv2.Document, hash string, canonicalSize uint64) (*FrozenSnapshot, error) {
-	result := &FrozenSnapshot{documentHash: hash, canonicalSize: canonicalSize, assets: make([]SnapshotAsset, len(frozen.Assets)), timelines: make([]SnapshotTimeline, len(frozen.Timelines))}
+	result := &FrozenSnapshot{
+		documentHash: hash, canonicalSize: canonicalSize,
+		assets:    make([]SnapshotAsset, len(frozen.Assets)),
+		timelines: make([]SnapshotTimeline, len(frozen.Timelines)),
+	}
 	var visits uint64
 	checkpoint := func() error {
 		visits++
@@ -241,8 +247,22 @@ func buildFrozenSnapshot(ctx context.Context, frozen documentv2.Document, hash s
 		return nil
 	}
 	assetIndexes := make(map[documentv2.ID]int, len(frozen.Assets))
+	textSourceCount := 0
 	for index, asset := range frozen.Assets {
+		if err := checkpoint(); err != nil {
+			return nil, err
+		}
 		assetIndexes[asset.ID] = index
+		if asset.Text != nil && asset.Text.Profile == documentv2.TextProfilePinnedFontViewportPXV2 {
+			if textSourceCount == int(^uint(0)>>1) {
+				return nil, errors.New("evaluator: frozen text source count exceeds platform int")
+			}
+			textSourceCount++
+		}
+	}
+	if textSourceCount > 0 {
+		result.textSourceSlots = make([]int, len(result.assets))
+		result.textSources = make([]frozenTextSourceRecord, 0, textSourceCount)
 	}
 	var sourceBytes uint64
 	for index, asset := range frozen.Assets {
@@ -254,18 +274,6 @@ func buildFrozenSnapshot(ctx context.Context, frozen documentv2.Document, hash s
 			if err := ctx.Err(); err != nil {
 				return nil, err
 			}
-			encoded, err := videoedit.CanonicalJSON(*asset.Text)
-			if err != nil {
-				return nil, err
-			}
-			if err := ctx.Err(); err != nil {
-				return nil, err
-			}
-			if uint64(len(encoded)) > math.MaxUint64-sourceBytes || sourceBytes+uint64(len(encoded)) > canonicalSize {
-				return nil, ErrCanonicalDocumentLimit
-			}
-			sourceBytes += uint64(len(encoded))
-			entry.CanonicalSourceBytes = uint64(len(encoded))
 			entry.TextProfile = asset.Text.Profile
 			entry.TextFontAssetID = asset.Text.FontAssetID
 			fontIndex, exists := assetIndexes[asset.Text.FontAssetID]
@@ -291,62 +299,30 @@ func buildFrozenSnapshot(ctx context.Context, frozen documentv2.Document, hash s
 			entry.TextUnicodeValidationTableHash = documentv2.TextUnicodeValidationTableHashV1
 			entry.TextSemanticHashProfile = documentv2.TextSemanticHashProfileV1
 			entry.TextLayoutInputHashProfile = documentv2.TextLayoutInputHashProfileV1
-			semantic := snapshotTextSemanticEnvelope{
-				SchemaVersion: 1, Profile: documentv2.TextSemanticHashProfileV1,
-				TextProfile: asset.Text.Profile, EvaluatorProfile: documentv2.EvaluatorTextPinnedFontViewportPXV2,
-				FontProfile: documentv2.TextFontProfileStaticGlyfV1, RunInputProfile: documentv2.TextRunInputProfileV1,
-				LayoutProfile: documentv2.TextLayoutProfileUnwrappedV1, OutlineProfile: documentv2.TextOutlineProfileQ26_6V1,
-				RasterProfile: documentv2.TextRasterProfileSupersample8x8V1, CoverageHashProfile: documentv2.TextCoverageHashProfileV1,
-				PaintProfile:                 documentv2.TextPaintProfileRGBA16SRGBV1,
-				LayoutInputHashProfile:       documentv2.TextLayoutInputHashProfileV1,
-				UnicodeVersion:               documentv2.TextUnicodeDataVersionV1,
-				UnicodeValidationProfile:     documentv2.TextUnicodeValidationTableProfileV1,
-				UnicodeValidationHashProfile: documentv2.TextUnicodeValidationTableHashProfileV1,
-				UnicodeValidationTableHash:   documentv2.TextUnicodeValidationTableHashV1,
-				FontContentHash:              entry.TextFontContentHash, Source: *asset.Text,
-			}
-			if err := ctx.Err(); err != nil {
-				return nil, err
-			}
-			semanticRaw, err := videoedit.CanonicalJSON(semantic)
+			identity, err := buildFrozenTextIdentity(ctx, *asset.Text, entry.TextFontContentHash)
 			if err != nil {
 				return nil, err
 			}
-			if err := ctx.Err(); err != nil {
-				return nil, err
+			if identity.canonicalSourceBytes > math.MaxUint64-sourceBytes ||
+				sourceBytes+identity.canonicalSourceBytes > canonicalSize {
+				return nil, ErrCanonicalDocumentLimit
 			}
-			layoutInput := snapshotTextLayoutInputEnvelope{
-				SchemaVersion: 1, Profile: documentv2.TextLayoutInputHashProfileV1,
-				TextProfile: asset.Text.Profile, EvaluatorProfile: documentv2.EvaluatorTextPinnedFontViewportPXV2,
-				FontProfile: documentv2.TextFontProfileStaticGlyfV1, RunInputProfile: documentv2.TextRunInputProfileV1,
-				LayoutProfile: documentv2.TextLayoutProfileUnwrappedV1, OutlineProfile: documentv2.TextOutlineProfileQ26_6V1,
-				RasterProfile: documentv2.TextRasterProfileSupersample8x8V1, CoverageHashProfile: documentv2.TextCoverageHashProfileV1,
-				UnicodeVersion:               documentv2.TextUnicodeDataVersionV1,
-				UnicodeValidationProfile:     documentv2.TextUnicodeValidationTableProfileV1,
-				UnicodeValidationHashProfile: documentv2.TextUnicodeValidationTableHashProfileV1,
-				UnicodeValidationTableHash:   documentv2.TextUnicodeValidationTableHashV1,
-				FontContentHash:              entry.TextFontContentHash, Text: asset.Text.Text, FontSize: asset.Text.FontSize,
-				LineHeight: *asset.Text.LineHeight, Viewport: *asset.Text.Viewport, Language: asset.Text.Language,
-				Script: asset.Text.Script, Direction: asset.Text.Direction, Alignment: asset.Text.Alignment,
-			}
-			if err := ctx.Err(); err != nil {
-				return nil, err
-			}
-			layoutInputRaw, err := videoedit.CanonicalJSON(layoutInput)
+			sourceBytes += identity.canonicalSourceBytes
+			entry.CanonicalSourceBytes = identity.canonicalSourceBytes
+			entry.TextSemanticHash = identity.textSemanticHash
+			entry.TextLayoutInputHash = identity.layoutInputHash
+			record, err := makeFrozenTextSourceRecord(
+				ctx, hash, canonicalSize, asset, index, frozen.Assets[fontIndex], fontIndex, *asset.Text, identity,
+			)
 			if err != nil {
 				return nil, err
 			}
-			if err := ctx.Err(); err != nil {
-				return nil, err
+			if result.textSourceSlots == nil || result.textSourceSlots[index] != 0 ||
+				len(result.textSources) >= cap(result.textSources) || len(result.textSources) >= len(result.assets) {
+				return nil, errors.New("evaluator: frozen text source slot invariant failed")
 			}
-			entry.TextSemanticHash = canonicalDocumentHash(semanticRaw)
-			if err := ctx.Err(); err != nil {
-				return nil, err
-			}
-			entry.TextLayoutInputHash = canonicalDocumentHash(layoutInputRaw)
-			if err := ctx.Err(); err != nil {
-				return nil, err
-			}
+			result.textSources = append(result.textSources, record)
+			result.textSourceSlots[index] = len(result.textSources)
 		}
 		if asset.Vector != nil {
 			if err := ctx.Err(); err != nil {
