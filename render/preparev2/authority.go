@@ -177,12 +177,8 @@ func (a *Authority) Authorize(ctx context.Context, document documentv2.Document,
 	if err = renderplanv2.VerifyAgainstDocument(ctx, owned.Plan, document); err != nil {
 		return result, err
 	}
-	if owned.Manifest.ProviderBuild != a.provider {
-		return result, denied("provider executable identity mismatch")
-	}
-	pins, err := canonical(hostPins{owned.Manifest.CompilerBuild, owned.Manifest.EvaluatorBuild, owned.Manifest.Backend, owned.Manifest.MediaRuntime})
-	if err != nil || !bytes.Equal(pins, []byte(a.pins)) {
-		return result, denied("host build/backend/media identity mismatch")
+	if err = a.comparePins(owned.Manifest); err != nil {
+		return result, err
 	}
 	if err = a.verifyResources(ctx, owned.Manifest); err != nil {
 		return result, err
@@ -191,6 +187,17 @@ func (a *Authority) Authorize(ctx context.Context, document documentv2.Document,
 		return result, err
 	}
 	return AuthorizedRequest{verified: verified}, nil
+}
+
+func (a *Authority) comparePins(manifest renderapi.ExecutionManifestV2) error {
+	if manifest.ProviderBuild != a.provider {
+		return denied("provider executable identity mismatch")
+	}
+	pins, err := canonical(hostPins{manifest.CompilerBuild, manifest.EvaluatorBuild, manifest.Backend, manifest.MediaRuntime})
+	if err != nil || !bytes.Equal(pins, []byte(a.pins)) {
+		return denied("host build/backend/media identity mismatch")
+	}
+	return nil
 }
 
 func (a *Authority) verifyResources(ctx context.Context, manifest renderapi.ExecutionManifestV2) error {
