@@ -16,6 +16,7 @@ import (
 	cachekey "github.com/CutlyLab/Cutly/cache/key"
 	"github.com/CutlyLab/Cutly/core/videoedit"
 	renderapi "github.com/CutlyLab/Cutly/render/api"
+	"github.com/CutlyLab/Cutly/render/chunkplan"
 	"github.com/CutlyLab/Cutly/render/prepared"
 	renderuntime "github.com/CutlyLab/Cutly/render/runtime"
 	"github.com/CutlyLab/Cutly/render/stagedag"
@@ -50,14 +51,27 @@ type contentStore interface {
 // Config makes the complete backend render's peak admission estimate explicit.
 // DiskBytes must cover the backend's own encoding/publication scratch plus the
 // recovery snapshot, the CAS payload scratch, and CAS publication metadata.
-// StageLimits in the enclosing runtime must admit both values.
+// In reference mode MemoryBytes must additionally cover the dependency receipt,
+// descriptor, aggregate and request validation allowance computed from the
+// exact chunk count. StageLimits in the enclosing runtime must admit both
+// values.
 type Config struct {
 	Environments EnvironmentSource
-	Backends     BackendResolver
-	CAS          *cas.Store
-	MemoryBytes  uint64
-	DiskBytes    uint64
-	Progress     renderapi.EventSink
+	// Backends is the legacy whole-job resolver. It is required when
+	// ReferenceChunks is nil and is never called in reference mode.
+	Backends BackendResolver
+	// ReferenceAssembler is a host-owned, locator-free assembler boundary.
+	// It is required exactly when ReferenceChunks is configured. Reference
+	// execution never passes an ExecutionManifest to Backends and never calls
+	// the legacy resolver.
+	ReferenceAssembler ChunkAssemblerBackend
+	CAS                *cas.Store
+	MemoryBytes        uint64
+	DiskBytes          uint64
+	Progress           renderapi.EventSink
+	// ReferenceChunks opts into the pre-codec reference surface/PCM profile.
+	// Nil preserves the restricted hard-cut whole-job backend path exactly.
+	ReferenceChunks *ReferenceChunkConfig
 }
 
 // Service implements the three runtime seams as one immutable unit so plan,
@@ -65,20 +79,34 @@ type Config struct {
 type Service struct {
 	environments EnvironmentSource
 	backends     BackendResolver
+	assembler    ChunkAssemblerBackend
 	cas          contentStore
 	memoryBytes  uint64
 	diskBytes    uint64
 	progress     renderapi.EventSink
+	reference    *referenceChunks
 }
 
 func New(config Config) (*Service, error) {
-	if nilLike(config.Environments) || nilLike(config.Backends) || config.CAS == nil ||
+	if nilLike(config.Environments) || config.CAS == nil ||
 		config.MemoryBytes == 0 || config.DiskBytes == 0 {
 		return nil, ErrConfiguration
 	}
+	reference, err := normalizeReferenceChunks(config.ReferenceChunks)
+	if err != nil {
+		return nil, err
+	}
+	if reference == nil {
+		if nilLike(config.Backends) {
+			return nil, ErrConfiguration
+		}
+	} else if nilLike(config.ReferenceAssembler) {
+		return nil, fmt.Errorf("%w: reference chunk profile requires a host-owned chunk assembler", ErrConfiguration)
+	}
 	return &Service{
-		environments: config.Environments, backends: config.Backends, cas: config.CAS,
+		environments: config.Environments, backends: config.Backends, assembler: config.ReferenceAssembler, cas: config.CAS,
 		memoryBytes: config.MemoryBytes, diskBytes: config.DiskBytes, progress: config.Progress,
+		reference: reference,
 	}, nil
 }
 
@@ -87,7 +115,7 @@ func (service *Service) ResolveStagePlan(ctx context.Context, job renderapi.Rend
 	if err != nil {
 		return stagedag.Plan{}, err
 	}
-	return service.buildPlan(request.Job)
+	return service.buildPlan(ctx, request.Job)
 }
 
 func (service *Service) ResolveExecutor(ctx context.Context, job renderapi.RenderJob, supplied stagedag.Plan) (stagedag.Executor, error) {
@@ -98,7 +126,7 @@ func (service *Service) ResolveExecutor(ctx context.Context, job renderapi.Rende
 	if err != nil {
 		return nil, err
 	}
-	want, err := service.buildPlan(job)
+	want, err := service.buildPlan(ctx, job)
 	if err != nil {
 		return nil, err
 	}
@@ -106,13 +134,34 @@ func (service *Service) ResolveExecutor(ctx context.Context, job renderapi.Rende
 	if err != nil {
 		return nil, err
 	}
-	backend, err := service.resolveBackend(ctx, environment)
+	resolved := &executor{
+		service: service, request: request, plan: frozen, reference: service.reference,
+		taskIndex: make(map[string]int, len(frozen.Tasks)),
+	}
+	for index, task := range frozen.Tasks {
+		resolved.taskIndex[task.ID] = index
+	}
+	if service.reference == nil {
+		backend, resolveErr := service.resolveBackend(ctx, environment)
+		if resolveErr != nil {
+			return nil, resolveErr
+		}
+		resolved.backend = backend
+		resolved.publishTask = frozen.Tasks[0]
+		return resolved, nil
+	}
+	assembler, err := service.resolveReferenceAssembler(ctx, environment.Manifest.Backend)
 	if err != nil {
 		return nil, err
 	}
-	return &executor{
-		service: service, request: request, task: frozen.Tasks[0], backend: backend,
-	}, nil
+	resolved.assembler = assembler
+	chunks, err := service.buildReferenceChunkPlan(ctx, request.Job)
+	if err != nil {
+		return nil, err
+	}
+	resolved.chunkPlan = &chunks
+	resolved.publishTask = frozen.Tasks[len(frozen.Tasks)-1]
+	return resolved, nil
 }
 
 func (service *Service) ResolveArtifact(ctx context.Context, job renderapi.RenderJob, supplied stagedag.Plan, result stagedag.RunResult) (renderapi.RenderArtifact, error) {
@@ -123,7 +172,7 @@ func (service *Service) ResolveArtifact(ctx context.Context, job renderapi.Rende
 	if err != nil {
 		return renderapi.RenderArtifact{}, err
 	}
-	want, err := service.buildPlan(job)
+	want, err := service.buildPlan(ctx, job)
 	if err != nil {
 		return renderapi.RenderArtifact{}, err
 	}
@@ -131,11 +180,47 @@ func (service *Service) ResolveArtifact(ctx context.Context, job renderapi.Rende
 	if err != nil {
 		return renderapi.RenderArtifact{}, err
 	}
+	if service.reference != nil {
+		required, ok := referenceFinalValidationMemory(len(plan.Tasks) - 1)
+		if !ok || plan.Tasks[len(plan.Tasks)-1].Resources.MemoryBytes < required {
+			return renderapi.RenderArtifact{}, fmt.Errorf("%w: reference artifact validation memory budget", ErrArtifact)
+		}
+	}
 	checkpoint, err := validateResult(plan, result)
 	if err != nil {
 		return renderapi.RenderArtifact{}, err
 	}
-	receiptArtifact, err := decodeReceipt(checkpoint.Output.Receipt)
+	var receiptArtifact renderapi.RenderArtifact
+	var assemblyRequest *ChunkAssemblyRequest
+	if service.reference == nil {
+		receiptArtifact, err = decodeReceipt(checkpoint.Output.Receipt)
+	} else {
+		var binding aggregateBinding
+		receiptArtifact, binding, err = decodeReferencePublishReceipt(checkpoint.Output.Receipt)
+		if err == nil {
+			chunks, buildErr := service.buildReferenceChunkPlan(ctx, request.Job)
+			if buildErr != nil {
+				return renderapi.RenderArtifact{}, buildErr
+			}
+			selection, selectionErr := service.selectReferenceChunks(ctx, chunks, result.Checkpoints[:len(chunks.Tasks)])
+			if selectionErr != nil || len(selection.Missing) != 0 || len(selection.Rejected) != 0 || len(selection.Ready) != len(chunks.Tasks) {
+				return renderapi.RenderArtifact{}, errors.Join(fmt.Errorf("%w: reference chunk set is incomplete", ErrArtifact), selectionErr)
+			}
+			videoReceipts, audioReceipts, videoDescriptors, audioDescriptors, receiptErr := receiptsFromCheckpoints(chunks, selection.Ready, service.reference.executableDigest)
+			if receiptErr != nil {
+				return renderapi.RenderArtifact{}, receiptErr
+			}
+			actualBinding, aggregateErr := aggregateReceipts(ctx, request.Job, videoReceipts, audioReceipts)
+			if aggregateErr != nil || !exactReferenceBinding(actualBinding, binding) {
+				return renderapi.RenderArtifact{}, errors.Join(fmt.Errorf("%w: final receipt aggregate root differs from chunks", ErrArtifact), aggregateErr)
+			}
+			assembled, assemblyErr := newChunkAssemblyRequest(request, service.reference.executableDigest, binding, audioDescriptors, videoDescriptors)
+			if assemblyErr != nil {
+				return renderapi.RenderArtifact{}, assemblyErr
+			}
+			assemblyRequest = &assembled
+		}
+	}
 	if err != nil {
 		return renderapi.RenderArtifact{}, err
 	}
@@ -145,14 +230,25 @@ func (service *Service) ResolveArtifact(ctx context.Context, job renderapi.Rende
 	if receiptArtifact.ContentHash != checkpoint.Output.ContentHash || receiptArtifact.SizeBytes != checkpoint.Output.SizeBytes {
 		return renderapi.RenderArtifact{}, fmt.Errorf("%w: receipt and checkpoint media identities differ", ErrArtifact)
 	}
-	if err := service.verifyCAS(ctx, plan.Tasks[0], checkpoint); err != nil {
+	publishTask := plan.Tasks[len(plan.Tasks)-1]
+	if err := service.verifyCAS(ctx, publishTask, checkpoint); err != nil {
 		return renderapi.RenderArtifact{}, err
 	}
-	backend, err := service.resolveBackend(ctx, environment)
-	if err != nil {
-		return renderapi.RenderArtifact{}, err
+	var actual renderapi.RenderArtifact
+	var found bool
+	if assemblyRequest == nil {
+		backend, resolveErr := service.resolveBackend(ctx, environment)
+		if resolveErr != nil {
+			return renderapi.RenderArtifact{}, resolveErr
+		}
+		actual, found, err = safeInspectPublished(ctx, backend, request)
+	} else {
+		assembler, resolveErr := service.resolveReferenceAssembler(ctx, environment.Manifest.Backend)
+		if resolveErr != nil {
+			return renderapi.RenderArtifact{}, resolveErr
+		}
+		actual, found, err = safeInspectChunkAssembly(ctx, assembler, *assemblyRequest)
 	}
-	actual, found, err := safeInspectPublished(ctx, backend, request)
 	if err != nil {
 		return renderapi.RenderArtifact{}, wrapError(ErrArtifact, "inspect published artifact", err)
 	}
@@ -165,7 +261,10 @@ func (service *Service) ResolveArtifact(ctx context.Context, job renderapi.Rende
 	return actual, nil
 }
 
-func (service *Service) buildPlan(job renderapi.RenderJob) (stagedag.Plan, error) {
+func (service *Service) buildPlan(ctx context.Context, job renderapi.RenderJob) (stagedag.Plan, error) {
+	if service.reference != nil {
+		return service.buildReferencePlan(ctx, job)
+	}
 	stageBinding, err := stagedag.StageBindingInput(renderapi.StagePublish)
 	if err != nil {
 		return stagedag.Plan{}, errors.Join(ErrPlan, err)
@@ -263,6 +362,9 @@ func (service *Service) resolveRequest(ctx context.Context, job renderapi.Render
 	if err := renderapi.ValidateRenderRequest(request); err != nil {
 		return prepared.Environment{}, renderapi.RenderRequest{}, wrapError(ErrEnvironment, "request binding", err)
 	}
+	if service.reference != nil && service.reference.executableDigest != request.Manifest.EvaluatorBuild {
+		return prepared.Environment{}, renderapi.RenderRequest{}, fmt.Errorf("%w: reference provider digest must equal the frozen evaluator build", ErrEnvironment)
+	}
 	return environment, request, nil
 }
 
@@ -327,6 +429,31 @@ func (service *Service) resolveBackend(ctx context.Context, environment prepared
 	return backend, nil
 }
 
+// resolveReferenceAssembler validates a directly configured host-owned
+// assembler against the locator-free backend identity frozen in the manifest.
+// Unlike resolveBackend, it deliberately has no resolver call and never hands
+// Resources, Fonts, or their locators to backend-selection code.
+func (service *Service) resolveReferenceAssembler(ctx context.Context, expected videoedit.BackendCapabilities) (ChunkAssemblerBackend, error) {
+	if service == nil || ctx == nil || nilLike(service.assembler) {
+		return nil, fmt.Errorf("%w: host-owned reference assembler is required", ErrBackend)
+	}
+	identifier, err := safeBackendID(service.assembler)
+	if err != nil {
+		return nil, wrapError(ErrBackend, "reference assembler ID", err)
+	}
+	capabilities, err := safeCapabilities(ctx, service.assembler)
+	if err != nil {
+		return nil, wrapError(ErrBackend, "reference assembler capabilities", err)
+	}
+	if identifier != expected.BackendID || !reflect.DeepEqual(
+		videoedit.CanonicalBackendCapabilities(capabilities),
+		videoedit.CanonicalBackendCapabilities(expected),
+	) {
+		return nil, fmt.Errorf("%w: live reference assembler identity does not match the frozen locator-free backend identity", ErrBackend)
+	}
+	return service.assembler, nil
+}
+
 func exactPlan(supplied, wanted stagedag.Plan) (stagedag.Plan, error) {
 	suppliedRaw, err := stagedag.CanonicalPlan(supplied)
 	if err != nil {
@@ -347,18 +474,24 @@ func exactPlan(supplied, wanted stagedag.Plan) (stagedag.Plan, error) {
 }
 
 func validateResult(plan stagedag.Plan, result stagedag.RunResult) (stagedag.Checkpoint, error) {
-	if len(plan.Tasks) != 1 || len(result.Checkpoints) != 1 || result.Retries != 0 ||
-		!((result.Executed == 1 && result.CacheHits == 0) || (result.Executed == 0 && result.CacheHits == 1)) {
+	if len(plan.Tasks) == 0 || len(result.Checkpoints) != len(plan.Tasks) || result.Retries != 0 ||
+		result.Executed < 0 || result.CacheHits < 0 || result.Executed+result.CacheHits != len(plan.Tasks) {
 		return stagedag.Checkpoint{}, fmt.Errorf("%w: run result shape", ErrArtifact)
 	}
-	checkpoint := result.Checkpoints[0]
-	if err := stagedag.ValidateCheckpoint(plan, plan.Tasks[0], checkpoint); err != nil {
-		return stagedag.Checkpoint{}, errors.Join(ErrArtifact, err)
+	for index, task := range plan.Tasks {
+		checkpoint := result.Checkpoints[index]
+		if _, err := stagedag.CanonicalCheckpoint(checkpoint); err != nil {
+			return stagedag.Checkpoint{}, errors.Join(ErrArtifact, err)
+		}
+		if checkpoint.JobID != plan.JobID || checkpoint.PlanFingerprint != plan.PlanFingerprint ||
+			checkpoint.ExecutionManifestFingerprint != plan.ExecutionManifestFingerprint ||
+			checkpoint.TaskID != task.ID || checkpoint.Stage != task.Stage || checkpoint.TaskProfile != task.Profile ||
+			checkpoint.CacheKey != task.CacheKey || !rangesEqual(checkpoint.FrameRange, task.FrameRange) ||
+			!rangesEqual(checkpoint.SampleRange, task.SampleRange) || checkpoint.AttemptCount != 1 {
+			return stagedag.Checkpoint{}, fmt.Errorf("%w: checkpoint/task binding", ErrArtifact)
+		}
 	}
-	if checkpoint.AttemptCount != 1 {
-		return stagedag.Checkpoint{}, fmt.Errorf("%w: publish checkpoint attempt count must be one", ErrArtifact)
-	}
-	return checkpoint, nil
+	return result.Checkpoints[len(result.Checkpoints)-1], nil
 }
 
 func validateArtifactBinding(artifact renderapi.RenderArtifact, request renderapi.RenderRequest) error {
@@ -406,10 +539,15 @@ func (service *Service) verifyCAS(ctx context.Context, task stagedag.Task, check
 }
 
 type executor struct {
-	service *Service
-	request renderapi.RenderRequest
-	task    stagedag.Task
-	backend Backend
+	service     *Service
+	request     renderapi.RenderRequest
+	plan        stagedag.Plan
+	publishTask stagedag.Task
+	backend     Backend
+	assembler   ChunkAssemblerBackend
+	reference   *referenceChunks
+	chunkPlan   *chunkplan.Plan
+	taskIndex   map[string]int
 }
 
 func (executor *executor) Execute(ctx context.Context, task stagedag.Task, dependencies []stagedag.Dependency) (stagedag.StageOutput, error) {
@@ -419,36 +557,86 @@ func (executor *executor) Execute(ctx context.Context, task stagedag.Task, depen
 	if err := ctx.Err(); err != nil {
 		return stagedag.StageOutput{}, err
 	}
-	if len(dependencies) != 0 || !reflect.DeepEqual(task, executor.task) {
-		return stagedag.StageOutput{}, fmt.Errorf("%w: executor received another task or dependencies", ErrExecution)
+	index, found := executor.taskIndex[task.ID]
+	if !found || index < 0 || index >= len(executor.plan.Tasks) || !reflect.DeepEqual(task, executor.plan.Tasks[index]) {
+		return stagedag.StageOutput{}, fmt.Errorf("%w: executor received another task", ErrExecution)
 	}
-	return executor.execute(ctx, task)
-}
-
-func (executor *executor) execute(ctx context.Context, task stagedag.Task) (output stagedag.StageOutput, returnErr error) {
-	artifact, found, err := safeInspectPublished(ctx, executor.backend, executor.request)
-	if err != nil {
-		return stagedag.StageOutput{}, wrapError(ErrExecution, "inspect recovery state", err)
+	if task.Profile == chunkplan.VideoStageProfileV1 || task.Profile == chunkplan.AudioStageProfileV1 {
+		if len(dependencies) != 0 {
+			return stagedag.StageOutput{}, fmt.Errorf("%w: chunk task received dependencies", ErrExecution)
+		}
+		return executor.executeChunk(ctx, task)
 	}
-	var rendered renderapi.RenderArtifact
-	if !found {
-		if err := preflightForRender(ctx, executor.backend, executor.request); err != nil {
+	if !reflect.DeepEqual(task, executor.publishTask) {
+		return stagedag.StageOutput{}, fmt.Errorf("%w: unsupported task profile", ErrExecution)
+	}
+	var assembly *validatedChunkAssembly
+	if executor.reference == nil {
+		if len(dependencies) != 0 {
+			return stagedag.StageOutput{}, fmt.Errorf("%w: legacy publish received dependencies", ErrExecution)
+		}
+	} else {
+		value, err := executor.validateChunkDependencies(ctx, dependencies)
+		if err != nil {
 			return stagedag.StageOutput{}, err
 		}
-		rendered, err = safeRender(ctx, executor.backend, executor.request, executor.service.progress)
+		assembly = value
+	}
+	return executor.execute(ctx, task, assembly)
+}
+
+func (executor *executor) execute(ctx context.Context, task stagedag.Task, assembly *validatedChunkAssembly) (output stagedag.StageOutput, returnErr error) {
+	var artifact renderapi.RenderArtifact
+	var found bool
+	var err error
+	if assembly == nil {
+		artifact, found, err = safeInspectPublished(ctx, executor.backend, executor.request)
+		if err != nil {
+			return stagedag.StageOutput{}, wrapError(ErrExecution, "inspect recovery state", err)
+		}
+		if !found {
+			if err := preflightForRender(ctx, executor.backend, executor.request); err != nil {
+				return stagedag.StageOutput{}, err
+			}
+			rendered, renderErr := safeRender(ctx, executor.backend, executor.request, executor.service.progress)
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return stagedag.StageOutput{}, ctxErr
+			}
+			var inspectErr error
+			artifact, found, inspectErr = safeInspectPublished(ctx, executor.backend, executor.request)
+			if inspectErr != nil || !found {
+				return stagedag.StageOutput{}, errors.Join(fmt.Errorf("%w: render did not leave a valid publication", ErrExecution), renderErr, inspectErr)
+			}
+			if renderErr == nil && !reflect.DeepEqual(rendered, artifact) {
+				return stagedag.StageOutput{}, fmt.Errorf("%w: render result differs from inspected publication", ErrExecution)
+			}
+			// If Render crossed its publication boundary and then returned an
+			// error, the independently verified publication is authoritative.
+		}
+	} else {
+		// A reference final checkpoint is the only recovery authority. Before
+		// that checkpoint exists, even a matching residual publication must not
+		// bypass consumption of the complete verified chunk source. The codec
+		// assembly therefore restarts in full on every final-task invocation.
+		rendered, assembleErr := safeAssembleChunks(ctx, executor.assembler, assembly.request, assembly.source, executor.service.progress)
+		sourceErr := assembly.source.VerifyComplete()
 		if ctxErr := ctx.Err(); ctxErr != nil {
-			return stagedag.StageOutput{}, ctxErr
+			return stagedag.StageOutput{}, errors.Join(ctxErr, sourceErr)
+		}
+		if sourceErr != nil {
+			return stagedag.StageOutput{}, errors.Join(fmt.Errorf("%w: assembler did not consume the complete verified chunk set", ErrExecution), assembleErr, sourceErr)
+		}
+		if assembleErr != nil {
+			return stagedag.StageOutput{}, errors.Join(fmt.Errorf("%w: chunk assembler returned an error after consuming the verified source", ErrExecution), assembleErr)
 		}
 		var inspectErr error
-		artifact, found, inspectErr = safeInspectPublished(ctx, executor.backend, executor.request)
+		artifact, found, inspectErr = safeInspectChunkAssembly(ctx, executor.assembler, assembly.request)
 		if inspectErr != nil || !found {
-			return stagedag.StageOutput{}, errors.Join(fmt.Errorf("%w: render did not leave a valid publication", ErrExecution), err, inspectErr)
+			return stagedag.StageOutput{}, errors.Join(fmt.Errorf("%w: assembly did not leave a valid publication", ErrExecution), assembleErr, inspectErr)
 		}
-		if err == nil && !reflect.DeepEqual(rendered, artifact) {
-			return stagedag.StageOutput{}, fmt.Errorf("%w: render result differs from inspected publication", ErrExecution)
+		if !reflect.DeepEqual(rendered, artifact) {
+			return stagedag.StageOutput{}, fmt.Errorf("%w: assembly result differs from inspected publication", ErrExecution)
 		}
-		// If Render crossed its publication boundary and then returned an error,
-		// the independently verified publication is authoritative and resumable.
 	}
 	if err := validateArtifactBinding(artifact, executor.request); err != nil {
 		return stagedag.StageOutput{}, err
@@ -457,7 +645,13 @@ func (executor *executor) execute(ctx context.Context, task stagedag.Task) (outp
 	if !ok || requiredDisk > task.Resources.DiskBytes {
 		return stagedag.StageOutput{}, fmt.Errorf("%w: snapshot+CAS minimum disk %d for media size %d exceeds declared estimate %d", ErrExecution, requiredDisk, artifact.SizeBytes, task.Resources.DiskBytes)
 	}
-	published, opened, err := safeOpenPublished(ctx, executor.backend, executor.request)
+	var published PublishedMedia
+	var opened bool
+	if assembly == nil {
+		published, opened, err = safeOpenPublished(ctx, executor.backend, executor.request)
+	} else {
+		published, opened, err = safeOpenChunkAssembly(ctx, executor.assembler, assembly.request)
+	}
 	if err != nil || !opened {
 		return stagedag.StageOutput{}, errors.Join(fmt.Errorf("%w: inspected publication could not be opened", ErrExecution), err)
 	}
@@ -487,7 +681,12 @@ func (executor *executor) execute(ctx context.Context, task stagedag.Task) (outp
 		(result.Disposition != cas.Published && result.Disposition != cas.AlreadyPresent) {
 		return stagedag.StageOutput{}, fmt.Errorf("%w: CAS returned another media identity", ErrExecution)
 	}
-	receipt, err := encodeReceipt(artifact)
+	var receipt json.RawMessage
+	if assembly == nil {
+		receipt, err = encodeReceipt(artifact)
+	} else {
+		receipt, err = encodeReferencePublishReceipt(artifact, assembly.request.Aggregate)
+	}
 	if err != nil {
 		return stagedag.StageOutput{}, err
 	}
@@ -534,12 +733,12 @@ func safeResolveBackend(ctx context.Context, resolver BackendResolver, manifest 
 	return resolver.ResolveBackend(ctx, manifest)
 }
 
-func safeBackendID(backend Backend) (_ string, returnErr error) {
+func safeBackendID(backend backendIdentity) (_ string, returnErr error) {
 	defer recoverError("backend ID", &returnErr)
 	return backend.ID(), nil
 }
 
-func safeCapabilities(ctx context.Context, backend Backend) (_ videoedit.BackendCapabilities, returnErr error) {
+func safeCapabilities(ctx context.Context, backend backendIdentity) (_ videoedit.BackendCapabilities, returnErr error) {
 	defer recoverError("backend capabilities", &returnErr)
 	return backend.Capabilities(ctx)
 }
@@ -587,6 +786,56 @@ func safeRender(ctx context.Context, backend Backend, request renderapi.RenderRe
 		return renderapi.RenderArtifact{}, err
 	}
 	return backend.Render(ctx, owned, sink)
+}
+
+func safeAssembleChunks(ctx context.Context, backend ChunkAssemblerBackend, request ChunkAssemblyRequest,
+	source ChunkSource, sink renderapi.EventSink) (_ renderapi.RenderArtifact, returnErr error) {
+	defer recoverError("chunk assembler", &returnErr)
+	if nilLike(backend) || nilLike(source) {
+		return renderapi.RenderArtifact{}, fmt.Errorf("%w: assembler backend and chunk source are required", ErrBackend)
+	}
+	owned := cloneChunkAssemblyRequest(request)
+	if err := validateChunkAssemblyRequest(owned); err != nil {
+		return renderapi.RenderArtifact{}, err
+	}
+	return backend.AssembleChunks(ctx, owned, source, sink)
+}
+
+func safeInspectChunkAssembly(ctx context.Context, backend ChunkAssemblerBackend, request ChunkAssemblyRequest) (_ renderapi.RenderArtifact, _ bool, returnErr error) {
+	defer recoverError("chunk assembly inspection", &returnErr)
+	if nilLike(backend) {
+		return renderapi.RenderArtifact{}, false, fmt.Errorf("%w: assembler backend is required", ErrBackend)
+	}
+	owned := cloneChunkAssemblyRequest(request)
+	if err := validateChunkAssemblyRequest(owned); err != nil {
+		return renderapi.RenderArtifact{}, false, err
+	}
+	return backend.InspectChunkAssembly(ctx, owned)
+}
+
+func safeOpenChunkAssembly(ctx context.Context, backend ChunkAssemblerBackend, request ChunkAssemblyRequest) (_ PublishedMedia, _ bool, returnErr error) {
+	defer recoverError("chunk assembly open", &returnErr)
+	if nilLike(backend) {
+		return nil, false, fmt.Errorf("%w: assembler backend is required", ErrBackend)
+	}
+	owned := cloneChunkAssemblyRequest(request)
+	if err := validateChunkAssemblyRequest(owned); err != nil {
+		return nil, false, err
+	}
+	published, found, err := backend.OpenChunkAssembly(ctx, owned)
+	if err != nil {
+		if !nilLike(published) {
+			err = errors.Join(err, safePublishedClose(published))
+		}
+		return nil, false, err
+	}
+	if found == nilLike(published) {
+		if !nilLike(published) {
+			_ = safePublishedClose(published)
+		}
+		return nil, false, fmt.Errorf("%w: assembler backend returned inconsistent found/media values", ErrBackend)
+	}
+	return published, found, nil
 }
 
 func safePublishedArtifact(published PublishedMedia) (_ renderapi.RenderArtifact, returnErr error) {

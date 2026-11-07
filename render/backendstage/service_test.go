@@ -596,33 +596,46 @@ func testCapabilities() videoedit.BackendCapabilities {
 type fakePublication struct {
 	media    []byte
 	artifact renderapi.RenderArtifact
+	assembly *ChunkAssemblyRequest
 }
 
 type fakeBackend struct {
 	capabilities videoedit.BackendCapabilities
 	media        []byte
 
-	mu             sync.Mutex
-	publications   map[string]fakePublication
-	renderCalls    atomic.Int32
-	preflightCalls atomic.Int32
-	inspectCalls   atomic.Int32
-	openCalls      atomic.Int32
+	mu                sync.Mutex
+	publications      map[string]fakePublication
+	renderCalls       atomic.Int32
+	preflightCalls    atomic.Int32
+	inspectCalls      atomic.Int32
+	openCalls         atomic.Int32
+	assembleCalls     atomic.Int32
+	assembledBytes    atomic.Int64
+	chunkInspectCalls atomic.Int32
+	chunkOpenCalls    atomic.Int32
 
-	blockRender          bool
-	renderStarted        chan struct{}
-	panicOpen            bool
-	closePanic           bool
-	mutatePreflight      bool
-	preflightDiagnostics []videoedit.Diagnostic
-	renderErr            error
-	lastRenderValidation atomic.Pointer[error]
+	blockRender           bool
+	renderStarted         chan struct{}
+	panicOpen             bool
+	closePanic            bool
+	mutatePreflight       bool
+	preflightDiagnostics  []videoedit.Diagnostic
+	renderErr             error
+	failBeforePublication atomic.Int32
+	publishWithoutSource  atomic.Int32
+	failAfterSource       atomic.Int32
+	pauseChunkRead        atomic.Bool
+	chunkReadPaused       chan struct{}
+	resumeChunkRead       chan struct{}
+	chunkPauseOnce        sync.Once
+	lastRenderValidation  atomic.Pointer[error]
 }
 
 func newFakeBackend(capabilities videoedit.BackendCapabilities) *fakeBackend {
 	return &fakeBackend{
 		capabilities: capabilities, media: []byte("encoded-media"),
 		publications: make(map[string]fakePublication), renderStarted: make(chan struct{}),
+		chunkReadPaused: make(chan struct{}), resumeChunkRead: make(chan struct{}),
 	}
 }
 
@@ -658,6 +671,9 @@ func (backend *fakeBackend) Render(ctx context.Context, request renderapi.Render
 		<-ctx.Done()
 		return renderapi.RenderArtifact{}, ctx.Err()
 	}
+	if backend.failBeforePublication.CompareAndSwap(1, 0) {
+		return renderapi.RenderArtifact{}, errors.New("encoder process crashed before publication")
+	}
 	artifact := renderapi.RenderArtifact{
 		URI: request.Job.ArtifactURI, ContentHash: hashBytes(backend.media), SizeBytes: int64(len(backend.media)),
 		ExecutionManifestFingerprint: request.Manifest.Fingerprint,
@@ -669,6 +685,104 @@ func (backend *fakeBackend) Render(ctx context.Context, request renderapi.Render
 	backend.publications[request.Job.ArtifactURI] = fakePublication{media: append([]byte(nil), backend.media...), artifact: artifact}
 	backend.mu.Unlock()
 	return artifact, backend.renderErr
+}
+
+func (backend *fakeBackend) AssembleChunks(ctx context.Context, request ChunkAssemblyRequest, source ChunkSource, _ renderapi.EventSink) (renderapi.RenderArtifact, error) {
+	backend.assembleCalls.Add(1)
+	if backend.failBeforePublication.CompareAndSwap(1, 0) {
+		return renderapi.RenderArtifact{}, errors.New("encoder process crashed before chunk publication")
+	}
+	if backend.publishWithoutSource.CompareAndSwap(1, 0) {
+		media := []byte("invalid-residual-assembly-without-source")
+		artifact := renderapi.RenderArtifact{
+			URI: request.ArtifactURI, ContentHash: hashBytes(media), SizeBytes: int64(len(media)),
+			ExecutionManifestFingerprint: request.ExecutionManifestFingerprint,
+			EvidenceURI:                  request.ArtifactURI + ".evidence.json", EvidenceFingerprint: digest('e'),
+			Duration: request.TimelineRange.Duration, FrameCount: request.FrameRange.Count, SampleCount: request.SampleRange.Count,
+		}
+		owned := cloneChunkAssemblyRequest(request)
+		backend.mu.Lock()
+		backend.publications[request.ArtifactURI] = fakePublication{media: media, artifact: artifact, assembly: &owned}
+		backend.mu.Unlock()
+		return artifact, nil
+	}
+	hash := sha256.New()
+	var consumed int64
+	for _, descriptor := range appendDescriptors(request.Audio, request.Video) {
+		reader, err := source.Open(ctx, descriptor)
+		if err != nil {
+			return renderapi.RenderArtifact{}, err
+		}
+		if backend.pauseChunkRead.Load() && consumed == 0 {
+			var first [1]byte
+			count, readErr := reader.Read(first[:])
+			if count > 0 {
+				_, _ = hash.Write(first[:count])
+				consumed += int64(count)
+			}
+			if readErr != nil && !errors.Is(readErr, io.EOF) {
+				_ = reader.Close()
+				return renderapi.RenderArtifact{}, readErr
+			}
+			backend.chunkPauseOnce.Do(func() { close(backend.chunkReadPaused) })
+			select {
+			case <-backend.resumeChunkRead:
+			case <-ctx.Done():
+				_ = reader.Close()
+				return renderapi.RenderArtifact{}, ctx.Err()
+			}
+		}
+		count, copyErr := io.Copy(hash, reader)
+		consumed += count
+		closeErr := reader.Close()
+		if err := errors.Join(copyErr, closeErr); err != nil {
+			return renderapi.RenderArtifact{}, err
+		}
+	}
+	backend.assembledBytes.Add(consumed)
+	if backend.failAfterSource.CompareAndSwap(1, 0) {
+		return renderapi.RenderArtifact{}, errors.New("encoder crashed after consuming chunks without publishing")
+	}
+	media := []byte("assembled-chunks:" + hex.EncodeToString(hash.Sum(nil)))
+	artifact := renderapi.RenderArtifact{
+		URI: request.ArtifactURI, ContentHash: hashBytes(media), SizeBytes: int64(len(media)),
+		ExecutionManifestFingerprint: request.ExecutionManifestFingerprint,
+		EvidenceURI:                  request.ArtifactURI + ".evidence.json", EvidenceFingerprint: digest('e'),
+		Duration: request.TimelineRange.Duration, FrameCount: request.FrameRange.Count, SampleCount: request.SampleRange.Count,
+	}
+	owned := cloneChunkAssemblyRequest(request)
+	backend.mu.Lock()
+	backend.publications[request.ArtifactURI] = fakePublication{media: media, artifact: artifact, assembly: &owned}
+	backend.mu.Unlock()
+	return artifact, backend.renderErr
+}
+
+func (backend *fakeBackend) InspectChunkAssembly(_ context.Context, request ChunkAssemblyRequest) (renderapi.RenderArtifact, bool, error) {
+	backend.chunkInspectCalls.Add(1)
+	backend.mu.Lock()
+	defer backend.mu.Unlock()
+	publication, found := backend.publications[request.ArtifactURI]
+	if !found {
+		return renderapi.RenderArtifact{}, false, nil
+	}
+	if publication.assembly == nil || !reflect.DeepEqual(*publication.assembly, request) {
+		return renderapi.RenderArtifact{}, false, errors.New("chunk publication aggregate mismatch")
+	}
+	return publication.artifact, true, nil
+}
+
+func (backend *fakeBackend) OpenChunkAssembly(_ context.Context, request ChunkAssemblyRequest) (PublishedMedia, bool, error) {
+	backend.chunkOpenCalls.Add(1)
+	backend.mu.Lock()
+	defer backend.mu.Unlock()
+	publication, found := backend.publications[request.ArtifactURI]
+	if !found {
+		return nil, false, nil
+	}
+	if publication.assembly == nil || !reflect.DeepEqual(*publication.assembly, request) {
+		return nil, false, errors.New("chunk publication aggregate mismatch")
+	}
+	return &fakePublished{Reader: *bytes.NewReader(append([]byte(nil), publication.media...)), artifact: publication.artifact}, true, nil
 }
 
 func (backend *fakeBackend) InspectPublished(_ context.Context, request renderapi.RenderRequest) (renderapi.RenderArtifact, bool, error) {

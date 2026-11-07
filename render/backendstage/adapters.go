@@ -40,6 +40,14 @@ type Backend interface {
 	OpenPublished(context.Context, renderapi.RenderRequest) (PublishedMedia, bool, error)
 }
 
+// backendIdentity is the only common surface between a legacy whole-job
+// backend and a reference chunk assembler. In particular it does not expose
+// Render, Preflight, or a frozen manifest.
+type backendIdentity interface {
+	ID() string
+	Capabilities(context.Context) (videoedit.BackendCapabilities, error)
+}
+
 // BackendResolver selects a host-owned backend from a frozen manifest. It must
 // be safe for concurrent calls and may not construct executable paths or trust
 // identities from mutable job fields.
