@@ -973,7 +973,7 @@ Deferred capabilities must produce stable preflight rejection. They must not be 
 | Stage | Status | Evidence / next action |
 | --- | --- | --- |
 | S0 Surface bridge | Complete | `0a19a82`; P0/P1/P2=0 |
-| S1 Document v2 plan | Not started | Next action: additive `core/renderplanv2` protocol + fixtures |
+| S1 Document v2 plan | Complete | `74edd28`, `9db5e5f`, `5e64a65`; final gates passed with documented wasm subset; independent P0/P1/P2 closure in `DOCUMENT_V2_S1_EVIDENCE.md` |
 | S2 Manifest/request v2 | Not started | Depends on verified S1 |
 | S3 Prepared v2 | Not started | Depends on verified S1/S2 |
 | S4 Provider bundle | Not started | Depends on restart-safe S3 |
