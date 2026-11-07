@@ -103,15 +103,48 @@ This does not complete PNG/font projections or restart reconstruction.
 
 The initial gap record schema/canonical corpus passed in `bvdh63gm5`. The previous attempt
 `bcpz3ca91` hit a transient compile error in an actively edited storage file; that error was fixed
-before the passing rerun. Added metadata-number vectors still require final synchronized checks.
+before the passing rerun. Gap and metadata-number schema/corpus normal and race checks passed in
+`b0nv18kk9`. Full synchronized checks remain pending: `bnbn7o0hb` and `bwucged86` hit transient
+compile errors during the codec admission repair; the latter still passed preparev2, wavsource and
+conformance normal tests but did not reach its race/vet commands.
 
 Independent codec review reproduced a P2 preallocation defect: a single 20 MiB RawMessage subtree
 composed of individually bounded strings reached typed shape allocation before the inherited 1 MiB
-RawMessage limit rejected it. Measured total allocation was about 445 MB. Repair and independent
-recheck are pending; final rejection alone does not satisfy early admission.
+RawMessage limit rejected it. Measured total allocation was about 445 MB. The implementation now
+prechecks complete raw spans using propagated field types, including nested Document raw leaves and
+S2's stricter 16 KiB program configuration limit. Permanent tests cover large composites, exact
+boundaries, unknown/case aliases and wrong container shapes. The implementer's reproduction reports
+1,184 allocated bytes for the same 20,978,893-byte input; this is not independent closure. Its focused
+prepared/renderplanv2/api normal, race and vet gates passed. Independent recheck remains pending;
+final rejection alone does not satisfy early admission. The codec reviewer
+`affbf76c18f4ddeaa` then terminated with a service API security-filter error before final repair
+closure. No replacement review or permission change is used to bypass that interruption. The known
+concrete repair and tests continue, but implementation results cannot substitute for independent
+closure, and S3 exit remains gated.
 
 Storage tests initially failed when corruption setup tried to overwrite intentionally read-only
 records; tests now explicitly make those records writable before hostile modification. Concurrent
 lock creation also exposed an ENOENT race under Darwin. The storage implementer reports bounded,
-anchored retry and passing stress tests; independent storage review remains pending. None of these
-interim results constitutes S3 acceptance.
+anchored retry and passing stress tests. The independent storage reviewer reports Darwin normal
+10 repetitions, race 3 repetitions and Linux aarch64 runtime 10 repetitions in Docker with read-only
+fixtures passed; these results precede the durability repair below.
+
+Independent storage review found a P2 durability defect: replacing `environment.json` or `complete.v2`
+after publication with byte-identical content on a new inode could return success although only the
+original write inode had been file-synced. Directory sync does not establish replacement-file data
+durability. The temporary `/tmp/s3-storage-independent-overlay.json` instruments Sync calls and
+reproduces both branches while holding the original descriptor to prevent inode-number reuse. Repair
+must sync the actual verified retained committed record and marker before claiming durable success,
+including the idempotent retry path, or reject replacement. Implementation and independent recheck
+have reached implementation freeze; independent recheck is pending. None of these interim results
+constitutes S3 acceptance.
+
+Parent verification after codec repair:
+
+- `bj6eftcrk`: `TestEnvironmentV2` normal/race and full conformance normal/race passed, as did diff check.
+- `bsn3r392o`: full prepared/preparev2/wavsource normal/race/vet passed after the storage fsync repair;
+  Linux/386 and Windows/amd64 prepared compile-only checks and diff check passed.
+
+The portable codec, schema and new fixed gap/number fixtures are a tested implementation checkpoint,
+not independent codec acceptance. Existing fixture paths were not modified. Storage, concrete
+resource projections and reconstruction remain separate unfinished boundaries. S3 stays open.
