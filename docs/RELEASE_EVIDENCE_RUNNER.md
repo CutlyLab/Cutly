@@ -40,7 +40,7 @@ Observed subprocess high-water marks: **8912896 bytes** for 16MiB input and **88
 for 256MiB input. This passed the existing 32MiB growth allowance. The measurements concern fresh
 synthetic-stream reader subprocesses, not the encoder/daemon process tree or one-hour retention.
 
-## Runner contract (implementation validation pending)
+## Runner contract
 
 The internal CLI requires an explicit profile and a new output path:
 
@@ -50,17 +50,41 @@ go run ./internal/cmd/release-evidence --profile smoke --output /tmp/cutly-rc-sm
 go run ./internal/cmd/release-evidence --profile long --output /tmp/cutly-rc-long.json
 ```
 
-These commands are the implementation contract, not yet recorded execution evidence. The smoke
-profile runs a bounded set of actual RC tests plus synthetic measurements. The long profile adds
-100 fault rounds and at least one hour of repeated fresh recovery test jobs. Neither profile mounts
-a disk image or changes daemon defaults. Long-profile completion does not certify a continuously
-running daemon's memory behavior.
+The smoke profile runs four bounded test invocations: one injected-fault round, backend publication recovery,
+daemon real-media recovery, and public Go SDK real-media end-to-end coverage. It does not run the
+synthetic benchmark/RSS checks or the ten-run decoded-root comparison.
+
+The long profile runs 100 injected-fault rounds, initial backend/daemon recovery, the 4096MiB
+synthetic streaming benchmark, reader-process RSS comparison, and the existing ten-run real-media
+decoded-root comparison. It then requires 61 successful paired backend/daemon recovery observations
+with 60 pauses of at least one minute and at least one hour of observation. These are fresh jobs,
+not one continuously running daemon. Neither profile mounts a disk image or changes daemon defaults.
+
+Defaults are a 15-minute smoke budget or a 100-minute long budget, a five-minute per-command timeout,
+and 64KiB retained per output stream. The CLI permits bounded timeout/budget/log overrides, not
+arbitrary test selectors or reduced long-profile round counts. The maximum budget is 105 minutes;
+long requires more than one hour. Total retained command logs are capped at 2MiB and reports at
+16MiB. Complete event streams are still checked even when retained log excerpts are truncated.
 
 Acceptance requires every selected test to execute and pass, not merely a zero `go test` exit code
 when tests skip or selectors match nothing. Failed, interrupted and incomplete observations must
 remain failures in the report. The report records observed source/runtime identities and bounded
 logs; treat it as local diagnostic evidence, not a signed attestation. Do not put sensitive private
 media into the test environment or publish logs without reviewing them.
+
+The report distinguishes `passed`, `failed`, `canceled`, and `timeout`, with requested/completed
+progress counters and per-command results. Durations are integer nanoseconds. Metric entries carry
+their observed value, unit and measurement scope; smoke reports have no synthetic metric entries.
+The pre-test source snapshot records revision and dirty status, not a source-content digest. A dirty
+checkout is allowed and reported honestly. Run on a clean candidate commit for release evidence.
+
+The output path is exclusively reserved before source/tool observation or test execution; an existing
+file or symlink is never replaced. Missing prerequisites and test failures are written to that same
+reserved path when report writing remains possible. Abrupt process termination or storage failure
+can leave an empty/incomplete report; never interpret its presence alone as success. Go flags,
+workspace/toolchain overrides and `CUTLY_*` opt-ins from the parent environment are removed from
+child commands. Process-group cleanup is implemented on Linux/macOS; other platforms fail closed
+rather than claiming equivalent runtime coverage.
 
 `.github/workflows/release-evidence.yml` provides a manual-only Linux/macOS run with read-only
 repository permissions. It attempts to retain the JSON report even on test failure; a runner setup
@@ -69,3 +93,40 @@ failure evidence. No cron schedule, PR trigger, npm publishing or release creati
 
 No workflow has been dispatched and no result has been published externally by this implementation
 session. Real disk-image exhaustion remains separately opt-in and is not part of the runner.
+
+## Local runner validation
+
+Implementation checkpoint: `2ccae89`. On 2026-11-07, real smoke task `batl503fv` exited 0:
+
+```sh
+go run ./internal/cmd/release-evidence --profile smoke \
+  --output /tmp/cutly-rc-smoke-20261107-session95292636.json
+```
+
+The report recorded `passed`, from `09:49:30.091925Z` to `09:49:58.422494Z`, on Darwin arm64 /
+Go 1.27.3 with observed FFmpeg and FFprobe 9.0.2. All four invocations exited 0 and passed;
+no command log excerpt was truncated. One requested injected-fault round and the public SDK
+real-media test completed. No long-profile recovery observation or synthetic metric was claimed.
+
+The source snapshot was `24b282e555a0f64b3e0c5da5ba36e1b5ae620964`, **dirty**, before the new runner
+was committed; it included unrelated concurrent video-authoring changes. This is local integration
+evidence, not a clean-candidate release run or a content attestation for `2ccae89`.
+The local report is 46,676 bytes with SHA-256
+`fc88f735589b39f0bf2214ca5876f7a871ab88155092cdf19714494bfc514afc`.
+It is retained in `/tmp` locally, not checked in or published; that path is not durable distribution.
+
+Focused normal/race/vet passed for `./internal/releaseevidence ./internal/cmd/release-evidence`.
+The manual-workflow architecture check passed (`bkhvw96z9`). New-package cross-compilation passed
+for Linux amd64, Linux 386, Windows amd64 and js/wasm (`bagrf6u7b`); this is not execution evidence
+for those platforms. TypeScript tests and package-local `pack:check` passed (`bjs9bzq8i`).
+
+Full-repository normal/race tests, `go vet ./...`, `go mod tidy -diff` and `git diff --check`
+passed at the implementation checkpoint (`b3dk2a6or`). Full Linux amd64/Linux 386/Windows amd64
+cross-compilation and the roadmap's documented js/wasm subset also passed (`bw48tggl9`). The wasm
+subset includes both new internal packages; the pre-existing FFmpeg RSS test syscall limitation
+still prevents treating a full wasm suite as supported.
+
+Independent read-only review remains open: a verified P2 found that internal output-cap cancellation
+could be mislabeled as caller cancellation and lose the cap diagnostic. A focused repair and
+independent reproduction recheck are required before accepting this runner. A complete real long
+profile has not been run; fake-clock long-profile tests do not supply one-hour runtime evidence.
