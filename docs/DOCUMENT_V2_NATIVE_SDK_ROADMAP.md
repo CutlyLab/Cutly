@@ -978,7 +978,7 @@ Deferred capabilities must produce stable preflight rejection. They must not be 
 | --- | --- | --- |
 | S0 Surface bridge | Complete | `0a19a82`; P0/P1/P2=0 |
 | S1 Document v2 plan | Complete | `74edd28`, `9db5e5f`, `5e64a65`; final gates passed with documented wasm subset; independent P0/P1/P2 closure in `DOCUMENT_V2_S1_EVIDENCE.md` |
-| S2 Manifest/request v2 | In progress: contract design | S1 exit recorded in `99fccaf`; see `DOCUMENT_V2_S2_EVIDENCE.md`; S3 remains gated on S2 audit closure |
+| S2 Manifest/request v2 | Implemented; independent audit blocked | `5bb222d`, `8cb6172`, `66a0b0b`, `0951ad3`; full Go/target gates passed; reviewer service terminated before final closure; see `DOCUMENT_V2_S2_EVIDENCE.md`; do not enter S3 |
 | S3 Prepared v2 | Not started | Depends on verified S1/S2 |
 | S4 Provider bundle | Not started | Depends on restart-safe S3 |
 | S5 Assembler/Evidence v2 | Not started | Depends on real S4 providers |
