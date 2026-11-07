@@ -629,11 +629,14 @@ func renderImpact(before, after d.Document) RenderImpact {
 	}
 	out.Visual = out.Visual && visualChanged
 	out.Audio = out.Audio && audioChanged
+	out.RenderRequired = out.Visual || out.Audio
+	if !out.RenderRequired {
+		return out
+	}
 	for id := range ids {
 		out.TimelineIDs = append(out.TimelineIDs, id)
 	}
 	sort.Slice(out.TimelineIDs, func(i, j int) bool { return out.TimelineIDs[i] < out.TimelineIDs[j] })
-	out.RenderRequired = out.Visual || out.Audio
 	return out
 }
 func stripIntent(doc *d.Document) {

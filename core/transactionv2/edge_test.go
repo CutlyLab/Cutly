@@ -206,6 +206,29 @@ func TestExtensionRenderingIntent(t *testing.T) {
 	}
 }
 
+func TestNonrenderStructuralImpactIDs(t *testing.T) {
+	check := func(r Result) {
+		t.Helper()
+		if !r.Impact.IdentityChanged || r.Impact.Visual || r.Impact.Audio || r.Impact.RenderRequired || len(r.Impact.TimelineIDs) != 0 {
+			t.Fatalf("nonrender structural impact %+v", r.Impact)
+		}
+	}
+	doc := base()
+	notes := d.Track{ID: "notes", Kind: d.TrackKindAnnotation}
+	added := roundtrip(t, doc, Operation{Kind: TrackAdd, Track: &TrackEdit{TimelineID: "tl", TrackID: "notes", Position: ptr(2), Value: &notes}})
+	check(added)
+	check(roundtrip(t, added.Document, Operation{Kind: TrackRemove, Track: &TrackEdit{TimelineID: "tl", TrackID: "notes"}}))
+	notes.Name = "changed"
+	notes.Annotations = []d.Annotation{{ID: "note", Namespace: "intent", Value: json.RawMessage(`{"note":1.5}`)}}
+	check(roundtrip(t, added.Document, Operation{Kind: TrackReplace, Track: &TrackEdit{TimelineID: "tl", TrackID: "notes", Position: ptr(2), Value: &notes}}))
+	unused := d.Asset{ID: "new-unused", Kind: d.AssetKindData, URI: "unused.json"}
+	addedAsset := roundtrip(t, doc, Operation{Kind: AssetAdd, Asset: &AssetEdit{AssetID: unused.ID, Position: ptr(3), Value: &unused}})
+	check(addedAsset)
+	unused.URI = "changed.json"
+	check(roundtrip(t, addedAsset.Document, Operation{Kind: AssetReplace, Asset: &AssetEdit{AssetID: unused.ID, Position: ptr(3), Value: &unused}}))
+	check(roundtrip(t, addedAsset.Document, Operation{Kind: AssetRemove, Asset: &AssetEdit{AssetID: unused.ID}}))
+}
+
 func TestUnicodeEscapeAllocationBudget(t *testing.T) {
 	for _, scalar := range []string{" ", " ", "<", ">", "&"} {
 		t.Run(scalar, func(t *testing.T) {
