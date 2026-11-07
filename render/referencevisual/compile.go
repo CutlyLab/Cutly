@@ -814,6 +814,15 @@ func (program *Program) DocumentHash() string {
 	}
 	return program.documentHash
 }
+
+// Profile returns the immutable export profile selected at compile time.
+func (program *Program) Profile() string {
+	if program == nil {
+		return ""
+	}
+	return program.profile()
+}
+
 func (program *Program) Config() Config {
 	if program == nil {
 		return Config{}

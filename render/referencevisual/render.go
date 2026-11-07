@@ -56,37 +56,52 @@ type FrameResult struct {
 	Result                Result               `json:"result"`
 }
 
+// SurfaceFrameResult is the pre-color, pre-PNG result for one exact composition frame. Result
+// remains in the canonical linear-BT.709 premultiplied RGBA16 surface domain and carries the same
+// fully replayed source receipt that a complete RenderFrame export would consume.
+type SurfaceFrameResult struct {
+	FrameClock            videoedit.FrameClock    `json:"frame_clock"`
+	CompositionFrameIndex int64                   `json:"composition_frame_index"`
+	Result                visualcompositor.Result `json:"result"`
+}
+
 func (program *Program) RenderAt(ctx context.Context, timelineID documentv2.ID, at documentv2.RationalTime) (Result, error) {
-	if err := program.validateRuntime(ctx); err != nil {
+	visual, err := program.RenderSurfaceAt(ctx, timelineID, at)
+	if err != nil {
 		return Result{}, err
+	}
+	return program.finishValidated(ctx, visual)
+}
+
+// RenderSurfaceAt renders and strictly validates one canonical visual surface without performing
+// the later RGBA8 conversion or PNG encoding stages. It is the embedding boundary for pre-codec
+// surface chunk providers. Failure and cancellation return a zero result.
+func (program *Program) RenderSurfaceAt(ctx context.Context, timelineID documentv2.ID, at documentv2.RationalTime) (visualcompositor.Result, error) {
+	if err := program.validateRuntime(ctx); err != nil {
+		return visualcompositor.Result{}, err
 	}
 	visual, err := program.visual.RenderAt(ctx, timelineID, at, program.providers())
 	if err != nil {
-		return Result{}, classifyRenderDependency("visual", err)
+		return visualcompositor.Result{}, classifyRenderDependency("visual", err)
 	}
 	if visual.TimelineID != timelineID || visual.TimelineTime != at {
-		return Result{}, pipelineError(CodeStageMismatch, "visual/request", ErrStageMismatch)
+		return visualcompositor.Result{}, pipelineError(CodeStageMismatch, "visual/request", ErrStageMismatch)
 	}
-	return program.finish(ctx, visual)
+	if err := program.validateVisualLive(ctx, visual); err != nil {
+		return visualcompositor.Result{}, err
+	}
+	if err := contextError(ctx, "visual/publish"); err != nil {
+		return visualcompositor.Result{}, err
+	}
+	return visual, nil
 }
 
 func (program *Program) RenderFrame(ctx context.Context, timelineID documentv2.ID, clock videoedit.FrameClock, compositionFrameIndex int64) (FrameResult, error) {
-	if err := program.validateRuntime(ctx); err != nil {
+	visualFrame, err := program.RenderSurfaceFrame(ctx, timelineID, clock, compositionFrameIndex)
+	if err != nil {
 		return FrameResult{}, err
 	}
-	expectedTime, err := videoedit.FrameTimeAt(clock, compositionFrameIndex)
-	if err != nil {
-		return FrameResult{}, pipelineError(CodeRenderFailed, "frame/clock", errors.Join(ErrRenderFailed, err))
-	}
-	visualFrame, err := program.visual.RenderFrame(ctx, timelineID, clock, compositionFrameIndex, program.providers())
-	if err != nil {
-		return FrameResult{}, classifyRenderDependency("visual", err)
-	}
-	if visualFrame.CompositionFrameIndex != compositionFrameIndex || visualFrame.Result.TimelineID != timelineID ||
-		visualFrame.Result.TimelineTime != expectedTime {
-		return FrameResult{}, pipelineError(CodeStageMismatch, "visual/frame", ErrStageMismatch)
-	}
-	result, err := program.finish(ctx, visualFrame.Result)
+	result, err := program.finishValidated(ctx, visualFrame.Result)
 	if err != nil {
 		return FrameResult{}, err
 	}
@@ -94,6 +109,34 @@ func (program *Program) RenderFrame(ctx context.Context, timelineID documentv2.I
 		return FrameResult{}, err
 	}
 	return FrameResult{FrameClock: clock, CompositionFrameIndex: compositionFrameIndex, Result: result}, nil
+}
+
+// RenderSurfaceFrame resolves one composition-wide frame index, renders its canonical visual
+// surface and repeats the complete live provider/receipt/hash validation. It performs no output
+// color conversion or image encoding. Failure and cancellation return a zero result.
+func (program *Program) RenderSurfaceFrame(ctx context.Context, timelineID documentv2.ID, clock videoedit.FrameClock, compositionFrameIndex int64) (SurfaceFrameResult, error) {
+	if err := program.validateRuntime(ctx); err != nil {
+		return SurfaceFrameResult{}, err
+	}
+	expectedTime, err := videoedit.FrameTimeAt(clock, compositionFrameIndex)
+	if err != nil {
+		return SurfaceFrameResult{}, pipelineError(CodeRenderFailed, "frame/clock", errors.Join(ErrRenderFailed, err))
+	}
+	visualFrame, err := program.visual.RenderFrame(ctx, timelineID, clock, compositionFrameIndex, program.providers())
+	if err != nil {
+		return SurfaceFrameResult{}, classifyRenderDependency("visual", err)
+	}
+	if visualFrame.CompositionFrameIndex != compositionFrameIndex || visualFrame.Result.TimelineID != timelineID ||
+		visualFrame.Result.TimelineTime != expectedTime {
+		return SurfaceFrameResult{}, pipelineError(CodeStageMismatch, "visual/frame", ErrStageMismatch)
+	}
+	if err := program.validateVisualLive(ctx, visualFrame.Result); err != nil {
+		return SurfaceFrameResult{}, err
+	}
+	if err := contextError(ctx, "visual/frame/publish"); err != nil {
+		return SurfaceFrameResult{}, err
+	}
+	return SurfaceFrameResult{FrameClock: clock, CompositionFrameIndex: compositionFrameIndex, Result: visualFrame.Result}, nil
 }
 
 func (program *Program) providers() visualcompositor.Providers {
@@ -153,10 +196,7 @@ func (program *Program) profile() string {
 	return ProfileV1
 }
 
-func (program *Program) finish(ctx context.Context, visual visualcompositor.Result) (Result, error) {
-	if err := program.validateVisualLive(ctx, visual); err != nil {
-		return Result{}, err
-	}
+func (program *Program) finishValidated(ctx context.Context, visual visualcompositor.Result) (Result, error) {
 	if err := contextError(ctx, "color"); err != nil {
 		return Result{}, err
 	}
