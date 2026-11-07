@@ -283,7 +283,10 @@ func TestServiceFailsClosedForMissingCASAndPublicationTamper(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	result := stagedag.RunResult{Checkpoints: []stagedag.Checkpoint{checkpoint}, Executed: 1}
+	result := stagedag.RunResult{
+		Checkpoints: []stagedag.Checkpoint{checkpoint}, Executed: 1,
+		TaskOutcomes: []stagedag.TaskOutcome{{TaskID: plan.Tasks[0].ID, AttemptsThisRun: 1}},
+	}
 
 	emptyRoot := t.TempDir()
 	emptyCAS, err := cas.New(filepath.Join(emptyRoot, "cas"), cas.Options{})
@@ -491,6 +494,7 @@ func TestServiceRejectsPlanTaskAndReceiptDrift(t *testing.T) {
 	checkpoint.AttemptCount = 2
 	if _, err := fixture.service.ResolveArtifact(context.Background(), job, plan, stagedag.RunResult{
 		Checkpoints: []stagedag.Checkpoint{checkpoint}, Executed: 1,
+		TaskOutcomes: []stagedag.TaskOutcome{{TaskID: plan.Tasks[0].ID, AttemptsThisRun: 1}},
 	}); !errors.Is(err, ErrArtifact) {
 		t.Fatalf("attempt drift error = %v", err)
 	}

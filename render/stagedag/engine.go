@@ -97,6 +97,16 @@ type RunResult struct {
 	CacheHits   int
 	Executed    int
 	Retries     int
+	// TaskOutcomes is ordered exactly as the frozen Plan.Tasks slice. It makes
+	// aggregate counters auditable without conflating a historical checkpoint's
+	// AttemptCount with attempts performed by this run.
+	TaskOutcomes []TaskOutcome
+}
+
+type TaskOutcome struct {
+	TaskID          string
+	CacheHit        bool
+	AttemptsThisRun uint8
 }
 
 type taskState struct {
@@ -164,7 +174,10 @@ func (engine Engine) Run(ctx context.Context, plan Plan) (RunResult, error) {
 	usedMemory := uint64(0)
 	usedDisk := uint64(0)
 	sequence := uint64(0)
-	runResult := RunResult{Checkpoints: make([]Checkpoint, len(frozen.Tasks))}
+	runResult := RunResult{
+		Checkpoints:  make([]Checkpoint, len(frozen.Tasks)),
+		TaskOutcomes: make([]TaskOutcome, len(frozen.Tasks)),
+	}
 
 	emit := func(task Task, cacheHit bool) error {
 		if engine.Sink == nil {
@@ -241,6 +254,7 @@ func (engine Engine) Run(ctx context.Context, plan Plan) (RunResult, error) {
 					done++
 					runResult.CacheHits++
 					runResult.Checkpoints[index] = cloneCheckpoint(checkpoint)
+					runResult.TaskOutcomes[index] = TaskOutcome{TaskID: task.ID, CacheHit: true}
 					if err := emit(task, true); err != nil {
 						cancel()
 						drainResults(results, running)
@@ -311,6 +325,9 @@ func (engine Engine) Run(ctx context.Context, plan Plan) (RunResult, error) {
 		runResult.Executed++
 		runResult.Retries += int(completed.attempts) - 1
 		runResult.Checkpoints[completed.index] = cloneCheckpoint(completed.checkpoint)
+		runResult.TaskOutcomes[completed.index] = TaskOutcome{
+			TaskID: task.ID, AttemptsThisRun: completed.attempts,
+		}
 		if err := emit(task, false); err != nil {
 			cancel()
 			drainResults(results, running)
@@ -519,5 +536,6 @@ func cloneRunResult(value RunResult) RunResult {
 	for index, checkpoint := range value.Checkpoints {
 		result.Checkpoints[index] = cloneCheckpoint(checkpoint)
 	}
+	result.TaskOutcomes = append([]TaskOutcome(nil), value.TaskOutcomes...)
 	return result
 }

@@ -4,4 +4,6 @@
 // frame/sample ranges and versioned stage/output profiles. Checkpoints make
 // chunk tasks resumable; concrete executors isolate work in child processes and
 // publish integrity-checked output bytes to CAS before returning success.
+// Run results include per-task cache/execution provenance so consumers can
+// distinguish historical checkpoint attempts from retries performed now.
 package stagedag

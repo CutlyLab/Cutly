@@ -231,7 +231,7 @@ func (service *Service) buildReferenceChunkPlan(ctx context.Context, job api.Ren
 	plan, err := chunkplan.Build(ctx, job, chunkplan.Config{
 		VideoResources: service.reference.videoResources,
 		AudioResources: service.reference.audioResources,
-		Retry:          stagedag.RetryPolicy{MaxAttempts: 1},
+		Retry:          stagedag.RetryPolicy{MaxAttempts: 2, RetryTransient: true},
 		MaxTasks:       service.reference.maxTasks,
 	})
 	if err != nil {
@@ -376,9 +376,12 @@ func metricsForChunk(request api.RenderRequest, task stagedag.Task) (chunkMetric
 	return chunkMetrics{unitBytes: int64(unit), payloadBytes: payload, memoryBytes: memory, diskBytes: disk}, nil
 }
 
-func (executor *executor) executeChunk(ctx context.Context, task stagedag.Task) (output stagedag.StageOutput, returnErr error) {
+func (executor *executor) executeChunk(ctx context.Context, task stagedag.Task, attempt uint8) (output stagedag.StageOutput, returnErr error) {
 	if executor.reference == nil {
 		return stagedag.StageOutput{}, fmt.Errorf("%w: reference chunk executor is not configured", ErrExecution)
+	}
+	if !attemptWithinPolicy(task, attempt) || !isReferenceChunkTask(task) {
+		return stagedag.StageOutput{}, fmt.Errorf("%w: invalid reference chunk attempt", ErrExecution)
 	}
 	metrics, err := metricsForChunk(executor.request, task)
 	if err != nil {
@@ -388,7 +391,10 @@ func (executor *executor) executeChunk(ctx context.Context, task stagedag.Task) 
 		return stagedag.StageOutput{}, fmt.Errorf("%w: chunk minimum memory=%d disk=%d exceeds declared memory=%d disk=%d",
 			ErrExecution, metrics.memoryBytes, metrics.diskBytes, task.Resources.MemoryBytes, task.Resources.DiskBytes)
 	}
-	invocation, err := newInvocationID()
+	if executor.newInvocation == nil {
+		return stagedag.StageOutput{}, fmt.Errorf("%w: reference invocation generator is not configured", ErrExecution)
+	}
+	invocation, err := executor.newInvocation()
 	if err != nil {
 		return stagedag.StageOutput{}, wrapError(ErrExecution, "create unique provider invocation ID", err)
 	}
@@ -405,7 +411,10 @@ func (executor *executor) executeChunk(ctx context.Context, task stagedag.Task) 
 	}
 	spoolPath := spool.Name()
 	defer func() {
-		returnErr = errors.Join(returnErr, closeFile(spool), removeSpool(spoolPath))
+		cleanupErr := errors.Join(closeFile(spool), removeSpool(spoolPath))
+		if cleanupErr != nil {
+			returnErr = chunkCleanupFailure(returnErr, cleanupErr)
+		}
 		if returnErr != nil {
 			output = stagedag.StageOutput{}
 		}
@@ -466,7 +475,7 @@ func (executor *executor) executeChunk(ctx context.Context, task stagedag.Task) 
 	}
 	receipt, err := chunkplan.NewReceipt(ctx, task, chunkplan.OutputIdentity{
 		ContentHash: contentHash, SizeBytes: metrics.payloadBytes, UnitBytes: metrics.unitBytes,
-	}, 1, chunkplan.WorkerBinding{
+	}, attempt, chunkplan.WorkerBinding{
 		InvocationID:     invocation,
 		ExecutableDigest: executor.reference.executableDigest,
 	})
@@ -474,6 +483,28 @@ func (executor *executor) executeChunk(ctx context.Context, task stagedag.Task) 
 		return stagedag.StageOutput{}, errors.Join(ErrExecution, err)
 	}
 	return chunkplan.StageOutput(receipt)
+}
+
+// chunkCleanupFailure deliberately excludes attemptErr from its unwrap chain.
+// A transient provider error is retryable only after its private spool was
+// closed and removed; cleanup failure makes local state unknown and must stop
+// the retry loop. Cancellation/deadline identity is retained separately.
+func chunkCleanupFailure(attemptErr, cleanupErr error) error {
+	if cleanupErr == nil {
+		return attemptErr
+	}
+	if attemptErr == nil {
+		return errors.Join(ErrExecution, fmt.Errorf("clean reference chunk spool: %w", cleanupErr))
+	}
+	detail := fmt.Errorf("chunk attempt failed (%v) and spool cleanup failed: %w", attemptErr, cleanupErr)
+	switch {
+	case errors.Is(attemptErr, context.Canceled):
+		return errors.Join(ErrExecution, context.Canceled, detail)
+	case errors.Is(attemptErr, context.DeadlineExceeded):
+		return errors.Join(ErrExecution, context.DeadlineExceeded, detail)
+	default:
+		return errors.Join(ErrExecution, detail)
+	}
 }
 
 type countingWriter struct {
@@ -597,14 +628,11 @@ func (executor *executor) validateChunkDependencies(ctx context.Context, depende
 		if dependency.TaskID != task.ID || checkpoint.TaskID != task.ID || checkpoint.JobID != executor.plan.JobID ||
 			checkpoint.PlanFingerprint != executor.plan.PlanFingerprint || checkpoint.ExecutionManifestFingerprint != executor.plan.ExecutionManifestFingerprint ||
 			checkpoint.Stage != task.Stage || checkpoint.TaskProfile != task.Profile || checkpoint.CacheKey != task.CacheKey ||
-			!rangesEqual(checkpoint.FrameRange, task.FrameRange) || !rangesEqual(checkpoint.SampleRange, task.SampleRange) || checkpoint.AttemptCount != 1 {
+			!rangesEqual(checkpoint.FrameRange, task.FrameRange) || !rangesEqual(checkpoint.SampleRange, task.SampleRange) {
 			return nil, fmt.Errorf("%w: chunk dependency %d binding", ErrExecution, index)
 		}
-		receipt, err := chunkplan.DecodeReceipt(checkpoint.Output.Receipt)
-		if err != nil || chunkplan.ValidateReceiptForTask(task, receipt) != nil ||
-			receipt.Output.ContentHash != checkpoint.Output.ContentHash || receipt.Output.SizeBytes != checkpoint.Output.SizeBytes ||
-			receipt.AttemptCount != checkpoint.AttemptCount ||
-			receipt.Worker.ExecutableDigest != executor.reference.executableDigest {
+		receipt, err := boundChunkReceipt(task, checkpoint, executor.reference.executableDigest)
+		if err != nil {
 			return nil, errors.Join(fmt.Errorf("%w: chunk dependency %d receipt", ErrExecution, index), err)
 		}
 		if err := executor.service.verifyCAS(ctx, task, checkpoint); err != nil {
@@ -779,12 +807,8 @@ func receiptsFromCheckpoints(plan chunkplan.Plan, checkpoints []stagedag.Checkpo
 	audioDescriptors = make([]ChunkDescriptor, 0)
 	for index, task := range plan.Tasks {
 		checkpoint := checkpoints[index]
-		receipt, err := chunkplan.DecodeReceipt(checkpoint.Output.Receipt)
-		if err != nil || chunkplan.ValidateReceiptForTask(task, receipt) != nil ||
-			receipt.Output.ContentHash != checkpoint.Output.ContentHash ||
-			receipt.Output.SizeBytes != checkpoint.Output.SizeBytes ||
-			receipt.AttemptCount != checkpoint.AttemptCount ||
-			receipt.Worker.ExecutableDigest != executableDigest {
+		receipt, err := boundChunkReceipt(task, checkpoint, executableDigest)
+		if err != nil {
 			return nil, nil, nil, nil, errors.Join(fmt.Errorf("%w: invalid chunk checkpoint %d", ErrArtifact, index), err)
 		}
 		descriptor := descriptorFor(task, receipt)
@@ -797,6 +821,40 @@ func receiptsFromCheckpoints(plan chunkplan.Plan, checkpoints []stagedag.Checkpo
 		}
 	}
 	return videoReceipts, audioReceipts, videoDescriptors, audioDescriptors, nil
+}
+
+func isReferenceChunkTask(task stagedag.Task) bool {
+	return task.Profile == chunkplan.VideoStageProfileV1 || task.Profile == chunkplan.AudioStageProfileV1
+}
+
+func attemptWithinPolicy(task stagedag.Task, attempt uint8) bool {
+	return attempt > 0 && attempt <= task.Retry.MaxAttempts
+}
+
+// boundChunkReceipt is the common recovery boundary for chunk telemetry. A
+// checkpoint is usable only when both it and its receipt name the same bounded
+// attempt. The current task policy constrains new execution, not historical
+// cache hits produced under an older policy. executableDigest may be empty only
+// for the generic RunResult shape check; dependency and artifact paths always
+// supply the configured provider digest.
+func boundChunkReceipt(task stagedag.Task, checkpoint stagedag.Checkpoint, executableDigest string) (chunkplan.Receipt, error) {
+	if !isReferenceChunkTask(task) || checkpoint.AttemptCount == 0 || checkpoint.AttemptCount > stagedag.MaxAttempts {
+		return chunkplan.Receipt{}, fmt.Errorf("chunk checkpoint attempt is outside the protocol bound")
+	}
+	receipt, err := chunkplan.DecodeReceipt(checkpoint.Output.Receipt)
+	if err != nil {
+		return chunkplan.Receipt{}, err
+	}
+	if err := chunkplan.ValidateReceiptForTask(task, receipt); err != nil {
+		return chunkplan.Receipt{}, err
+	}
+	if receipt.Output.ContentHash != checkpoint.Output.ContentHash ||
+		receipt.Output.SizeBytes != checkpoint.Output.SizeBytes ||
+		receipt.AttemptCount != checkpoint.AttemptCount ||
+		(executableDigest != "" && receipt.Worker.ExecutableDigest != executableDigest) {
+		return chunkplan.Receipt{}, fmt.Errorf("chunk receipt/checkpoint binding")
+	}
+	return receipt, nil
 }
 
 // SelectMissingChunks exposes the exact chunkplan recovery selector used by

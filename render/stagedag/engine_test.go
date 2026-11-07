@@ -111,7 +111,8 @@ func TestEngineRunsBudgetedDAGAndResumesFromCheckpoints(t *testing.T) {
 		Limits: Limits{MaxConcurrent: 2, MaxMemoryBytes: 8, MaxDiskBytes: 8},
 	}
 	result, err := engine.Run(context.Background(), plan)
-	if err != nil || result.Executed != 4 || result.CacheHits != 0 || len(result.Checkpoints) != 4 {
+	if err != nil || result.Executed != 4 || result.CacheHits != 0 || len(result.Checkpoints) != 4 ||
+		len(result.TaskOutcomes) != 4 {
 		t.Fatalf("result = %+v, err = %v", result, err)
 	}
 	if maximumRunning != 2 {
@@ -121,8 +122,10 @@ func TestEngineRunsBudgetedDAGAndResumesFromCheckpoints(t *testing.T) {
 		t.Fatalf("mux dependency order = %s", got)
 	}
 	for index, checkpoint := range result.Checkpoints {
-		if checkpoint.TaskID != plan.Tasks[index].ID {
-			t.Fatalf("checkpoint order[%d] = %s", index, checkpoint.TaskID)
+		outcome := result.TaskOutcomes[index]
+		if checkpoint.TaskID != plan.Tasks[index].ID || outcome.TaskID != plan.Tasks[index].ID ||
+			outcome.CacheHit || outcome.AttemptsThisRun != 1 {
+			t.Fatalf("result order[%d] checkpoint=%s outcome=%+v", index, checkpoint.TaskID, outcome)
 		}
 	}
 
@@ -133,6 +136,16 @@ func TestEngineRunsBudgetedDAGAndResumesFromCheckpoints(t *testing.T) {
 	resumed, err := resume.Run(context.Background(), plan)
 	if err != nil || resumed.Executed != 0 || resumed.CacheHits != 4 {
 		t.Fatalf("resumed = %+v, err = %v", resumed, err)
+	}
+	for index, outcome := range resumed.TaskOutcomes {
+		if outcome.TaskID != plan.Tasks[index].ID || !outcome.CacheHit || outcome.AttemptsThisRun != 0 {
+			t.Fatalf("resumed outcome[%d] = %+v", index, outcome)
+		}
+	}
+	cloned := cloneRunResult(resumed)
+	resumed.TaskOutcomes[0].TaskID = "mutated"
+	if cloned.TaskOutcomes[0].TaskID != plan.Tasks[0].ID {
+		t.Fatal("cloneRunResult aliases task outcomes")
 	}
 	eventMu.Lock()
 	defer eventMu.Unlock()
@@ -162,7 +175,8 @@ func TestEngineRetriesOnlyClassifiedFailures(t *testing.T) {
 	plan.Tasks[0].Retry.RetryTransient = true
 	result, err := engine.Run(context.Background(), plan)
 	if err != nil || result.Executed != 1 || result.Retries != 1 || attempts.Load() != 2 ||
-		len(result.Checkpoints) != 1 || result.Checkpoints[0].AttemptCount != 2 {
+		len(result.Checkpoints) != 1 || result.Checkpoints[0].AttemptCount != 2 ||
+		len(result.TaskOutcomes) != 1 || result.TaskOutcomes[0] != (TaskOutcome{TaskID: "retry", AttemptsThisRun: 2}) {
 		t.Fatalf("result = %+v attempts=%d err=%v", result, attempts.Load(), err)
 	}
 
@@ -177,6 +191,35 @@ func TestEngineRetriesOnlyClassifiedFailures(t *testing.T) {
 	})
 	if _, err := engine.Run(context.Background(), plan); !errors.Is(err, ErrExecution) || attempts.Load() != 1 {
 		t.Fatalf("unclassified err=%v attempts=%d", err, attempts.Load())
+	}
+}
+
+func TestEngineMarksHistoricalAttemptAsCacheHitAfterPolicyReduction(t *testing.T) {
+	historical := Plan{
+		Profile: PlanProfileV1, JobID: "job-historical-attempt", PlanFingerprint: digest('a'), ExecutionManifestFingerprint: digest('b'),
+		Tasks: []Task{testTask("historical", renderapi.StageDecode, nil, 1, 1, 3)},
+	}
+	bindTaskCacheKeys(t, &historical)
+	checkpoint, err := NewCheckpoint(historical, historical.Tasks[0], testOutput(t, "historical"), 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := newMemoryCheckpointStore()
+	store.values[checkpoint.TaskID] = checkpoint
+	reduced := historical
+	reduced.Tasks = cloneTasks(historical.Tasks)
+	reduced.Tasks[0].Retry = RetryPolicy{MaxAttempts: 1}
+	result, err := (Engine{
+		Store: store,
+		Executor: ExecutorFunc(func(context.Context, Task, []Dependency) (StageOutput, error) {
+			return StageOutput{}, errors.New("historical cache hit must not execute")
+		}),
+		Limits: Limits{MaxConcurrent: 1, MaxMemoryBytes: 1, MaxDiskBytes: 1},
+	}).Run(context.Background(), reduced)
+	if err != nil || result.Executed != 0 || result.CacheHits != 1 || result.Retries != 0 ||
+		len(result.TaskOutcomes) != 1 || result.TaskOutcomes[0] != (TaskOutcome{TaskID: "historical", CacheHit: true}) ||
+		result.Checkpoints[0].AttemptCount != 3 {
+		t.Fatalf("historical result = %+v, %v", result, err)
 	}
 }
 
@@ -219,7 +262,8 @@ func TestEngineAttemptExecutorBindsTheProducingAttempt(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got := fmt.Sprint(attempts); got != "[1 2]" || legacyCalls != 0 ||
-		result.Executed != 1 || result.Retries != 1 || len(result.Checkpoints) != 1 {
+		result.Executed != 1 || result.Retries != 1 || len(result.Checkpoints) != 1 ||
+		len(result.TaskOutcomes) != 1 || result.TaskOutcomes[0] != (TaskOutcome{TaskID: "retry", AttemptsThisRun: 2}) {
 		t.Fatalf("attempts=%s legacy=%d result=%+v", got, legacyCalls, result)
 	}
 	checkpoint := result.Checkpoints[0]

@@ -69,6 +69,13 @@ func NewReceipt(ctx context.Context, task stagedag.Task, output OutputIdentity, 
 	if err := ctx.Err(); err != nil {
 		return Receipt{}, err
 	}
+	// Creation describes the current execution and therefore must obey the
+	// current task policy. Validation below is intentionally more permissive so
+	// a canonical checkpoint produced under an older, larger policy remains a
+	// usable cache hit after the policy is reduced.
+	if attempt == 0 || attempt > task.Retry.MaxAttempts {
+		return Receipt{}, fmt.Errorf("%w: attempt exceeds the executing task policy", ErrReceipt)
+	}
 	profile, err := validateChunkTask(task)
 	if err != nil {
 		return Receipt{}, err
@@ -117,9 +124,6 @@ func ValidateReceiptForTask(task stagedag.Task, receipt Receipt) error {
 		!equalRange(receipt.SampleRange, task.SampleRange) || receipt.OutputProfile != task.CacheInput.OutputProfile ||
 		!equalCacheInput(receipt.CacheInput, task.CacheInput) {
 		return fmt.Errorf("%w: receipt/task binding", ErrReceipt)
-	}
-	if receipt.AttemptCount > task.Retry.MaxAttempts {
-		return fmt.Errorf("%w: receipt attempt exceeds task retry policy", ErrReceipt)
 	}
 	want, err := receiptFingerprint(receipt)
 	if err != nil {

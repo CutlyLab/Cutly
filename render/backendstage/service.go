@@ -136,7 +136,7 @@ func (service *Service) ResolveExecutor(ctx context.Context, job renderapi.Rende
 	}
 	resolved := &executor{
 		service: service, request: request, plan: frozen, reference: service.reference,
-		taskIndex: make(map[string]int, len(frozen.Tasks)),
+		taskIndex: make(map[string]int, len(frozen.Tasks)), newInvocation: newInvocationID,
 	}
 	for index, task := range frozen.Tasks {
 		resolved.taskIndex[task.ID] = index
@@ -474,12 +474,14 @@ func exactPlan(supplied, wanted stagedag.Plan) (stagedag.Plan, error) {
 }
 
 func validateResult(plan stagedag.Plan, result stagedag.RunResult) (stagedag.Checkpoint, error) {
-	if len(plan.Tasks) == 0 || len(result.Checkpoints) != len(plan.Tasks) || result.Retries != 0 ||
-		result.Executed < 0 || result.CacheHits < 0 || result.Executed+result.CacheHits != len(plan.Tasks) {
+	if len(plan.Tasks) == 0 || len(result.Checkpoints) != len(plan.Tasks) ||
+		len(result.TaskOutcomes) != len(plan.Tasks) || result.Retries < 0 ||
+		result.Executed < 0 || result.CacheHits < 0 {
 		return stagedag.Checkpoint{}, fmt.Errorf("%w: run result shape", ErrArtifact)
 	}
+	executed, cacheHits, retries := 0, 0, 0
 	for index, task := range plan.Tasks {
-		checkpoint := result.Checkpoints[index]
+		checkpoint, outcome := result.Checkpoints[index], result.TaskOutcomes[index]
 		if _, err := stagedag.CanonicalCheckpoint(checkpoint); err != nil {
 			return stagedag.Checkpoint{}, errors.Join(ErrArtifact, err)
 		}
@@ -487,9 +489,34 @@ func validateResult(plan stagedag.Plan, result stagedag.RunResult) (stagedag.Che
 			checkpoint.ExecutionManifestFingerprint != plan.ExecutionManifestFingerprint ||
 			checkpoint.TaskID != task.ID || checkpoint.Stage != task.Stage || checkpoint.TaskProfile != task.Profile ||
 			checkpoint.CacheKey != task.CacheKey || !rangesEqual(checkpoint.FrameRange, task.FrameRange) ||
-			!rangesEqual(checkpoint.SampleRange, task.SampleRange) || checkpoint.AttemptCount != 1 {
+			!rangesEqual(checkpoint.SampleRange, task.SampleRange) || outcome.TaskID != task.ID {
 			return stagedag.Checkpoint{}, fmt.Errorf("%w: checkpoint/task binding", ErrArtifact)
 		}
+		if isReferenceChunkTask(task) {
+			if _, err := boundChunkReceipt(task, checkpoint, ""); err != nil {
+				return stagedag.Checkpoint{}, errors.Join(ErrArtifact, err)
+			}
+		} else if checkpoint.AttemptCount != 1 {
+			// Legacy and reference-final receipts do not carry an attempt field;
+			// those task policies remain deliberately single-attempt.
+			return stagedag.Checkpoint{}, fmt.Errorf("%w: publish checkpoint attempt", ErrArtifact)
+		}
+		if outcome.CacheHit {
+			if outcome.AttemptsThisRun != 0 {
+				return stagedag.Checkpoint{}, fmt.Errorf("%w: cache-hit task has execution attempts", ErrArtifact)
+			}
+			cacheHits++
+			continue
+		}
+		if !attemptWithinPolicy(task, outcome.AttemptsThisRun) || outcome.AttemptsThisRun != checkpoint.AttemptCount {
+			return stagedag.Checkpoint{}, fmt.Errorf("%w: executed task attempt telemetry", ErrArtifact)
+		}
+		executed++
+		retries += int(outcome.AttemptsThisRun) - 1
+	}
+	if result.Executed != executed || result.CacheHits != cacheHits || result.Retries != retries ||
+		executed+cacheHits != len(plan.Tasks) {
+		return stagedag.Checkpoint{}, fmt.Errorf("%w: run retry telemetry", ErrArtifact)
 	}
 	return result.Checkpoints[len(result.Checkpoints)-1], nil
 }
@@ -539,18 +566,26 @@ func (service *Service) verifyCAS(ctx context.Context, task stagedag.Task, check
 }
 
 type executor struct {
-	service     *Service
-	request     renderapi.RenderRequest
-	plan        stagedag.Plan
-	publishTask stagedag.Task
-	backend     Backend
-	assembler   ChunkAssemblerBackend
-	reference   *referenceChunks
-	chunkPlan   *chunkplan.Plan
-	taskIndex   map[string]int
+	service       *Service
+	request       renderapi.RenderRequest
+	plan          stagedag.Plan
+	publishTask   stagedag.Task
+	backend       Backend
+	assembler     ChunkAssemblerBackend
+	reference     *referenceChunks
+	chunkPlan     *chunkplan.Plan
+	taskIndex     map[string]int
+	newInvocation func() (string, error)
 }
 
 func (executor *executor) Execute(ctx context.Context, task stagedag.Task, dependencies []stagedag.Dependency) (stagedag.StageOutput, error) {
+	return executor.ExecuteAttempt(ctx, task, dependencies, 1)
+}
+
+// ExecuteAttempt binds the exact 1-based stagedag attempt into reference
+// chunk receipts. Execute remains the compatibility entry point and is exactly
+// equivalent to attempt 1.
+func (executor *executor) ExecuteAttempt(ctx context.Context, task stagedag.Task, dependencies []stagedag.Dependency, attempt uint8) (stagedag.StageOutput, error) {
 	if executor == nil || executor.service == nil || ctx == nil {
 		return stagedag.StageOutput{}, ErrConfiguration
 	}
@@ -561,11 +596,14 @@ func (executor *executor) Execute(ctx context.Context, task stagedag.Task, depen
 	if !found || index < 0 || index >= len(executor.plan.Tasks) || !reflect.DeepEqual(task, executor.plan.Tasks[index]) {
 		return stagedag.StageOutput{}, fmt.Errorf("%w: executor received another task", ErrExecution)
 	}
+	if !attemptWithinPolicy(task, attempt) {
+		return stagedag.StageOutput{}, fmt.Errorf("%w: attempt %d exceeds task policy", ErrExecution, attempt)
+	}
 	if task.Profile == chunkplan.VideoStageProfileV1 || task.Profile == chunkplan.AudioStageProfileV1 {
 		if len(dependencies) != 0 {
 			return stagedag.StageOutput{}, fmt.Errorf("%w: chunk task received dependencies", ErrExecution)
 		}
-		return executor.executeChunk(ctx, task)
+		return executor.executeChunk(ctx, task, attempt)
 	}
 	if !reflect.DeepEqual(task, executor.publishTask) {
 		return stagedag.StageOutput{}, fmt.Errorf("%w: unsupported task profile", ErrExecution)
@@ -901,5 +939,5 @@ var (
 	_ renderuntime.PlanSource       = (*Service)(nil)
 	_ renderuntime.ExecutorSource   = (*Service)(nil)
 	_ renderuntime.ArtifactResolver = (*Service)(nil)
-	_ stagedag.Executor             = (*executor)(nil)
+	_ stagedag.AttemptExecutor      = (*executor)(nil)
 )

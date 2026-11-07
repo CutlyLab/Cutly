@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -66,6 +67,314 @@ func TestReferenceChunksExecuteCanonicalBytesAndResumeFromCheckpoints(t *testing
 	}
 }
 
+func TestReferenceChunksRetryExplicitTransientFailureWithAttemptBoundReceipt(t *testing.T) {
+	fixture := newReferenceFixture(t)
+	job := fixture.job("job-reference-transient-retry", "reference-transient-retry.mp4")
+	plan := mustPlan(t, fixture.service, job)
+	originalPCM := fixture.service.reference.pcm
+	var providerCalls atomic.Int32
+	var firstSpool string
+	fixture.service.reference.pcm = PCMProviderFunc(func(ctx context.Context, request ReferenceChunkRequest, sampleRange videoedit.TickRange) (*pcm16le.Block, error) {
+		call := providerCalls.Add(1)
+		entries, err := os.ReadDir(fixture.service.reference.scratchDirectory)
+		if err != nil || len(entries) != 1 {
+			return nil, fmt.Errorf("attempt %d scratch entries=%d: %w", call, len(entries), err)
+		}
+		if call == 1 {
+			firstSpool = entries[0].Name()
+			return nil, &stagedag.StageError{Class: renderapi.FailureTransient, Err: errors.New("temporary provider outage")}
+		}
+		if call != 2 || entries[0].Name() == firstSpool {
+			return nil, fmt.Errorf("retry reused or leaked spool: first=%q current=%q call=%d", firstSpool, entries[0].Name(), call)
+		}
+		reader, openErr := fixture.store.Open(ctx, plan.Tasks[0].CacheKey, "transient-attempt-audit")
+		if reader != nil {
+			_ = reader.Close()
+			return nil, errors.New("failed attempt exposed partial chunk CAS")
+		}
+		if !errors.Is(openErr, cas.ErrMiss) {
+			return nil, fmt.Errorf("failed-attempt CAS lookup: %w", openErr)
+		}
+		return originalPCM.RenderPCM(ctx, request, sampleRange)
+	})
+
+	resolved := mustExecutor(t, fixture.service, job, plan)
+	attemptExecutor, ok := resolved.(*executor)
+	if !ok {
+		t.Fatalf("executor type = %T", resolved)
+	}
+	var invocationCalls atomic.Int32
+	attemptExecutor.newInvocation = func() (string, error) {
+		return fmt.Sprintf("reference-attempt-%d", invocationCalls.Add(1)), nil
+	}
+	store := newReferenceCheckpointStore(t, fixture)
+	engine := stagedag.Engine{
+		Store: store, Executor: attemptExecutor,
+		Limits: stagedag.Limits{MaxConcurrent: 1, MaxMemoryBytes: 8 << 20, MaxDiskBytes: 64 << 20},
+	}
+	result, err := engine.Run(context.Background(), plan)
+	if err != nil || result.Executed != len(plan.Tasks) || result.CacheHits != 0 || result.Retries != 1 {
+		t.Fatalf("retry result = %+v, %v", result, err)
+	}
+	audioCheckpoint := result.Checkpoints[0]
+	audioReceipt, err := chunkplan.DecodeReceipt(audioCheckpoint.Output.Receipt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if providerCalls.Load() != 2 || audioCheckpoint.AttemptCount != 2 || audioReceipt.AttemptCount != 2 ||
+		audioReceipt.Worker.InvocationID != "reference-attempt-2" || invocationCalls.Load() != 3 {
+		t.Fatalf("provider/invocation/checkpoint = %d/%d/%d/%q totalInvocations=%d",
+			providerCalls.Load(), audioCheckpoint.AttemptCount, audioReceipt.AttemptCount,
+			audioReceipt.Worker.InvocationID, invocationCalls.Load())
+	}
+	if entries, readErr := os.ReadDir(fixture.service.reference.scratchDirectory); readErr != nil || len(entries) != 0 {
+		t.Fatalf("retry left spool entries=%d err=%v", len(entries), readErr)
+	}
+	selection, err := fixture.service.SelectMissingChunks(context.Background(), job, result.Checkpoints[:len(plan.Tasks)-1])
+	if err != nil || len(selection.Ready) != len(plan.Tasks)-1 || len(selection.Missing) != 0 || len(selection.Rejected) != 0 {
+		t.Fatalf("attempt-2 recovery selection = %+v, %v", selection, err)
+	}
+	if _, err := fixture.service.ResolveArtifact(context.Background(), job, plan, result); err != nil {
+		t.Fatalf("attempt-2 artifact resolution: %v", err)
+	}
+	resumed, err := engine.Run(context.Background(), plan)
+	if err != nil || resumed.Executed != 0 || resumed.CacheHits != len(plan.Tasks) || resumed.Retries != 0 ||
+		resumed.Checkpoints[0].AttemptCount != 2 {
+		t.Fatalf("attempt-2 checkpoint restart = %+v, %v", resumed, err)
+	}
+	if _, err := fixture.service.ResolveArtifact(context.Background(), job, plan, resumed); err != nil {
+		t.Fatalf("resumed attempt-2 artifact resolution: %v", err)
+	}
+
+	allExecutedWithoutRetry := result
+	allExecutedWithoutRetry.Retries = 0
+	if _, err := fixture.service.ResolveArtifact(context.Background(), job, plan, allExecutedWithoutRetry); !errors.Is(err, ErrArtifact) {
+		t.Fatalf("all-executed retry counter forgery = %v", err)
+	}
+	finalOnlyWithRetry := result
+	finalOnlyWithRetry.Executed, finalOnlyWithRetry.CacheHits, finalOnlyWithRetry.Retries = 1, len(plan.Tasks)-1, 1
+	finalOnlyWithRetry.TaskOutcomes = append([]stagedag.TaskOutcome(nil), result.TaskOutcomes...)
+	for index, task := range plan.Tasks {
+		finalOnlyWithRetry.TaskOutcomes[index] = stagedag.TaskOutcome{TaskID: task.ID, CacheHit: true}
+	}
+	finalOnlyWithRetry.TaskOutcomes[len(plan.Tasks)-1] = stagedag.TaskOutcome{
+		TaskID: plan.Tasks[len(plan.Tasks)-1].ID, AttemptsThisRun: 1,
+	}
+	if _, err := fixture.service.ResolveArtifact(context.Background(), job, plan, finalOnlyWithRetry); !errors.Is(err, ErrArtifact) {
+		t.Fatalf("final-only retry counter forgery = %v", err)
+	}
+	chunkOnlyRetry := result
+	chunkOnlyRetry.Executed, chunkOnlyRetry.CacheHits, chunkOnlyRetry.Retries = 1, len(plan.Tasks)-1, 1
+	chunkOnlyRetry.TaskOutcomes = append([]stagedag.TaskOutcome(nil), finalOnlyWithRetry.TaskOutcomes...)
+	chunkOnlyRetry.TaskOutcomes[0] = stagedag.TaskOutcome{TaskID: plan.Tasks[0].ID, AttemptsThisRun: 2}
+	chunkOnlyRetry.TaskOutcomes[len(plan.Tasks)-1] = stagedag.TaskOutcome{
+		TaskID: plan.Tasks[len(plan.Tasks)-1].ID, CacheHit: true,
+	}
+	if _, err := fixture.service.ResolveArtifact(context.Background(), job, plan, chunkOnlyRetry); err != nil {
+		t.Fatalf("legitimate chunk-only retry telemetry rejected: %v", err)
+	}
+
+	// The enclosing checkpoint and canonical receipt must name the same
+	// producing attempt on every recovery path.
+	mismatched := append([]stagedag.Checkpoint(nil), result.Checkpoints...)
+	mismatched[0].AttemptCount = 1
+	selection, err = fixture.service.SelectMissingChunks(context.Background(), job, mismatched[:len(plan.Tasks)-1])
+	if err != nil || len(selection.Missing) != 1 || len(selection.Rejected) != 1 || len(selection.Ready) != len(plan.Tasks)-2 {
+		t.Fatalf("attempt-mismatch selection = %+v, %v", selection, err)
+	}
+	mismatchedResult := result
+	mismatchedResult.Checkpoints = mismatched
+	if _, err := fixture.service.ResolveArtifact(context.Background(), job, plan, mismatchedResult); !errors.Is(err, ErrArtifact) {
+		t.Fatalf("attempt-mismatch artifact error = %v", err)
+	}
+}
+
+func TestReferenceHistoricalAttemptRemainsAForcedCacheHitAfterPolicyReduction(t *testing.T) {
+	fixture := newReferenceFixture(t)
+	job := fixture.job("job-reference-historical-attempt", "reference-historical-attempt.mp4")
+	plan := mustPlan(t, fixture.service, job)
+	executor := mustExecutor(t, fixture.service, job, plan)
+	seed, err := executor.Execute(context.Background(), plan.Tasks[0], nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	seedReceipt, err := chunkplan.DecodeReceipt(seed.Receipt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	historicalPlan := plan
+	historicalPlan.Tasks = append([]stagedag.Task(nil), plan.Tasks...)
+	historicalPlan.Tasks[0].Retry = stagedag.RetryPolicy{MaxAttempts: 3, RetryTransient: true}
+	historicalReceipt, err := chunkplan.NewReceipt(context.Background(), historicalPlan.Tasks[0], seedReceipt.Output, 3, chunkplan.WorkerBinding{
+		InvocationID: "reference-historical-attempt", ExecutableDigest: fixture.service.reference.executableDigest,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	historicalOutput, err := chunkplan.StageOutput(historicalReceipt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	historicalCheckpoint, err := stagedag.NewCheckpoint(historicalPlan, historicalPlan.Tasks[0], historicalOutput, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := newReferenceCheckpointStore(t, fixture)
+	if err := store.Commit(context.Background(), historicalCheckpoint); err != nil {
+		t.Fatal(err)
+	}
+	selection, err := fixture.service.SelectMissingChunks(context.Background(), job, []stagedag.Checkpoint{historicalCheckpoint})
+	if err != nil || len(selection.Ready) != 1 || len(selection.Missing) != len(plan.Tasks)-2 ||
+		len(selection.Rejected) != 0 || selection.Ready[0].AttemptCount != 3 {
+		t.Fatalf("historical checkpoint selection = %+v, %v", selection, err)
+	}
+	result, err := fixture.engine(t, job, plan, store).Run(context.Background(), plan)
+	if err != nil || result.CacheHits != 1 || result.Executed != len(plan.Tasks)-1 || result.Retries != 0 ||
+		result.Checkpoints[0].AttemptCount != 3 ||
+		result.TaskOutcomes[0] != (stagedag.TaskOutcome{TaskID: plan.Tasks[0].ID, CacheHit: true}) {
+		t.Fatalf("historical checkpoint run = %+v, %v", result, err)
+	}
+	if fixture.providers.pcmCalls.Load() != 1 {
+		t.Fatalf("historical cache hit reran PCM provider %d times", fixture.providers.pcmCalls.Load())
+	}
+	if _, err := fixture.service.ResolveArtifact(context.Background(), job, plan, result); err != nil {
+		t.Fatalf("historical checkpoint artifact resolution: %v", err)
+	}
+	forgedExecution := result
+	forgedExecution.Executed, forgedExecution.CacheHits, forgedExecution.Retries = len(plan.Tasks), 0, 2
+	forgedExecution.TaskOutcomes = append([]stagedag.TaskOutcome(nil), result.TaskOutcomes...)
+	forgedExecution.TaskOutcomes[0] = stagedag.TaskOutcome{TaskID: plan.Tasks[0].ID, AttemptsThisRun: 3}
+	if _, err := fixture.service.ResolveArtifact(context.Background(), job, plan, forgedExecution); !errors.Is(err, ErrArtifact) {
+		t.Fatalf("historical attempt was accepted as current execution: %v", err)
+	}
+}
+
+func TestReferenceVideoRetryDiscardsPartialFirstAttemptSpool(t *testing.T) {
+	fixture := newReferenceFixture(t)
+	job := fixture.job("job-reference-partial-video-retry", "reference-partial-video-retry.mp4")
+	plan := mustPlan(t, fixture.service, job)
+	original := fixture.service.reference.surfaces
+	firstFrame, secondFrame := plan.Tasks[1].FrameRange.First, plan.Tasks[1].FrameRange.First+1
+	var failed atomic.Bool
+	var firstSpool string
+	fixture.service.reference.surfaces = SurfaceProviderFunc(func(ctx context.Context, request ReferenceChunkRequest, frame int64) (*cpucompositor.Surface, error) {
+		if frame == secondFrame && failed.CompareAndSwap(false, true) {
+			entries, err := os.ReadDir(fixture.service.reference.scratchDirectory)
+			if err != nil || len(entries) != 1 {
+				return nil, fmt.Errorf("partial attempt scratch entries=%d: %w", len(entries), err)
+			}
+			firstSpool = entries[0].Name()
+			return nil, &stagedag.StageError{Class: renderapi.FailureTransient, Err: errors.New("temporary second-frame failure")}
+		}
+		if frame == firstFrame && failed.Load() {
+			entries, err := os.ReadDir(fixture.service.reference.scratchDirectory)
+			if err != nil || len(entries) != 1 || entries[0].Name() == firstSpool {
+				return nil, fmt.Errorf("partial retry leaked/reused spool first=%q entries=%v: %w", firstSpool, entries, err)
+			}
+			reader, openErr := fixture.store.Open(ctx, plan.Tasks[1].CacheKey, "partial-video-attempt-audit")
+			if reader != nil {
+				_ = reader.Close()
+				return nil, errors.New("partial video attempt exposed CAS")
+			}
+			if !errors.Is(openErr, cas.ErrMiss) {
+				return nil, openErr
+			}
+		}
+		return original.RenderSurface(ctx, request, frame)
+	})
+	result, err := fixture.engine(t, job, plan, newReferenceCheckpointStore(t, fixture)).Run(context.Background(), plan)
+	if err != nil || result.Retries != 1 || result.Checkpoints[1].AttemptCount != 2 ||
+		result.TaskOutcomes[1] != (stagedag.TaskOutcome{TaskID: plan.Tasks[1].ID, AttemptsThisRun: 2}) {
+		t.Fatalf("partial video retry = %+v, %v", result, err)
+	}
+	if entries, readErr := os.ReadDir(fixture.service.reference.scratchDirectory); readErr != nil || len(entries) != 0 {
+		t.Fatalf("partial video retry left spool entries=%d err=%v", len(entries), readErr)
+	}
+}
+
+func TestReferenceChunkCleanupFailureSuppressesTransientRetryClass(t *testing.T) {
+	transient := &stagedag.StageError{Class: renderapi.FailureTransient, Err: errors.New("temporary")}
+	err := chunkCleanupFailure(wrapError(ErrExecution, "provider", transient), errors.New("remove spool"))
+	var classified *stagedag.StageError
+	if !errors.Is(err, ErrExecution) || errors.As(err, &classified) {
+		t.Fatalf("cleanup failure retained retry classification: %v", err)
+	}
+	canceled := chunkCleanupFailure(&stagedag.StageError{Class: renderapi.FailureTransient, Err: context.Canceled}, errors.New("remove spool"))
+	classified = nil
+	if !errors.Is(canceled, context.Canceled) || errors.As(canceled, &classified) {
+		t.Fatalf("cleanup failure lost cancellation or retained retry class: %v", canceled)
+	}
+}
+
+func TestReferenceChunksDoNotRetryCancellationPanicOrUnclassifiedFailures(t *testing.T) {
+	tests := []struct {
+		name      string
+		failure   error
+		panicNow  bool
+		wantCause error
+	}{
+		{name: "canceled transient", failure: &stagedag.StageError{Class: renderapi.FailureTransient, Err: context.Canceled}, wantCause: context.Canceled},
+		{name: "deadline transient", failure: &stagedag.StageError{Class: renderapi.FailureTransient, Err: context.DeadlineExceeded}, wantCause: context.DeadlineExceeded},
+		{name: "unclassified", failure: errors.New("unclassified provider failure")},
+		{name: "permanent", failure: &stagedag.StageError{Class: renderapi.FailureNonRetryable, Err: errors.New("permanent provider failure")}},
+		{name: "resource", failure: &stagedag.StageError{Class: renderapi.FailureResource, Err: errors.New("resource provider failure")}},
+		{name: "panic", panicNow: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fixture := newReferenceFixture(t)
+			var calls atomic.Int32
+			fixture.service.reference.surfaces = SurfaceProviderFunc(func(context.Context, ReferenceChunkRequest, int64) (*cpucompositor.Surface, error) {
+				calls.Add(1)
+				if test.panicNow {
+					panic("provider panic")
+				}
+				return nil, test.failure
+			})
+			job := fixture.job("job-no-retry-"+strings.ReplaceAll(test.name, " ", "-"), "no-retry.mp4")
+			plan := mustPlan(t, fixture.service, job)
+			result, err := fixture.engine(t, job, plan, newReferenceCheckpointStore(t, fixture)).Run(context.Background(), plan)
+			if err == nil || result.Executed != 0 || calls.Load() != 1 {
+				t.Fatalf("failure result=%+v calls=%d err=%v", result, calls.Load(), err)
+			}
+			if test.wantCause != nil && !errors.Is(err, test.wantCause) {
+				t.Fatalf("failure cause = %v, want %v", err, test.wantCause)
+			}
+			if fixture.backend.assembleCalls.Load() != 0 {
+				t.Fatal("failed chunk reached final assembler")
+			}
+			reader, openErr := fixture.store.Open(context.Background(), plan.Tasks[1].CacheKey, "no-retry-audit")
+			if reader != nil || !errors.Is(openErr, cas.ErrMiss) {
+				if reader != nil {
+					_ = reader.Close()
+				}
+				t.Fatalf("failed chunk CAS reader=%v err=%v", reader, openErr)
+			}
+			if entries, readErr := os.ReadDir(fixture.service.reference.scratchDirectory); readErr != nil || len(entries) != 0 {
+				t.Fatalf("failed chunk left spool entries=%d err=%v", len(entries), readErr)
+			}
+		})
+	}
+
+	t.Run("final transient", func(t *testing.T) {
+		fixture := newReferenceFixture(t)
+		fixture.backend.renderErr = &stagedag.StageError{Class: renderapi.FailureTransient, Err: errors.New("temporary encoder failure")}
+		job := fixture.job("job-final-transient-no-retry", "final-transient-no-retry.mp4")
+		plan := mustPlan(t, fixture.service, job)
+		result, err := fixture.engine(t, job, plan, newReferenceCheckpointStore(t, fixture)).Run(context.Background(), plan)
+		if err == nil || result.Executed != 0 || fixture.backend.assembleCalls.Load() != 1 {
+			t.Fatalf("final transient result=%+v calls=%d err=%v", result, fixture.backend.assembleCalls.Load(), err)
+		}
+		reader, openErr := fixture.store.Open(context.Background(), plan.Tasks[len(plan.Tasks)-1].CacheKey, "final-transient-audit")
+		if reader != nil || !errors.Is(openErr, cas.ErrMiss) {
+			if reader != nil {
+				_ = reader.Close()
+			}
+			t.Fatalf("failed final CAS reader=%v err=%v", reader, openErr)
+		}
+	})
+}
+
 func TestReferenceChunksWorkerCrashRestartsOnlyMissingWork(t *testing.T) {
 	fixture := newReferenceFixture(t)
 	fixture.providers.failSurface.Store(1)
@@ -79,6 +388,9 @@ func TestReferenceChunksWorkerCrashRestartsOnlyMissingWork(t *testing.T) {
 	}
 	if fixture.providers.pcmCalls.Load() != 1 || fixture.backend.assembleCalls.Load() != 0 || fixture.backend.renderCalls.Load() != 0 {
 		t.Fatalf("work before crash = pcm %d assembler %d render %d", fixture.providers.pcmCalls.Load(), fixture.backend.assembleCalls.Load(), fixture.backend.renderCalls.Load())
+	}
+	if fixture.providers.surfaceCalls.Load() != 1 {
+		t.Fatalf("unclassified worker failure retried %d times", fixture.providers.surfaceCalls.Load())
 	}
 	if reader, openErr := fixture.store.Open(context.Background(), plan.Tasks[1].CacheKey, "worker-crash-audit"); reader != nil || !errors.Is(openErr, cas.ErrMiss) {
 		if reader != nil {
@@ -118,7 +430,8 @@ func TestReferenceChunkReceiptInvocationIDsArePerExecution(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if first.ContentHash != second.ContentHash || firstReceipt.Worker.InvocationID == secondReceipt.Worker.InvocationID {
+	if first.ContentHash != second.ContentHash || firstReceipt.AttemptCount != 1 || secondReceipt.AttemptCount != 1 ||
+		firstReceipt.Worker.InvocationID == secondReceipt.Worker.InvocationID {
 		t.Fatalf("content/invocations = %s %s / %s %s", first.ContentHash, second.ContentHash, firstReceipt.Worker.InvocationID, secondReceipt.Worker.InvocationID)
 	}
 }
@@ -895,7 +1208,10 @@ func assertReferencePlan(t *testing.T, plan stagedag.Plan) {
 	if len(plan.Tasks) != 3 || plan.Tasks[0].Profile != chunkplan.AudioStageProfileV1 ||
 		plan.Tasks[1].Profile != chunkplan.VideoStageProfileV1 ||
 		plan.Tasks[2].Profile != ReferenceChunkPublishStageProfileV1 ||
-		len(plan.Tasks[2].DependsOn) != 2 || plan.Tasks[2].Retry.MaxAttempts != 1 {
+		plan.Tasks[0].Retry.MaxAttempts != 2 || !plan.Tasks[0].Retry.RetryTransient || plan.Tasks[0].Retry.RetryResource ||
+		plan.Tasks[1].Retry.MaxAttempts != 2 || !plan.Tasks[1].Retry.RetryTransient || plan.Tasks[1].Retry.RetryResource ||
+		len(plan.Tasks[2].DependsOn) != 2 || plan.Tasks[2].Retry.MaxAttempts != 1 ||
+		plan.Tasks[2].Retry.RetryTransient || plan.Tasks[2].Retry.RetryResource {
 		t.Fatalf("reference plan = %+v", plan)
 	}
 }

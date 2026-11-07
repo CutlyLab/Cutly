@@ -59,6 +59,31 @@ func TestSelectMissingValidatesCheckpointReceiptAndCAS(t *testing.T) {
 	}
 }
 
+func TestSelectMissingAcceptsHistoricalAttemptAfterRetryPolicyReduction(t *testing.T) {
+	plan := mustPlan(t, testJob("job-resume-policy-reduction", 1, 0))
+	historicalTask := plan.Tasks[0]
+	receipt := mustReceipt(t, historicalTask, 3)
+	output, err := StageOutput(receipt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkpoint, err := stagedag.NewCheckpoint(plan.Plan, historicalTask, output, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reduced := plan
+	reduced.Tasks = append([]stagedag.Task(nil), plan.Tasks...)
+	reduced.Tasks[0].Retry = stagedag.RetryPolicy{MaxAttempts: 1}
+	selection, err := SelectMissing(context.Background(), reduced, []stagedag.Checkpoint{checkpoint},
+		ArtifactAvailabilityFunc(func(_ context.Context, key cachekey.Key, hash string, size int64) (bool, error) {
+			return key == reduced.Tasks[0].CacheKey && hash == checkpoint.Output.ContentHash && size == checkpoint.Output.SizeBytes, nil
+		}))
+	if err != nil || len(selection.Ready) != 1 || len(selection.Missing) != 0 || len(selection.Rejected) != 0 ||
+		selection.Ready[0].AttemptCount != 3 {
+		t.Fatalf("historical selection = %+v, %v", selection, err)
+	}
+}
+
 func TestSelectMissingIsolatesInvalidDuplicateAndUnknownCandidates(t *testing.T) {
 	plan := mustPlan(t, testJob("job-reject", 65, 0))
 	valid := makeCheckpoint(t, plan, 0)

@@ -46,7 +46,8 @@ materialization, filesystem allocation units, and concurrently active jobs.
 
 V1 deliberately uses one non-retrying publish task. Backend and CAS publication
 are independently idempotent; retries happen by resuming the durable job rather
-than repeating an ambiguous in-process stage attempt.
+than repeating an ambiguous in-process publish attempt. This remains true for
+both the legacy whole-job publish and the reference profile's final codec task.
 
 ## Executable reference chunk profile
 
@@ -80,6 +81,22 @@ hashes the exact canonical bytes, atomically publishes them to CAS, and returns
 the canonical chunk receipt. Provider calls cannot observe `JobID`, the
 idempotency key, or the final publication URI because those values are excluded
 from chunk cache keys.
+
+Surface and PCM tasks allow at most two in-process attempts, and only an
+explicit `stagedag.StageError` classified as `transient` can select the second
+attempt. The receipt and checkpoint both record the actual producing attempt.
+Cancellation, deadlines, panics, unclassified failures, resource/permanent
+classes, unsafe spool cleanup, and every legacy/final publication failure stop
+without an in-process retry. A durable restart can still reuse any already
+committed chunk checkpoint.
+
+Reducing a retry policy does not invalidate an already committed canonical
+chunk. A checkpoint whose receipt records an older, higher attempt remains
+eligible only as a cache hit; a new execution must stay within the current
+policy. `stagedag.RunResult.TaskOutcomes` records per-task cache/execution
+provenance, so artifact resolution recomputes `Executed`, `CacheHits`, and
+`Retries` exactly instead of mistaking historical attempt telemetry for work
+performed by the current run.
 
 The final publish task depends on every chunk checkpoint. Before the backend is
 allowed to encode, the executor revalidates each receipt and CAS entry and

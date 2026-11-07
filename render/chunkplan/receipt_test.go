@@ -79,6 +79,23 @@ func TestReceiptStrictWireAndTamperRejection(t *testing.T) {
 	}
 }
 
+func TestHistoricalReceiptSurvivesRetryPolicyReductionButNewReceiptDoesNot(t *testing.T) {
+	plan := mustPlan(t, testJob("job-receipt-policy-reduction", 1, 0))
+	historicalTask := plan.Tasks[0]
+	if historicalTask.Retry.MaxAttempts != 3 {
+		t.Fatalf("historical policy = %+v", historicalTask.Retry)
+	}
+	historical := mustReceipt(t, historicalTask, 3)
+	reducedTask := historicalTask
+	reducedTask.Retry = stagedag.RetryPolicy{MaxAttempts: 1}
+	if err := ValidateReceiptForTask(reducedTask, historical); err != nil {
+		t.Fatalf("historical receipt rejected after policy reduction: %v", err)
+	}
+	if _, err := NewReceipt(context.Background(), reducedTask, historical.Output, 2, historical.Worker); !errors.Is(err, ErrReceipt) {
+		t.Fatalf("new receipt above reduced policy = %v", err)
+	}
+}
+
 func TestNewReceiptFailureIsZeroAndBoundsOutput(t *testing.T) {
 	plan := mustPlan(t, testJob("job-failure", 1, 1))
 	task := plan.Tasks[0]

@@ -24,6 +24,11 @@ receipt fingerprints and its worker trust/attestation policy.
 Checkpoints intentionally remain job-specific. Equivalent jobs produce the
 same task cache keys, so a later executor may reuse verified CAS chunks and
 commit a new job-bound checkpoint rather than trusting another job's journal.
+Retry policy is execution policy rather than output identity: creating a new
+receipt must obey the current task policy, while validation may accept a
+bounded historical receipt produced under a larger policy. Its enclosing
+checkpoint must still carry the exact same attempt, and the scheduler must
+identify it as a cache hit rather than current execution.
 
 Programmatic jobs pass fixed scheduler-equivalent string, digest and range
 admission checks before JSON freezing. This keeps oversized identifiers and
