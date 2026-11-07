@@ -26,6 +26,13 @@ boundaries as local commits; no push, package publication, tag, or daemon defaul
 S1 acceptance evidence is recorded in `DOCUMENT_V2_S1_EVIDENCE.md`; the active S2 ledger is
 `DOCUMENT_V2_S2_EVIDENCE.md`.
 
+The independent release-evidence runner is implemented and its three P2 audit findings were
+independently closed at `0f08c2e`; post-repair smoke and full repository gates passed. A real long
+restricted-RC observation is running, not accepted yet. See `RELEASE_EVIDENCE_RUNNER.md` for exact
+scope, dirty-source caveats and results. This parallel lane does not close S2, unlock S3–S6, or
+substitute for the broad mixed-media SDK lifecycle. Actual built archive inspection is the next
+independent packaging verification task; workflow text checks alone are not artifact evidence.
+
 ## 1. Purpose and completion boundary
 
 This document is the implementation plan for taking Cutly from its current restricted hard-cut RC
