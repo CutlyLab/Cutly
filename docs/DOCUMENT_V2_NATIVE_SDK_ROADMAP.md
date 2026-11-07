@@ -983,6 +983,6 @@ Deferred capabilities must produce stable preflight rejection. They must not be 
 | S4 Provider bundle | Not started | Depends on restart-safe S3 |
 | S5 Assembler/Evidence v2 | Not started | Depends on real S4 providers |
 | S6 Production runtime/cache | Not started | Depends on S3-S5 |
-| S7a Mutation/project core | Not started | May run beside S1-S6; required before public edit APIs |
+| S7a Mutation/project core | In progress: independent edit/project lane | See `DOCUMENT_V2_S7A_EVIDENCE.md`; does not waive blocked S2 audit; required before public edit APIs |
 | S7 Public SDK/CLI/Agent | Not started | Depends on S6 and audited S7a |
 | S8 Player/UI/release | Not started | Depends on S6/S7 and parallel release lane |
