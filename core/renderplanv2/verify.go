@@ -3,6 +3,7 @@ package renderplanv2
 import (
 	"reflect"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/CutlyLab/Cutly/core/documentv2"
@@ -123,6 +124,15 @@ func verifyStructure(p Plan) error {
 			return invalid("feature token")
 		}
 	}
+	// An explicit graph always executes routing, bus gain and bus pan. Other
+	// bus properties (such as a limiter) remain document-only closure facts.
+	if len(p.AudioBusIDs) != 0 {
+		for _, feature := range []videoedit.CapabilityID{documentv2.CapabilityAudioRouteV1, documentv2.CapabilityAudioGainV1, documentv2.CapabilityAudioPanV1} {
+			if !contains(caps.Features, feature) {
+				return invalid("missing explicit audio graph capability %q", feature)
+			}
+		}
+	}
 	for _, id := range p.AudioBusIDs {
 		if !validID(id) {
 			return invalid("bus ID")
@@ -174,6 +184,17 @@ func verifyStructure(p Plan) error {
 		if !contains(caps.TrackKinds, b.TrackKind) || !contains(caps.AssetKinds, b.AssetKind) {
 			return invalid("missing binding capabilities")
 		}
+		// Source/timeline duration ratios are visible in a binding, unlike
+		// properties and source profiles that require the original Document.
+		if temporal(b) && !equalTime(b.SourceRange.Duration, b.TimelineRange.Duration) {
+			feature := videoedit.CapabilityVideoLinearRetime
+			if b.TrackKind == documentv2.TrackKindAudio {
+				feature = videoedit.CapabilityAudioVarispeed
+			}
+			if !contains(caps.Features, feature) {
+				return invalid("missing temporal retime capability %q", feature)
+			}
+		}
 		if b.AudioBusID != "" && !contains(p.AudioBusIDs, b.AudioBusID) {
 			return invalid("missing routed bus")
 		}
@@ -221,6 +242,8 @@ func verifyStructure(p Plan) error {
 	transitionIDs := map[documentv2.ID]bool{}
 	transitionOut := map[documentv2.ID]bool{}
 	transitionIn := map[documentv2.ID]bool{}
+	incomingWindowEnd := map[documentv2.ID]documentv2.RationalTime{}
+	outgoingWindowStart := map[documentv2.ID]documentv2.RationalTime{}
 	for i, tr := range p.Transitions {
 		if !validID(tr.TransitionID) || tr.Profile != documentv2.TransitionDissolveV1 || (i > 0 && p.Transitions[i-1].TransitionIndex >= tr.TransitionIndex) || tr.PreDuration.Validate() != nil || tr.PostDuration.Validate() != nil || tr.PreDuration.Value < 0 || tr.PostDuration.Value < 0 {
 			return invalid("transition identity/order")
@@ -252,6 +275,12 @@ func verifyStructure(p Plan) error {
 		if e != nil || whole != tr.TimelineRange {
 			return invalid("transition window")
 		}
+		windowEnd, e := whole.End()
+		if e != nil {
+			return invalid("transition window end")
+		}
+		incomingWindowEnd[in.ClipID] = windowEnd
+		outgoingWindowStart[out.ClipID] = whole.Start
 		active, ok, e := intersection(whole, p.RequestedRange)
 		if e != nil || !ok || active != tr.ActiveTimelineRange {
 			return invalid("active transition range")
@@ -262,6 +291,19 @@ func verifyStructure(p Plan) error {
 		if !contains(caps.Features, videoedit.CapabilityID(tr.Profile)) {
 			return invalid("missing transition capability")
 		}
+		// Nonzero text/vector transitions have a frozen viewport-px source
+		// scope in Document v2, so both source and transition scope features
+		// are inferable even though arbitrary clip properties are not.
+		var scope, source videoedit.CapabilityID
+		switch out.TrackKind {
+		case documentv2.TrackKindText:
+			scope, source = documentv2.CapabilityTextTransitionScopeV1, documentv2.CapabilityTextPinnedFontViewportPXV2
+		case documentv2.TrackKindVector:
+			scope, source = documentv2.CapabilityVectorTransitionScopeV1, documentv2.CapabilityVectorPathViewportPXV2
+		}
+		if scope != "" && (!contains(caps.Features, scope) || !contains(caps.Features, source)) {
+			return invalid("missing transition source/scope capabilities")
+		}
 		for _, part := range []TransitionParticipant{tr.Outgoing, tr.Incoming} {
 			if e := addBinding(part.Binding); e != nil {
 				return e
@@ -269,6 +311,29 @@ func verifyStructure(p Plan) error {
 			expected, e := participant(part.Binding, active)
 			if e != nil || !reflect.DeepEqual(expected, part) {
 				return invalid("transition sampled/handle spans")
+			}
+		}
+	}
+	for id, incomingEnd := range incomingWindowEnd {
+		if outgoingStart, ok := outgoingWindowStart[id]; ok && less(outgoingStart, incomingEnd) {
+			return invalid("overlapping transition windows within clip")
+		}
+	}
+	// Compare all known bindings, including handle-only participants, in
+	// authored index order. Missing unselected indices are legitimate; their
+	// presence cannot be inferred, but known neighbors must never overlap or
+	// run backwards in timeline time. Deduplication above avoids double draws.
+	ordered := make([]ClipBinding, 0, len(bindings))
+	for _, b := range bindings {
+		ordered = append(ordered, b)
+	}
+	sort.Slice(ordered, func(i, j int) bool { return before(ordered[i], ordered[j]) })
+	for i := 1; i < len(ordered); i++ {
+		previous, current := ordered[i-1], ordered[i]
+		if previous.TrackIndex == current.TrackIndex {
+			end, err := previous.TimelineRange.End()
+			if err != nil || less(current.TimelineRange.Start, end) {
+				return invalid("overlapping or inverted authored clip ranges")
 			}
 		}
 	}

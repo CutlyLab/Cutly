@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/CutlyLab/Cutly/core/renderplanv2"
@@ -55,6 +56,25 @@ func TestDocumentV2RenderPlanPublishedFixtures(t *testing.T) {
 				t.Fatal("legacy decoder accepted Document v2 semantic plan")
 			}
 		})
+	}
+	invalidPaths, err := filepath.Glob(filepath.Join(root, "conformance", "fixtures", "document-v2-render-plan-*.invalid.json"))
+	if err != nil || len(invalidPaths) == 0 {
+		t.Fatalf("invalid fixture inventory: %v", err)
+	}
+	for _, path := range invalidPaths {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		canonical, err := canonicaljson.Canonicalize(raw)
+		if err != nil || !bytes.Equal(raw, canonical) {
+			t.Fatalf("hostile fixture %s must be canonical JSON: %v", filepath.Base(path), err)
+		}
+		// Some attacks satisfy JSON Schema but contradict semantic cross-field
+		// invariants. The strict codec must reject the entire published corpus.
+		if plan, err := renderplanv2.Decode(raw); err == nil || !reflect.DeepEqual(plan, renderplanv2.Plan{}) {
+			t.Fatalf("hostile fixture %s accepted or returned a partial plan", filepath.Base(path))
+		}
 	}
 	for _, name := range []string{"render-plan-v2.valid.json", "render-plan-v3.canonical.json", "document-v2.canonical.json"} {
 		if _, err := renderplanv2.Decode(fixture(t, name)); err == nil {

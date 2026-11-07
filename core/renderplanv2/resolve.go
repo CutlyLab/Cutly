@@ -215,7 +215,12 @@ func Resolve(ctx context.Context, document documentv2.Document, requested docume
 // VerifyAgainstDocument proves complete authored closure by re-resolving and
 // comparing canonical bytes. Standalone Verify alone cannot prove an omitted
 // clip, transition, bus ancestor, property capability or document hash is honest.
-func VerifyAgainstDocument(ctx context.Context, p Plan, document documentv2.Document) error {
+func VerifyAgainstDocument(ctx context.Context, p Plan, document documentv2.Document) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = invalid("document verification panic: %v", r)
+		}
+	}()
 	if ctx == nil {
 		return invalid("nil context")
 	}
