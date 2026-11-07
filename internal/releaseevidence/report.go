@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -81,6 +82,12 @@ func Observe(ctx context.Context, c Config, e Executor) (Source, error) {
 		out := &capture{limit: 65536, max: 65536, cancel: cancel}
 		errout := &capture{limit: 4096, max: 65536, cancel: cancel}
 		result := e.Execute(child, Command{Path: path, Args: args, Dir: c.Repo}, out, errout)
+		if ctx.Err() != nil {
+			return "", fmt.Errorf("observe %s: %w", path, ctx.Err())
+		}
+		if capErr := errors.Join(out.capError("observation stdout"), errout.capError("observation stderr")); capErr != nil {
+			return "", fmt.Errorf("observe %s: %w", path, capErr)
+		}
 		if child.Err() != nil {
 			return "", fmt.Errorf("observe %s: %w", path, child.Err())
 		}
@@ -89,9 +96,6 @@ func Observe(ctx context.Context, c Config, e Executor) (Source, error) {
 		}
 		if result.ExitCode != 0 {
 			return "", fmt.Errorf("observe %s: exit %d: %s", path, result.ExitCode, errout.data)
-		}
-		if out.total > out.max || errout.total > errout.max {
-			return "", fmt.Errorf("observation output cap exceeded")
 		}
 		return strings.TrimSpace(string(out.data)), nil
 	}
@@ -148,7 +152,12 @@ func Observe(ctx context.Context, c Config, e Executor) (Source, error) {
 	return s, nil
 }
 func hashFile(ctx context.Context, path string) (string, error) {
-	f, err := os.Open(path)
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	// Open nonblocking before inspecting the descriptor. A path-level stat alone
+	// cannot prevent a regular executable being swapped for a blocking FIFO.
+	f, err := openToolForHash(path)
 	if err != nil {
 		return "", err
 	}

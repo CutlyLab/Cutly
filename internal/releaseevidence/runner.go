@@ -167,14 +167,18 @@ func (r Runner) invoke(ctx context.Context, c Config, cmd Command, remaining *in
 	inv.LogTruncated = stdout.truncated || stderr.truncated
 	*remaining -= len(stdout.data) + len(stderr.data)
 	err := parser.finish()
-	if err == nil && (stdout.total > stdout.max || stderr.total > stderr.max) {
-		err = fmt.Errorf("command output cap exceeded")
-	}
+	capErr := errors.Join(stdout.capError("stdout"), stderr.capError("stderr"))
 	if ctx.Err() != nil {
+		// A genuine caller cancellation/deadline takes precedence over cleanup.
 		err = ctx.Err()
+	} else if capErr != nil {
+		err = capErr
+	} else if parser.err != nil {
+		// Malformed evidence also cancels the child internally; keep its cause.
+		err = parser.err
 	} else if errors.Is(child.Err(), context.DeadlineExceeded) {
 		err = child.Err()
-	} else if result.Err != nil && (err == nil || (parser.err == nil && (errors.Is(result.Err, context.Canceled) || errors.Is(result.Err, context.DeadlineExceeded)))) {
+	} else if result.Err != nil && (err == nil || errors.Is(result.Err, context.Canceled) || errors.Is(result.Err, context.DeadlineExceeded)) {
 		err = result.Err
 	}
 	if result.ExitCode != 0 && err == nil {

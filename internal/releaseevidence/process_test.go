@@ -5,10 +5,13 @@ package releaseevidence
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -58,6 +61,51 @@ func TestOSExecutorCancelsDescendants(t *testing.T) {
 	}
 	if elapsed := time.Since(start); elapsed > 1500*time.Millisecond {
 		t.Fatalf("process tree did not stop promptly (%s); inherited descendant stdout likely remained open", elapsed)
+	}
+}
+func TestObserveExecutableFIFOHelper(t *testing.T) {
+	if os.Getenv("RELEASE_EVIDENCE_FIFO_HELPER") != "1" {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	r := NewRunner()
+	r.Executor = executorFunc(func(_ context.Context, c Command, w, _ io.Writer) Result {
+		if c.Args[0] == "rev-parse" {
+			fmt.Fprintln(w, strings.Repeat("a", 40))
+		}
+		return Result{}
+	})
+	config := Defaults("smoke")
+	config.Budget = time.Second
+	report, err := r.Run(ctx, config)
+	if err == nil || report.Status != "failed" || !strings.Contains(report.Error, "not a regular file") {
+		t.Fatalf("FIFO observation: %v %+v", err, report)
+	}
+}
+func TestObserveExecutableFIFOIsBounded(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "go")
+	if err := syscall.Mkfifo(path, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(path, 0700); err != nil {
+		t.Fatal(err)
+	}
+	// Run the regression in a killable child. A reintroduced blocking open fails
+	// within 3s without leaving a blocked goroutine in this test process.
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestObserveExecutableFIFOHelper$")
+	cmd.Env = append(executionEnvironment(nil), "RELEASE_EVIDENCE_FIFO_HELPER=1", "PATH="+dir)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("FIFO observation was not bounded/rejected: %v %s", err, output)
+	}
+	canceled, stop := context.WithCancel(context.Background())
+	stop()
+	if _, err := hashFile(canceled, path); !errors.Is(err, context.Canceled) {
+		t.Fatalf("open must honor preexisting cancellation: %v", err)
 	}
 }
 func TestOSExecutorDeadlineAndMissingExecutable(t *testing.T) {

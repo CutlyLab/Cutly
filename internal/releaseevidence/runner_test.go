@@ -148,6 +148,51 @@ func TestRejectedExecutionEvidence(t *testing.T) {
 		})
 	}
 }
+func TestInternalOutputCapCancellationRemainsFailure(t *testing.T) {
+	for _, stream := range []string{"stdout", "stderr"} {
+		t.Run(stream, func(t *testing.T) {
+			r := fakeRunner(t)
+			r.Executor = executorFunc(func(ctx context.Context, c Command, out, errout io.Writer) Result {
+				if stream == "stdout" {
+					// Leave the parser without an error: the stream cap itself fires
+					// before any of this oversized write is parsed.
+					_, _ = out.Write([]byte(strings.Repeat("x", (8<<20)+1)))
+				} else {
+					passing(c, out)
+					_, _ = errout.Write([]byte(strings.Repeat("x", (1<<20)+1)))
+				}
+				if !errors.Is(ctx.Err(), context.Canceled) {
+					t.Error("cap did not cancel child")
+				}
+				// OSExecutor reports the internally canceled child this way.
+				return Result{-1, ctx.Err()}
+			})
+			path := filepath.Join(t.TempDir(), "cap.json")
+			report, err := r.RunToFile(context.Background(), Defaults("smoke"), path)
+			if err == nil || errors.Is(err, context.Canceled) || report.Status != "failed" || !strings.Contains(report.Error, stream+" output cap exceeded") {
+				t.Fatalf("cap misclassified: %v %+v", err, report)
+			}
+			if len(report.Commands) != 1 || report.Commands[0].Status != "failed" || !strings.Contains(report.Commands[0].Error, stream+" output cap exceeded") {
+				t.Fatalf("command cap misclassified: %+v", report.Commands)
+			}
+			data, readErr := os.ReadFile(path)
+			if readErr != nil || !strings.Contains(string(data), stream+" output cap exceeded") || strings.Contains(string(data), `"status": "canceled"`) {
+				t.Fatalf("bad persisted cap report: %s %v", data, readErr)
+			}
+		})
+	}
+}
+func TestInternalParserCancellationRemainsFailure(t *testing.T) {
+	r := fakeRunner(t)
+	r.Executor = executorFunc(func(ctx context.Context, _ Command, out, _ io.Writer) Result {
+		_, _ = io.WriteString(out, "malformed JSON\n")
+		return Result{-1, ctx.Err()}
+	})
+	report, err := r.Run(context.Background(), Defaults("smoke"))
+	if err == nil || report.Status != "failed" || !strings.Contains(report.Error, "malformed") {
+		t.Fatalf("%v %+v", err, report)
+	}
+}
 func TestCancellationAndDeadline(t *testing.T) {
 	for _, deadline := range []bool{false, true} {
 		t.Run(fmt.Sprint(deadline), func(t *testing.T) {
@@ -287,8 +332,11 @@ func TestEnvironmentRejectsInheritedOptIns(t *testing.T) {
 	t.Setenv("CUTLY_M1_RSS_HELPER_MIB", "4096")
 	t.Setenv("GOFLAGS", "-run=Anything")
 	t.Setenv("GOWORK", "/untrusted")
+	for _, key := range []string{"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY", "GIT_CONFIG_COUNT", "GIT_CONFIG_SYSTEM", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_PARAMETERS"} {
+		t.Setenv(key, "foreign-git-override")
+	}
 	env := strings.Join(executionEnvironment(map[string]string{"CUTLY_M1_STREAM_BENCH_MIB": "4096"}), "\n")
-	for _, bad := range []string{"CUTLY_REAL_SMALL_FS_TEST=1", "CUTLY_M1_RSS_HELPER_MIB=4096", "-run=Anything", "GOWORK=/untrusted"} {
+	for _, bad := range []string{"CUTLY_REAL_SMALL_FS_TEST=1", "CUTLY_M1_RSS_HELPER_MIB=4096", "-run=Anything", "GOWORK=/untrusted", "foreign-git-override"} {
 		if strings.Contains(env, bad) {
 			t.Fatalf("inherited %s", bad)
 		}

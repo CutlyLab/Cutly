@@ -20,3 +20,9 @@ func configureProcessTree(cmd *exec.Cmd) error {
 	return nil
 }
 func cleanupProcessTree(cmd *exec.Cmd) { _ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }
+
+func openToolForHash(path string) (*os.File, error) {
+	// O_NONBLOCK prevents an executable FIFO on PATH (including a path swapped
+	// after LookPath) from waiting for a writer before descriptor validation.
+	return os.OpenFile(path, os.O_RDONLY|syscall.O_NONBLOCK|syscall.O_CLOEXEC, 0)
+}

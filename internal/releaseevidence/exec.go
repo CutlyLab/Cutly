@@ -44,12 +44,13 @@ func (OSExecutor) Execute(ctx context.Context, c Command, stdout, stderr io.Writ
 	return Result{code, err}
 }
 func executionEnvironment(overrides map[string]string) []string {
-	// Do not inherit Go flags/overlays/toolchain downloads or RC helper opt-ins.
+	// Do not inherit Go flags/overlays/toolchain downloads, Git repository/index/
+	// configuration redirects, or RC helper opt-ins.
 	// ffmpeg and its children still use the same observed PATH resolution.
 	var env []string
 	for _, entry := range os.Environ() {
 		key, _, _ := strings.Cut(entry, "=")
-		if strings.HasPrefix(key, "CUTLY_") || strings.HasPrefix(key, "GO") || key == "GODEBUG" {
+		if strings.HasPrefix(key, "CUTLY_") || strings.HasPrefix(key, "GO") || strings.HasPrefix(key, "GIT_") || key == "GODEBUG" {
 			continue
 		}
 		env = append(env, entry)
@@ -89,6 +90,15 @@ func (w *capture) Write(b []byte) (int, error) {
 		w.truncated = true
 	}
 	return len(b), nil
+}
+
+// capError is checked independently of executor/context errors: exceeding a
+// stream cap cancels the child only as a cleanup mechanism, not a user cancel.
+func (w *capture) capError(stream string) error {
+	if w.total > w.max {
+		return fmt.Errorf("%s output cap exceeded (%d bytes maximum)", stream, w.max)
+	}
+	return nil
 }
 
 type checkedWriter struct {

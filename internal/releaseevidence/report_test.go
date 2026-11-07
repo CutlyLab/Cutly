@@ -91,6 +91,35 @@ func TestObservationFailures(t *testing.T) {
 		}
 	})
 }
+func TestObservationCapsRemainFailure(t *testing.T) {
+	for _, stream := range []string{"stdout", "stderr"} {
+		t.Run(stream, func(t *testing.T) {
+			r := fakeRunner(t)
+			r.Observe = Observe
+			r.Executor = executorFunc(func(ctx context.Context, _ Command, out, errout io.Writer) Result {
+				writer := out
+				if stream == "stderr" {
+					writer = errout
+				}
+				_, _ = writer.Write([]byte(strings.Repeat("x", 65537)))
+				if !errors.Is(ctx.Err(), context.Canceled) {
+					t.Error("observation cap did not cancel child")
+				}
+				return Result{-1, ctx.Err()}
+			})
+			path := filepath.Join(t.TempDir(), "observe-cap.json")
+			report, err := r.RunToFile(context.Background(), Defaults("smoke"), path)
+			diagnostic := "observation " + stream + " output cap exceeded"
+			if err == nil || errors.Is(err, context.Canceled) || report.Status != "failed" || !strings.Contains(report.Error, diagnostic) {
+				t.Fatalf("%v %+v", err, report)
+			}
+			data, readErr := os.ReadFile(path)
+			if readErr != nil || !strings.Contains(string(data), diagnostic) || strings.Contains(string(data), `"status": "canceled"`) {
+				t.Fatalf("%s %v", data, readErr)
+			}
+		})
+	}
+}
 func TestObservationContextClassification(t *testing.T) {
 	for _, want := range []error{context.Canceled, context.DeadlineExceeded} {
 		t.Run(want.Error(), func(t *testing.T) {
