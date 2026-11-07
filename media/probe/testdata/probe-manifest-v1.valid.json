@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "resource": {
+    "asset_id": "asset-main",
+    "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "size_bytes": 1048576
+  },
+  "probe": {
+    "implementation": "ffprobe-json-v1",
+    "build_fingerprint": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "options_fingerprint": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "container": {
+    "format_name": "mov,mp4,m4a,3gp,3g2,mj2",
+    "start_time": {"value": -1001, "rate": 30000},
+    "bit_rate": 838860,
+    "seekable": true
+  },
+  "duration": {"value": 10, "rate": 1},
+  "streams": [
+    {
+      "index": 0,
+      "kind": "video",
+      "codec": "h264",
+      "time_base": {"value": 1, "rate": 30000},
+      "start_pts": -1001,
+      "duration_pts": 300000,
+      "video": {
+        "width": 1920,
+        "height": 1080,
+        "rotation_degrees": 0,
+        "sample_aspect_ratio": {"numerator": 1, "denominator": 1},
+        "display_aspect_ratio": {"numerator": 16, "denominator": 9},
+        "pixel_format": "yuv420p",
+        "has_alpha": false,
+        "frame_rate_mode": "cfr",
+        "average_frame_rate": {"value": 30000, "rate": 1001},
+        "keyframes": {
+          "complete": true,
+          "count": 10,
+          "first_pts": -1001,
+          "last_pts": 269269,
+          "index_hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        },
+        "color": {
+          "primaries": "bt709",
+          "transfer": "bt709",
+          "matrix": "bt709",
+          "range": "limited",
+          "chroma_location": "left"
+        }
+      }
+    },
+    {
+      "index": 1,
+      "kind": "audio",
+      "codec": "aac",
+      "time_base": {"value": 1, "rate": 48000},
+      "start_pts": 0,
+      "duration_pts": 480000,
+      "audio": {
+        "sample_rate": 48000,
+        "channels": 2,
+        "channel_layout": "stereo",
+        "sample_format": "fltp",
+        "bits_per_sample": 32,
+        "encoder_delay_samples": 1024,
+        "padding_samples": 0
+      }
+    }
+  ]
+}

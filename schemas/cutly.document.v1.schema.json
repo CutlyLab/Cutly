@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.cutly.dev/document/v1",
+  "title": "Cutly Document v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "revision"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "id": {"$ref": "#/$defs/id"},
+    "revision": {"$ref": "#/$defs/revision"},
+    "assets": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/asset"}
+    },
+    "timelines": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/timeline"}
+    },
+    "annotations": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/annotation"}
+    },
+    "metadata": {"$ref": "#/$defs/extensions"}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "\\S"},
+    "revision": {"type": "integer", "minimum": 0, "maximum": 18446744073709551615},
+    "rationalTime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "rate"],
+      "properties": {
+        "value": {"type": "integer", "minimum": -9223372036854775808, "maximum": 9223372036854775807},
+        "rate": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807}
+      }
+    },
+    "nonNegativeTime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "rate"],
+      "properties": {
+        "value": {"type": "integer", "minimum": 0, "maximum": 9223372036854775807},
+        "rate": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807}
+      }
+    },
+    "positiveTime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "rate"],
+      "properties": {
+        "value": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807},
+        "rate": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807}
+      }
+    },
+    "timeRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "duration"],
+      "properties": {
+        "start": {"$ref": "#/$defs/rationalTime"},
+        "duration": {"$ref": "#/$defs/nonNegativeTime"}
+      }
+    },
+    "positiveTimeRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "duration"],
+      "properties": {
+        "start": {"$ref": "#/$defs/rationalTime"},
+        "duration": {"$ref": "#/$defs/positiveTime"}
+      }
+    },
+    "extensions": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "kind": {"enum": ["video", "audio", "image", "font", "data"]},
+        "uri": {"type": "string", "minLength": 1},
+        "content_hash": {"$ref": "#/$defs/digest"},
+        "duration": {"$ref": "#/$defs/nonNegativeTime"},
+        "metadata": {"$ref": "#/$defs/extensions"}
+      },
+      "anyOf": [
+        {"required": ["uri"]},
+        {"required": ["content_hash"]}
+      ]
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "timeline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "name": {"type": "string"},
+        "tracks": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/track"}
+        },
+        "annotations": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/annotation"}
+        },
+        "metadata": {"$ref": "#/$defs/extensions"}
+      }
+    },
+    "track": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "kind": {"enum": ["video", "audio"]},
+        "name": {"type": "string"},
+        "clips": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/clip"}
+        },
+        "annotations": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/annotation"}
+        },
+        "metadata": {"$ref": "#/$defs/extensions"}
+      }
+    },
+    "clip": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "asset_id", "timeline_range", "source_range"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "asset_id": {"$ref": "#/$defs/id"},
+        "timeline_range": {"$ref": "#/$defs/positiveTimeRange"},
+        "source_range": {"$ref": "#/$defs/positiveTimeRange"},
+        "disabled": {"type": "boolean"},
+        "properties": {"$ref": "#/$defs/extensions"},
+        "annotations": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/annotation"}
+        }
+      }
+    },
+    "annotation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "namespace", "value"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "namespace": {"type": "string", "minLength": 1},
+        "key": {"type": "string"},
+        "range": {"$ref": "#/$defs/timeRange"},
+        "value": true
+      }
+    }
+  }
+}

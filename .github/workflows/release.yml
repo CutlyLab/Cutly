@@ -1,0 +1,191 @@
+name: Cutly release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify release identity and source
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: https://registry.npmjs.org
+          cache: false
+
+      - name: Install media test runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+
+      - name: Require one version across tag, Go and npm
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          go_version="$(go run ./cmd/cutly version | awk '{print $2}')"
+          npm_version="$(node -p 'require("./sdk/typescript/package.json").version')"
+          test "${GITHUB_REF_NAME}" = "v${version}"
+          test "${version}" = "${go_version}"
+          test "${version}" = "${npm_version}"
+          test "${version}" != "0.1.0-dev"
+
+      - name: Verify module and public packages
+        run: |
+          go mod tidy -diff
+          go vet ./...
+          go test -race -count=1 ./...
+          npm --prefix sdk/typescript test
+          npm --prefix sdk/typescript pack --dry-run --cache "${RUNNER_TEMP}/cutly-npm-cache"
+
+  build:
+    name: Build ${{ matrix.goos }}/${{ matrix.goarch }}
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+          - goos: freebsd
+            goarch: amd64
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Build command archives
+        shell: bash
+        env:
+          CGO_ENABLED: "0"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          package="cutly-${version}-${GOOS}-${GOARCH}"
+          output="${RUNNER_TEMP}/${package}"
+          mkdir "${output}"
+          suffix=""
+          if [[ "${GOOS}" = "windows" ]]; then suffix=".exe"; fi
+          go build -trimpath -ldflags='-s -w' -o "${output}/cutly${suffix}" ./cmd/cutly
+          go build -trimpath -ldflags='-s -w' -o "${output}/cutlyd${suffix}" ./cmd/cutlyd
+          cp LICENSE "${output}/LICENSE"
+          cp cmd/cutlyd/README.md "${output}/CUTLYD.md"
+          if [[ "${GOOS}" = "windows" ]]; then
+            cd "${RUNNER_TEMP}"
+            zip -q -r "${package}.zip" "${package}"
+          else
+            tar -C "${RUNNER_TEMP}" -czf "${RUNNER_TEMP}/${package}.tar.gz" "${package}"
+          fi
+
+      - name: Upload command archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: cutly-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: ${{ runner.temp }}/cutly-*-${{ matrix.goos }}-${{ matrix.goarch }}.*
+          if-no-files-found: error
+          retention-days: 7
+
+  publish-npm:
+    name: Publish npm package with provenance
+    needs:
+      - verify
+      - build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: https://registry.npmjs.org
+          cache: false
+
+      - name: Publish public SDK
+        working-directory: sdk/typescript
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          dist_tag="latest"
+          if [[ "${version}" = *-* ]]; then dist_tag="rc"; fi
+          npm publish --access public --provenance --tag "${dist_tag}"
+
+  release:
+    name: Publish checksummed GitHub release
+    needs:
+      - build
+      - publish-npm
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - name: Download command archives
+        uses: actions/download-artifact@v4
+        with:
+          pattern: cutly-*
+          path: dist
+          merge-multiple: true
+
+      - name: Create SHA-256 manifest
+        shell: bash
+        run: |
+          cd dist
+          sha256sum cutly-* > SHA256SUMS
+
+      - name: Attest release archives
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/cutly-*
+
+      - name: Create GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          prerelease=""
+          if [[ "${version}" = *-* ]]; then prerelease="--prerelease"; fi
+          gh release create "${GITHUB_REF_NAME}" dist/* --verify-tag --generate-notes --title "Cutly ${version}" ${prerelease}

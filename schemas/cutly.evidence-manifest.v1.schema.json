@@ -1,0 +1,274 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.cutly.dev/evidence-manifest/v1",
+  "title": "Cutly EvidenceManifest v1",
+  "description": "Immutable render evidence. Repeatability is measured from canonical decoded frame and PCM chunks; encoded container bytes are recorded only for artifact integrity.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "document",
+    "plan_fingerprint",
+    "execution_manifest_fingerprint",
+    "backend",
+    "runtime",
+    "output",
+    "job",
+    "artifact",
+    "duration",
+    "frame_count",
+    "sample_count",
+    "cache",
+    "peak_rss_bytes",
+    "fingerprint"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "document": {"$ref": "#/$defs/documentIdentity"},
+    "plan_fingerprint": {"$ref": "#/$defs/digest"},
+    "execution_manifest_fingerprint": {"$ref": "#/$defs/digest"},
+    "backend": {"$ref": "#/$defs/backendIdentity"},
+    "runtime": {"$ref": "#/$defs/runtimeIdentity"},
+    "output": {"$ref": "#/$defs/outputProfile"},
+    "job": {"$ref": "#/$defs/jobIdentity"},
+    "artifact": {"$ref": "#/$defs/artifactIdentity"},
+    "duration": {"$ref": "#/$defs/positiveRationalTime"},
+    "frame_count": {"type": "integer", "minimum": 0, "maximum": 9223372036854775807},
+    "sample_count": {"type": "integer", "minimum": 0, "maximum": 9223372036854775807},
+    "decoded_video": {"$ref": "#/$defs/decodedSequence"},
+    "decoded_audio": {"$ref": "#/$defs/decodedSequence"},
+    "warnings": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/notice"},
+      "uniqueItems": true
+    },
+    "fallbacks": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/fallback"},
+      "uniqueItems": true
+    },
+    "degraded_capabilities": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/capabilityID"},
+      "uniqueItems": true
+    },
+    "cache": {"$ref": "#/$defs/cacheEvidence"},
+    "stage_timings": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/stageTiming"},
+      "uniqueItems": true
+    },
+    "peak_rss_bytes": {"type": "integer", "minimum": 0, "maximum": 9223372036854775807},
+    "fingerprint": {"$ref": "#/$defs/digest"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"frame_count": {"minimum": 1}}},
+      "then": {
+        "required": ["decoded_video"],
+        "properties": {"decoded_video": {"properties": {
+          "unit": {"const": "frames"},
+          "domain": {"const": "cutly.decoded-video.rgba8.interleaved.top-down.tight.v1"}
+        }}}
+      },
+      "else": {"not": {"required": ["decoded_video"]}}
+    },
+    {
+      "if": {"properties": {"sample_count": {"minimum": 1}}},
+      "then": {
+        "required": ["decoded_audio"],
+        "properties": {"decoded_audio": {"properties": {
+          "unit": {"const": "samples"},
+          "domain": {"const": "cutly.decoded-audio.pcm-s16le.interleaved.v1"}
+        }}}
+      },
+      "else": {"not": {"required": ["decoded_audio"]}}
+    }
+  ],
+  "$defs": {
+    "nonBlank": {"type": "string", "pattern": "\\S"},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "capabilityID": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*\\.v[1-9][0-9]*$"},
+    "rationalTime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "rate"],
+      "properties": {
+        "value": {"type": "integer", "minimum": -9223372036854775808, "maximum": 9223372036854775807},
+        "rate": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807}
+      }
+    },
+    "positiveRationalTime": {
+      "allOf": [
+        {"$ref": "#/$defs/rationalTime"},
+        {"properties": {"value": {"minimum": 1}}}
+      ]
+    },
+    "positiveTimeRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "duration"],
+      "properties": {
+        "start": {"$ref": "#/$defs/rationalTime"},
+        "duration": {"$ref": "#/$defs/positiveRationalTime"}
+      }
+    },
+    "jobTickRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["first", "count"],
+      "properties": {
+        "first": {"type": "integer", "minimum": -9223372036854775808, "maximum": 9223372036854775807},
+        "count": {"type": "integer", "minimum": 0, "maximum": 9223372036854775807}
+      }
+    },
+    "tickRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["first", "count"],
+      "properties": {
+        "first": {"type": "integer", "minimum": -9223372036854775808, "maximum": 9223372036854775807},
+        "count": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807}
+      }
+    },
+    "documentIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "revision", "hash"],
+      "properties": {
+        "id": {"$ref": "#/$defs/nonBlank"},
+        "revision": {"type": "integer", "minimum": 0, "maximum": 18446744073709551615},
+        "hash": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "backendIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "build_fingerprint"],
+      "properties": {
+        "id": {"$ref": "#/$defs/nonBlank"},
+        "build_fingerprint": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "runtimeIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ffmpeg_build", "decoder_profile", "encoder_profile", "color_profile"],
+      "properties": {
+        "ffmpeg_build": {"$ref": "#/$defs/digest"},
+        "decoder_profile": {"$ref": "#/$defs/nonBlank"},
+        "encoder_profile": {"$ref": "#/$defs/nonBlank"},
+        "color_profile": {"$ref": "#/$defs/nonBlank"}
+      }
+    },
+    "outputProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reference_profile", "format", "width", "height", "pixel_format", "color_space", "video_codec", "audio_codec", "decoded_video_profile", "decoded_audio_profile", "audio_sample_format", "sample_rate", "channels"],
+      "properties": {
+        "reference_profile": {"$ref": "#/$defs/nonBlank"},
+        "format": {"$ref": "#/$defs/nonBlank"},
+        "width": {"type": "integer", "minimum": 1, "maximum": 2147483647},
+        "height": {"type": "integer", "minimum": 1, "maximum": 2147483647},
+        "pixel_format": {"$ref": "#/$defs/nonBlank"},
+        "color_space": {"$ref": "#/$defs/nonBlank"},
+        "video_codec": {"$ref": "#/$defs/nonBlank"},
+        "audio_codec": {"$ref": "#/$defs/nonBlank"},
+        "decoded_video_profile": {"const": "cutly.decoded-video.rgba8.interleaved.top-down.tight.v1"},
+        "decoded_audio_profile": {"const": "cutly.decoded-audio.pcm-s16le.interleaved.v1"},
+        "audio_sample_format": {"const": "s16le"},
+        "sample_rate": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807},
+        "channels": {"type": "integer", "minimum": 1, "maximum": 2147483647}
+      }
+    },
+    "jobIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "id", "idempotency_key", "timeline_range", "frame_range", "sample_range", "artifact_uri"],
+      "properties": {
+        "schema_version": {"const": 1},
+        "id": {"$ref": "#/$defs/nonBlank"},
+        "idempotency_key": {"$ref": "#/$defs/nonBlank"},
+        "timeline_range": {"$ref": "#/$defs/positiveTimeRange"},
+        "frame_range": {"$ref": "#/$defs/jobTickRange"},
+        "sample_range": {"$ref": "#/$defs/jobTickRange"},
+        "artifact_uri": {"type": "string", "pattern": "^file:///[^/?#][^?#]*$"}
+      }
+    },
+    "artifactIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["uri", "content_hash", "size_bytes"],
+      "properties": {
+        "uri": {"$ref": "#/$defs/nonBlank"},
+        "content_hash": {"$ref": "#/$defs/digest"},
+        "size_bytes": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807}
+      }
+    },
+    "decodedChunk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["first", "count", "content_hash"],
+      "properties": {
+        "first": {"type": "integer", "minimum": -9223372036854775808, "maximum": 9223372036854775807},
+        "count": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807},
+        "content_hash": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "decodedSequence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["domain", "unit", "unit_bytes", "range", "chunks", "root_hash"],
+      "properties": {
+        "domain": {"type": "string", "minLength": 1, "maxLength": 256},
+        "unit": {"enum": ["frames", "samples"]},
+        "unit_bytes": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807},
+        "range": {"$ref": "#/$defs/tickRange"},
+        "chunks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/decodedChunk"}
+        },
+        "root_hash": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "notice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": {"$ref": "#/$defs/nonBlank"},
+        "path": {"type": "string"},
+        "message": {"$ref": "#/$defs/nonBlank"}
+      }
+    },
+    "fallback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capability", "selected", "reason"],
+      "properties": {
+        "capability": {"$ref": "#/$defs/capabilityID"},
+        "selected": {"$ref": "#/$defs/nonBlank"},
+        "reason": {"$ref": "#/$defs/nonBlank"}
+      }
+    },
+    "cacheEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hit", "key"],
+      "properties": {
+        "hit": {"type": "boolean"},
+        "key": {"$ref": "#/$defs/nonBlank"}
+      }
+    },
+    "stageTiming": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stage", "duration_micros"],
+      "properties": {
+        "stage": {"$ref": "#/$defs/nonBlank"},
+        "duration_micros": {"type": "integer", "minimum": 0, "maximum": 9223372036854775807}
+      }
+    }
+  }
+}

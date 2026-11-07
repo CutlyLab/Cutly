@@ -1,0 +1,236 @@
+{
+  "spdxVersion": "SPDX-2.3",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": "Cutly dependency and linked text-shape provider closure",
+  "documentNamespace": "https://github.com/CutlyLab/Cutly/deps/sbom/text-shape-provider-v1",
+  "creationInfo": {
+    "created": "2026-11-06T00:00:00Z",
+    "creators": [
+      "Tool: Cutly dependency-lock v1"
+    ],
+    "comment": "Reproducible source SBOM. The timestamp is the lock revision date, not a runtime build attestation. dependency-lock.json is the normative machine-readable reachability classifier."
+  },
+  "documentDescribes": [
+    "SPDXRef-Package-Cutly",
+    "SPDXRef-Package-JSONSchemaGo",
+    "SPDXRef-Package-GoCmp",
+    "SPDXRef-Package-GoTextTypesetting",
+    "SPDXRef-Package-XImage",
+    "SPDXRef-Package-GoTextUtils",
+    "SPDXRef-Package-XText",
+    "SPDXRef-Package-HarfBuzz"
+  ],
+  "packages": [
+    {
+      "SPDXID": "SPDXRef-Package-Cutly",
+      "name": "github.com/CutlyLab/Cutly",
+      "versionInfo": "unreleased-m2-shape-provider",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "copyrightText": "NOASSERTION",
+      "comment": "Current independently buildable Cutly source module. This SBOM is not an executable or signed release attestation."
+    },
+    {
+      "SPDXID": "SPDXRef-Package-JSONSchemaGo",
+      "name": "github.com/google/jsonschema-go",
+      "versionInfo": "v0.4.2",
+      "downloadLocation": "https://github.com/google/jsonschema-go",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "Copyright (c) 2025 JSON Schema Go Project Authors",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:golang/github.com/google/jsonschema-go@v0.4.2"
+        },
+        {
+          "referenceCategory": "OTHER",
+          "referenceType": "go-module-sum",
+          "referenceLocator": "h1:tmrUohrwoLZZS/P3x7ex0WAVknEkBZM46iALbcqoRA8="
+        }
+      ],
+      "comment": "closure=current_test; reachability=test_import; linked_package_count=1. Imported only by Cutly conformance tests, never by current production packages."
+    },
+    {
+      "SPDXID": "SPDXRef-Package-GoCmp",
+      "name": "github.com/google/go-cmp",
+      "versionInfo": "v0.7.0",
+      "downloadLocation": "https://github.com/google/go-cmp",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-3-Clause",
+      "licenseDeclared": "BSD-3-Clause",
+      "copyrightText": "Copyright (c) 2017 The Go Authors",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:golang/github.com/google/go-cmp@v0.7.0"
+        },
+        {
+          "referenceCategory": "OTHER",
+          "referenceType": "go-module-sum",
+          "referenceLocator": "h1:wk8382ETsv4n6YpYiWiBsYLSJiTsyBybVuN8="
+        }
+      ],
+      "comment": "closure=current_module_graph_only; reachability=upstream_test; linked_package_count=0. Required by jsonschema-go's go.mod for its upstream tests; no go-cmp package is imported by Cutly tests or production packages."
+    },
+    {
+      "SPDXID": "SPDXRef-Package-GoTextTypesetting",
+      "name": "github.com/go-text/typesetting",
+      "versionInfo": "v0.3.5",
+      "downloadLocation": "https://github.com/go-text/typesetting",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-3-Clause",
+      "licenseDeclared": "(Unlicense OR BSD-3-Clause)",
+      "copyrightText": "Copyright 2021 The go-text authors",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:golang/github.com/go-text/typesetting@v0.3.5"
+        },
+        {
+          "referenceCategory": "OTHER",
+          "referenceType": "go-module-sum",
+          "referenceLocator": "h1:XZPUooClHY0Vf/rFyUyuPRNEkawARaFzLMQcXLSEyPk="
+        }
+      ],
+      "comment": "closure=current_production; reachability=production_import; linked_package_count=8. Imported by Cutly's pinned shape-only static-glyf provider; this does not advertise final Text render capability."
+    },
+    {
+      "SPDXID": "SPDXRef-Package-XImage",
+      "name": "golang.org/x/image",
+      "versionInfo": "v0.23.0",
+      "downloadLocation": "https://go.googlesource.com/image",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-3-Clause",
+      "licenseDeclared": "BSD-3-Clause",
+      "copyrightText": "Copyright 2009 The Go Authors",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:golang/golang.org/x/image@v0.23.0"
+        },
+        {
+          "referenceCategory": "OTHER",
+          "referenceType": "go-module-sum",
+          "referenceLocator": "h1:HseQ7c2OpPKTPVzNjG5fwJsOTCiiwS4QdsYi5XU6H68="
+        }
+      ],
+      "comment": "closure=current_production_transitive; reachability=production_import; linked_package_count=3. Linked transitively through go-text font parsing. Upstream LICENSE and PATENTS bytes are locked."
+    },
+    {
+      "SPDXID": "SPDXRef-Package-GoTextUtils",
+      "name": "github.com/go-text/typesetting-utils",
+      "versionInfo": "v0.0.0-20260419141703-4ffe8874dabc",
+      "downloadLocation": "https://github.com/go-text/typesetting-utils",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-3-Clause",
+      "licenseDeclared": "(Unlicense OR BSD-3-Clause)",
+      "copyrightText": "Copyright 2021 The go-text authors",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:golang/github.com/go-text/typesetting-utils@v0.0.0-20260419141703-4ffe8874dabc"
+        },
+        {
+          "referenceCategory": "OTHER",
+          "referenceType": "go-module-sum",
+          "referenceLocator": "h1:8FGo2It5K75XkavhTiCKExUfVaVDS1feBnLCru5qeoY="
+        }
+      ],
+      "comment": "closure=current_module_graph_only; reachability=upstream_test_generate; linked_package_count=0. Upstream test/generation requirement only; no package is linked into the Cutly provider."
+    },
+    {
+      "SPDXID": "SPDXRef-Package-XText",
+      "name": "golang.org/x/text",
+      "versionInfo": "v0.21.0",
+      "downloadLocation": "https://go.googlesource.com/text",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-3-Clause",
+      "licenseDeclared": "BSD-3-Clause",
+      "copyrightText": "Copyright 2009 The Go Authors",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:golang/golang.org/x/text@v0.21.0"
+        },
+        {
+          "referenceCategory": "OTHER",
+          "referenceType": "go-module-sum",
+          "referenceLocator": "h1:zyQAAkrwaneQ066sspRyJaG9VNi/YJ1NfzcGB3hZ/qo="
+        }
+      ],
+      "comment": "closure=current_module_graph_only; reachability=module_graph_only; linked_package_count=0. Selected by current MVS through x/image's go.mod, but no x/text package is in the production import closure. Upstream LICENSE and PATENTS bytes are locked."
+    },
+    {
+      "SPDXID": "SPDXRef-Package-HarfBuzz",
+      "name": "HarfBuzz source base",
+      "versionInfo": "12.3.0",
+      "downloadLocation": "https://github.com/harfbuzz/harfbuzz",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "comment": "Embedded algorithm source base identified by commit 5a31dd02f0b32de12336f72db9297bfe94cf0da1 and ported inside go-text/typesetting v0.3.5; this is not a separate linked C library."
+    }
+  ],
+  "relationships": [
+    {
+      "spdxElementId": "SPDXRef-Package-Cutly",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-GoTextTypesetting",
+      "comment": "Current direct production dependency for Cutly's linked shape-only static-glyf provider; this edge does not advertise final Text render capability."
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-JSONSchemaGo",
+      "relationshipType": "TEST_DEPENDENCY_OF",
+      "relatedSpdxElement": "SPDXRef-Package-Cutly"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-GoCmp",
+      "relationshipType": "TEST_DEPENDENCY_OF",
+      "relatedSpdxElement": "SPDXRef-Package-JSONSchemaGo",
+      "comment": "Current MVS graph relationship inherited from jsonschema-go's upstream test requirement; no go-cmp package is imported by Cutly."
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-GoTextTypesetting",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-XImage",
+      "comment": "Current selected-package relationship used by Cutly's linked shape-only provider."
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-XImage",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-XText",
+      "comment": "Current MVS-only relationship from x/image's go.mod. The selected x/image packages do not import x/text, so x/text linked_package_count remains zero."
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-GoTextUtils",
+      "relationshipType": "BUILD_DEPENDENCY_OF",
+      "relatedSpdxElement": "SPDXRef-Package-GoTextTypesetting",
+      "comment": "Upstream test/generation module-graph relationship, not a selected production package import."
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-GoTextTypesetting",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-Package-HarfBuzz"
+    }
+  ],
+  "annotations": [
+    {
+      "annotationDate": "2026-11-06T00:00:00Z",
+      "annotationType": "OTHER",
+      "annotator": "Tool: Cutly dependency-lock v1",
+      "comment": "The pinned go-text and x/image packages are current shape-provider dependencies. This SBOM does not assert final Text render capability; dependency-lock.json is the normative reachability classifier."
+    }
+  ]
+}

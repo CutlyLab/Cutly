@@ -1,0 +1,6 @@
+{
+  "id": "tx-empty",
+  "idempotency_key": "fixture-empty-r7",
+  "expected_revision": 7,
+  "operations": []
+}

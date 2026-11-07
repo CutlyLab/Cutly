@@ -1,0 +1,176 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.cutly.dev/execution-manifest/v1",
+  "title": "Cutly ExecutionManifest v1",
+  "description": "Frozen environment, backend and materialized locator choices for one semantic RenderPlan. Machine locators belong here, never in RenderPlan v3.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "plan_fingerprint",
+    "semantic_profile",
+    "compiler_build",
+    "evaluator_build",
+    "backend",
+    "media_runtime",
+    "output",
+    "deterministic_seed",
+    "fingerprint"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "plan_fingerprint": {"$ref": "#/$defs/digest"},
+    "semantic_profile": {"const": "cutly.semantic.v1"},
+    "compiler_build": {"$ref": "#/$defs/digest"},
+    "evaluator_build": {"$ref": "#/$defs/digest"},
+    "resources": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/materializedResource"},
+      "uniqueItems": true
+    },
+    "fonts": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/fontResource"},
+      "uniqueItems": true
+    },
+    "plugins": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/pluginSelection"},
+      "uniqueItems": true
+    },
+    "backend": {"$ref": "#/$defs/backendCapabilities"},
+    "media_runtime": {"$ref": "#/$defs/mediaRuntime"},
+    "output": {"$ref": "#/$defs/outputSpec"},
+    "deterministic_seed": {"type": "integer", "minimum": -9223372036854775808, "maximum": 9223372036854775807},
+    "browser_fingerprint": {"$ref": "#/$defs/digest"},
+    "fingerprint": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {
+    "nonBlank": {"type": "string", "pattern": "\\S"},
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "capabilityID": {
+      "description": "Open, versioned semantic capability identifier.",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]*\\.v[1-9][0-9]*$"
+    },
+    "materializedResource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["asset_id", "kind", "content_hash", "size_bytes", "locator_scheme", "locator", "probe_fingerprint"],
+      "properties": {
+        "asset_id": {"$ref": "#/$defs/nonBlank"},
+        "kind": {"enum": ["video", "audio", "image", "font", "data"]},
+        "content_hash": {"$ref": "#/$defs/digest"},
+        "size_bytes": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807},
+        "locator_scheme": {"enum": ["cas", "file"]},
+        "locator": {
+          "description": "Worker-visible controlled locator. It is execution state, not semantic project state.",
+          "$ref": "#/$defs/nonBlank"
+        },
+        "probe_fingerprint": {"$ref": "#/$defs/digest"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"locator_scheme": {"const": "cas"}}},
+          "then": {"properties": {"locator": {"pattern": "^cas://sha256/[0-9a-f]{64}$"}}}
+        },
+        {
+          "if": {"properties": {"locator_scheme": {"const": "file"}}},
+          "then": {
+            "properties": {
+              "locator": {
+                "pattern": "^/",
+                "not": {"pattern": "(^|/)\\.\\.?(/|$)"}
+              }
+            }
+          }
+        }
+      ]
+    },
+    "fontResource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["family", "content_hash", "locator"],
+      "properties": {
+        "family": {"$ref": "#/$defs/nonBlank"},
+        "content_hash": {"$ref": "#/$defs/digest"},
+        "locator": {
+          "type": "string",
+          "pattern": "^(cas://sha256/[0-9a-f]{64}|/)",
+          "not": {"pattern": "(^|/)\\.\\.?(/|$)"}
+        }
+      }
+    },
+    "pluginSelection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "content_hash"],
+      "properties": {
+        "id": {"$ref": "#/$defs/nonBlank"},
+        "version": {"$ref": "#/$defs/nonBlank"},
+        "content_hash": {"$ref": "#/$defs/digest"},
+        "build_fingerprint": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "backendCapabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["backend_id", "build_fingerprint"],
+      "properties": {
+        "backend_id": {"$ref": "#/$defs/nonBlank"},
+        "build_fingerprint": {"$ref": "#/$defs/digest"},
+        "track_kinds": {
+          "type": "array",
+          "items": {"enum": ["video", "audio"]},
+          "uniqueItems": true
+        },
+        "asset_kinds": {
+          "type": "array",
+          "items": {"enum": ["video", "audio", "image", "font", "data"]},
+          "uniqueItems": true
+        },
+        "features": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/capabilityID"},
+          "uniqueItems": true
+        },
+        "max_width": {"type": "integer", "minimum": 0, "maximum": 2147483647},
+        "max_height": {"type": "integer", "minimum": 0, "maximum": 2147483647}
+      }
+    },
+    "mediaRuntime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ffmpeg_build", "decoder_profile", "encoder_profile", "color_profile"],
+      "properties": {
+        "ffmpeg_build": {"$ref": "#/$defs/digest"},
+        "decoder_profile": {"$ref": "#/$defs/nonBlank"},
+        "encoder_profile": {"$ref": "#/$defs/nonBlank"},
+        "text_shaper_build": {"$ref": "#/$defs/digest"},
+        "color_profile": {"$ref": "#/$defs/nonBlank"}
+      }
+    },
+    "outputSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reference_profile", "format", "width", "height", "pixel_format", "color_space", "video_codec", "audio_codec", "sample_rate", "channels", "decoded_video_profile", "decoded_audio_profile"],
+      "properties": {
+        "reference_profile": {"$ref": "#/$defs/nonBlank"},
+        "format": {"$ref": "#/$defs/nonBlank"},
+        "width": {"type": "integer", "minimum": 1, "maximum": 2147483647},
+        "height": {"type": "integer", "minimum": 1, "maximum": 2147483647},
+        "pixel_format": {"$ref": "#/$defs/nonBlank"},
+        "color_space": {"$ref": "#/$defs/nonBlank"},
+        "video_codec": {"$ref": "#/$defs/nonBlank"},
+        "audio_codec": {"$ref": "#/$defs/nonBlank"},
+        "sample_rate": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807},
+        "channels": {"type": "integer", "minimum": 1, "maximum": 2147483647},
+        "decoded_video_profile": {"const": "cutly.decoded-video.rgba8.interleaved.top-down.tight.v1"},
+        "decoded_audio_profile": {"const": "cutly.decoded-audio.pcm-s16le.interleaved.v1"}
+      }
+    }
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "plan_fingerprint": "sha256:44dc6f863c4cf29000e004e1c5b1dfa5b47e46e161320ee10ec167db27abd2b4",
+  "semantic_profile": "cutly.semantic.v1",
+  "compiler_build": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "evaluator_build": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "resources": [
+    {
+      "asset_id": "audio",
+      "kind": "audio",
+      "content_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "size_bytes": 200,
+      "locator_scheme": "cas",
+      "locator": "cas://sha256/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "probe_fingerprint": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    },
+    {
+      "asset_id": "video",
+      "kind": "video",
+      "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "size_bytes": 100,
+      "locator_scheme": "file",
+      "locator": "/controlled/video.mp4",
+      "probe_fingerprint": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    }
+  ],
+  "backend": {
+    "backend_id": "native-cpu",
+    "build_fingerprint": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "track_kinds": ["audio", "video"],
+    "asset_kinds": ["audio", "video"],
+    "max_width": 3840,
+    "max_height": 2160
+  },
+  "media_runtime": {
+    "ffmpeg_build": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+    "decoder_profile": "ffmpeg-sw-v1",
+    "encoder_profile": "libx264-aac-v1",
+    "color_profile": "cutly.bt709-linear.v1"
+  },
+  "output": {
+    "reference_profile": "cutly.reference.hardcut.v1",
+    "format": "mp4",
+    "width": 1920,
+    "height": 1080,
+    "pixel_format": "yuv420p",
+    "color_space": "bt709",
+    "video_codec": "h265",
+    "audio_codec": "aac",
+    "sample_rate": 48000,
+    "channels": 2,
+    "decoded_video_profile": "cutly.decoded-video.rgba8.interleaved.top-down.tight.v1",
+    "decoded_audio_profile": "cutly.decoded-audio.pcm-s16le.interleaved.v1"
+  },
+  "deterministic_seed": 42,
+  "fingerprint": "sha256:fe522f924a4f18bc4f44c20c69a7a23350819f2f6cb821f7c35f77e6b87507ae"
+}

@@ -1,0 +1,29 @@
+{
+  "schema_version": 2,
+  "id": "text-v2-document-invalid",
+  "revision": 1,
+  "assets": [
+    {
+      "id": "font",
+      "kind": "font",
+      "uri": "fonts/pinned.ttf",
+      "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "id": "text",
+      "kind": "text",
+      "text": {
+        "profile": "cutly.text.pinned-font-viewport-px.v2",
+        "text": "Cutly",
+        "font_asset_id": "font",
+        "font_size": {"numerator": 48, "denominator": 1},
+        "line_height": {"numerator": 60, "denominator": 1},
+        "fill": {"r": 65535, "g": 60000, "b": 4096, "a": 65535},
+        "language": "en",
+        "script": "Latn",
+        "direction": "ltr",
+        "alignment": "center"
+      }
+    }
+  ]
+}

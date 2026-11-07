@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "id": "fixture-document",
+  "revision": 7,
+  "assets": [
+    {"id": "missing-locator", "kind": "video"}
+  ],
+  "timelines": [
+    {
+      "id": "timeline-main",
+      "tracks": [
+        {
+          "id": "track-video",
+          "kind": "video",
+          "clips": [
+            {
+              "id": "clip-video",
+              "asset_id": "unknown-asset",
+              "timeline_range": {
+                "start": {"value": 0, "rate": 1},
+                "duration": {"value": 0, "rate": 1}
+              },
+              "source_range": {
+                "start": {"value": 0, "rate": 1},
+                "duration": {"value": 1, "rate": 1}
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

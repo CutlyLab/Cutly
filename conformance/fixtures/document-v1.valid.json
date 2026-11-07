@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "id": "fixture-document",
+  "revision": 7,
+  "assets": [
+    {
+      "id": "asset-video",
+      "kind": "video",
+      "uri": "media/video.mp4",
+      "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "duration": {"value": 12, "rate": 1}
+    },
+    {
+      "id": "asset-audio",
+      "kind": "audio",
+      "uri": "media/audio.wav",
+      "content_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "duration": {"value": 12, "rate": 1}
+    }
+  ],
+  "timelines": [
+    {
+      "id": "timeline-main",
+      "name": "Main",
+      "tracks": [
+        {
+          "id": "track-video",
+          "kind": "video",
+          "clips": [
+            {
+              "id": "clip-video",
+              "asset_id": "asset-video",
+              "timeline_range": {
+                "start": {"value": 0, "rate": 1},
+                "duration": {"value": 6, "rate": 1}
+              },
+              "source_range": {
+                "start": {"value": 1, "rate": 1},
+                "duration": {"value": 6, "rate": 1}
+              },
+              "properties": {"cutly.opacity.v1": 1}
+            }
+          ]
+        },
+        {
+          "id": "track-audio",
+          "kind": "audio",
+          "clips": [
+            {
+              "id": "clip-audio",
+              "asset_id": "asset-audio",
+              "timeline_range": {
+                "start": {"value": 0, "rate": 1},
+                "duration": {"value": 6, "rate": 1}
+              },
+              "source_range": {
+                "start": {"value": 0, "rate": 1},
+                "duration": {"value": 6, "rate": 1}
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "annotations": [
+    {
+      "id": "annotation-intent",
+      "namespace": "cutly.intent.v1",
+      "key": "purpose",
+      "value": {"kind": "demo"}
+    }
+  ],
+  "metadata": {"fixture": true}
+}

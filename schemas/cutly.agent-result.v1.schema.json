@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.cutly.dev/agent-result/v1",
+  "title": "Cutly Agent Result v1",
+  "description": "Unified business-result envelope. Transport failure is outside this value; business rejection is ok=false with an error diagnostic.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocol_version", "ok", "request_id", "tool", "action", "state", "changed", "replayed", "render_required", "diagnostics", "next_actions"],
+  "properties": {
+    "protocol_version": {"const": 1},
+    "ok": {"type": "boolean"},
+    "request_id": {"$ref": "#/$defs/identity"},
+    "tool": {"enum": ["cutly_project", "cutly_edit", "cutly_render"]},
+    "action": {"$ref": "#/$defs/action"},
+    "state": {"$ref": "#/$defs/identity"},
+    "project_id": {"$ref": "#/$defs/identity"},
+    "transaction_id": {"$ref": "#/$defs/identity"},
+    "job_id": {"$ref": "#/$defs/identity"},
+    "base_revision": {"$ref": "#/$defs/revision"},
+    "new_revision": {"$ref": "#/$defs/revision"},
+    "changed": {"type": "boolean"},
+    "replayed": {"type": "boolean"},
+    "render_required": {"type": "boolean"},
+    "diagnostics": {"type": "array", "maxItems": 4096, "items": {"$ref": "#/$defs/diagnostic"}},
+    "diff": {"type": "object"},
+    "receipt": {"type": "object"},
+    "next_actions": {"type": "array", "maxItems": 4096, "items": {"$ref": "#/$defs/nextAction"}}
+  },
+  "allOf": [
+    {
+      "oneOf": [
+        {"properties": {"tool": {"const": "cutly_project"}, "action": {"enum": ["inspect", "status", "history", "capabilities"]}}},
+        {"properties": {"tool": {"const": "cutly_edit"}, "action": {"enum": ["plan", "apply", "discard", "revert"]}}},
+        {"properties": {"tool": {"const": "cutly_render"}, "action": {"enum": ["plan", "prepare", "preflight", "frame", "render", "status", "history", "cancel"]}}}
+      ]
+    },
+    {
+      "if": {"properties": {"ok": {"const": true}}, "required": ["ok"]},
+      "then": {
+        "properties": {
+          "diagnostics": {
+            "not": {
+              "contains": {
+                "properties": {"severity": {"const": "error"}},
+                "required": ["severity"]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"ok": {"const": false}}, "required": ["ok"]},
+      "then": {
+        "properties": {
+          "diagnostics": {
+            "contains": {
+              "properties": {"severity": {"const": "error"}},
+              "required": ["severity"]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"not": {"properties": {"action": {"const": "capabilities"}}, "required": ["action"]}},
+      "then": {"required": ["project_id"]}
+    },
+    {
+      "if": {"properties": {"tool": {"const": "cutly_edit"}}, "required": ["tool"]},
+      "else": {"not": {"required": ["transaction_id"]}}
+    },
+    {
+      "if": {"properties": {"tool": {"const": "cutly_render"}}, "required": ["tool"]},
+      "else": {"not": {"required": ["job_id"]}}
+    }
+  ],
+  "$defs": {
+    "identity": {"type": "string", "minLength": 1, "maxLength": 4096, "pattern": "[^\\t\\n\\r ]"},
+    "action": {"type": "string", "minLength": 1, "maxLength": 4096, "pattern": "[^\\t\\n\\r ]"},
+    "revision": {"type": "integer", "minimum": 0, "maximum": 18446744073709551615},
+    "diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "severity", "message"],
+      "properties": {
+        "code": {"$ref": "#/$defs/identity"},
+        "severity": {"enum": ["info", "warning", "error"]},
+        "path": {"type": "string", "maxLength": 4096},
+        "message": {"type": "string", "minLength": 1, "maxLength": 65536},
+        "fixes": {"type": "array", "maxItems": 4096, "items": {"$ref": "#/$defs/candidateFix"}}
+      }
+    },
+    "candidateFix": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["description"],
+      "properties": {
+        "description": {"type": "string", "minLength": 1, "maxLength": 65536},
+        "operation": {"type": "object"},
+        "side_effects": {"type": "array", "maxItems": 4096, "items": {"type": "string", "maxLength": 65536}}
+      }
+    },
+    "nextAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tool", "action"],
+      "properties": {
+        "tool": {"enum": ["cutly_project", "cutly_edit", "cutly_render"]},
+        "action": {"$ref": "#/$defs/action"},
+        "project_id": {"$ref": "#/$defs/identity"},
+        "revision": {"$ref": "#/$defs/revision"},
+        "job_id": {"$ref": "#/$defs/identity"}
+      },
+      "oneOf": [
+        {"properties": {"tool": {"const": "cutly_project"}, "action": {"enum": ["inspect", "status", "history", "capabilities"]}}},
+        {"properties": {"tool": {"const": "cutly_edit"}, "action": {"enum": ["plan", "apply", "discard", "revert"]}}},
+        {"properties": {"tool": {"const": "cutly_render"}, "action": {"enum": ["plan", "prepare", "preflight", "frame", "render", "status", "history", "cancel"]}}}
+      ],
+      "allOf": [
+        {
+          "if": {"not": {"properties": {"action": {"const": "capabilities"}}, "required": ["action"]}},
+          "then": {"required": ["project_id"]}
+        },
+        {
+          "if": {"properties": {"tool": {"const": "cutly_render"}}, "required": ["tool"]},
+          "else": {"not": {"required": ["job_id"]}}
+        }
+      ]
+    }
+  }
+}

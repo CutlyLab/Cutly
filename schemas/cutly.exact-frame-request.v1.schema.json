@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.cutly.dev/exact-frame-request/v1",
+  "title": "Cutly ExactFrameRequest v1",
+  "description": "One idempotent exact composition-frame PNG request bound to immutable semantic and execution identities.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "idempotency_key",
+    "plan_fingerprint",
+    "execution_manifest_fingerprint",
+    "composition_frame_index",
+    "artifact_uri"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "id": {"$ref": "#/$defs/nonBlank"},
+    "idempotency_key": {"$ref": "#/$defs/nonBlank"},
+    "plan_fingerprint": {"$ref": "#/$defs/digest"},
+    "execution_manifest_fingerprint": {"$ref": "#/$defs/digest"},
+    "composition_frame_index": {
+      "type": "integer",
+      "minimum": -9223372036854775808,
+      "maximum": 9223372036854775807
+    },
+    "artifact_uri": {
+      "description": "Controlled direct .png child publication destination authorized by the scheduler.",
+      "type": "string",
+      "pattern": "^file:///[^/?#][^?#]*\\.png$",
+      "not": {"pattern": "(^|/)\\.\\.?(/|$)"}
+    }
+  },
+  "$defs": {
+    "nonBlank": {"type": "string", "pattern": "\\S"},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}

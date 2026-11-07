@@ -1,0 +1,64 @@
+{
+  "schema_version": 2,
+  "document_id": "fixture-document",
+  "revision": 7,
+  "document_hash": "sha256:document",
+  "timeline_id": "timeline-main",
+  "range": {
+    "start": {"value": 0, "rate": 1},
+    "duration": {"value": 2, "rate": 1}
+  },
+  "target": {
+    "timeline_id": "timeline-main",
+    "width": 1920,
+    "height": 1080,
+    "frame_rate": {"value": 30000, "rate": 1001},
+    "sample_rate": 48000,
+    "channels": 2,
+    "pixel_format": "yuv420p",
+    "color_space": "bt709"
+  },
+  "capabilities": {
+    "backend_id": "reference-cpu-v1",
+    "track_kinds": ["video", "audio"],
+    "asset_kinds": ["video", "audio"],
+    "features": ["video.linear_retime.v1", "audio.linear_retime.v1"],
+    "max_width": 3840,
+    "max_height": 2160
+  },
+  "video": [
+    {
+      "track_id": "track-video",
+      "clip_id": "clip-video",
+      "asset_id": "asset-video",
+      "track_index": 0,
+      "clip_index": 0,
+      "timeline_range": {
+        "start": {"value": 0, "rate": 1},
+        "duration": {"value": 6, "rate": 1}
+      },
+      "source_range": {
+        "start": {"value": 1, "rate": 1},
+        "duration": {"value": 6, "rate": 1}
+      },
+      "visible_timeline_range": {
+        "start": {"value": 0, "rate": 1},
+        "duration": {"value": 2, "rate": 1}
+      },
+      "visible_source_range": {
+        "start": {"value": 1, "rate": 1},
+        "duration": {"value": 2, "rate": 1}
+      },
+      "properties": {"cutly.opacity.v1": 1}
+    }
+  ],
+  "resources": [
+    {
+      "asset_id": "asset-video",
+      "kind": "video",
+      "uri": "media/video.mp4",
+      "content_hash": "sha256:video"
+    }
+  ],
+  "fingerprint": "sha256:render-plan-v2-fixture"
+}
