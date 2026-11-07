@@ -177,6 +177,13 @@ func (service *Service) withLockedRoot(ctx context.Context, action func(*os.Root
 		return err
 	}
 	defer root.Close()
+	// A v2 initialization intent reserves this root before its first document
+	// projection exists. Never let v1 creation or recovery overwrite that intent.
+	if _, err := root.Lstat(".cutly/v2"); err == nil {
+		return fmt.Errorf("%w: project root is reserved for Document v2", ErrInvalid)
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
 	return action(root)
 }
 
