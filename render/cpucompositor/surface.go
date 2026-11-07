@@ -1,6 +1,7 @@
 package cpucompositor
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
@@ -248,4 +249,41 @@ func (surface *Surface) CanonicalHash() (string, error) {
 		return "", err
 	}
 	return "sha256:" + hex.EncodeToString(hash.Sum(nil)), nil
+}
+
+// CanonicalHashContext returns the same profile-defined pixel hash as CanonicalHash while making
+// validation and encoding cooperatively cancelable. It performs only O(1) structural validation
+// before validating and hashing every pixel in one pass and never allocates a frame-sized buffer.
+func (surface *Surface) CanonicalHashContext(ctx context.Context) (string, error) {
+	if ctx == nil {
+		return "", kernelError(CodeInvalidSurface, "context", ErrInvalidSurface)
+	}
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	if surface == nil || surface.width <= 0 || surface.height <= 0 ||
+		surface.width > maxInt()/surface.height || len(surface.pixels) != surface.width*surface.height {
+		return "", kernelError(CodeInvalidSurface, "surface", ErrInvalidSurface)
+	}
+	digest := sha256.New()
+	var encoded [8]byte
+	for index, pixel := range surface.pixels {
+		if index != 0 && index&1023 == 0 {
+			if err := ctx.Err(); err != nil {
+				return "", err
+			}
+		}
+		if !pixel.valid() {
+			return "", kernelError(CodeInvalidPixel, fmt.Sprintf("surface/pixels/%d", index), ErrInvalidPixel)
+		}
+		binary.BigEndian.PutUint16(encoded[0:2], pixel.R)
+		binary.BigEndian.PutUint16(encoded[2:4], pixel.G)
+		binary.BigEndian.PutUint16(encoded[4:6], pixel.B)
+		binary.BigEndian.PutUint16(encoded[6:8], pixel.A)
+		_, _ = digest.Write(encoded[:])
+	}
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	return "sha256:" + hex.EncodeToString(digest.Sum(nil)), nil
 }

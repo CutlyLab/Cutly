@@ -2,12 +2,14 @@ package cpucompositor
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"math"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestSurfaceOwnershipInvariantAndCanonicalBytes(t *testing.T) {
@@ -42,6 +44,51 @@ func TestSurfaceOwnershipInvariantAndCanonicalBytes(t *testing.T) {
 		t.Fatalf("canonical hash = %q / %q, want %q err=%v", firstHash, secondHash, wantHash, err)
 	}
 }
+
+func TestCanonicalHashContextMatchesCanonicalHashAndCancelsMidStream(t *testing.T) {
+	pixels := make([]Pixel, 4_096)
+	for index := range pixels {
+		alpha := uint16(index)
+		pixels[index] = Pixel{R: alpha / 4, G: alpha / 3, B: alpha / 2, A: alpha}
+	}
+	surface, err := NewSurfaceFromPixelsWithLimits(64, 64, pixels, Limits{
+		MaxWidth: 64, MaxHeight: 64, MaxBytes: uint64(len(pixels)) * BytesPerPixel,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := surface.CanonicalHash()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := surface.CanonicalHashContext(context.Background())
+	if err != nil || got != want {
+		t.Fatalf("context hash=%q want=%q err=%v", got, want, err)
+	}
+	if got, err := surface.CanonicalHashContext(nil); got != "" || !errors.Is(err, ErrInvalidSurface) {
+		t.Fatalf("nil context hash=%q err=%v", got, err)
+	}
+	ctx := &cancelHashContext{cancelAt: 3}
+	if got, err := surface.CanonicalHashContext(ctx); got != "" || !errors.Is(err, context.Canceled) || ctx.checks != 3 {
+		t.Fatalf("canceled hash=%q err=%v checks=%d", got, err, ctx.checks)
+	}
+}
+
+type cancelHashContext struct {
+	checks   int
+	cancelAt int
+}
+
+func (*cancelHashContext) Deadline() (time.Time, bool) { return time.Time{}, false }
+func (*cancelHashContext) Done() <-chan struct{}       { return nil }
+func (value *cancelHashContext) Err() error {
+	value.checks++
+	if value.checks >= value.cancelAt {
+		return context.Canceled
+	}
+	return nil
+}
+func (*cancelHashContext) Value(any) any { return nil }
 
 func TestReadViewIsZeroCopyImmutableAndBoundsChecked(t *testing.T) {
 	surface, err := NewSurfaceFromPixels(2, 1, []Pixel{{R: 1, A: 2}, {G: 3, A: 4}})
