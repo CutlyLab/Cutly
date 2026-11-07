@@ -6,7 +6,24 @@ Updated: 2026-11-07
 
 Implementation branch: `codex/video-sdk-core`
 
-Handoff base commit: `0a19a82` (`feat: expose host-bound reference surfaces`)
+Original handoff base commit: `0a19a82` (`feat: expose host-bound reference surfaces`)
+
+### Standalone execution baseline (2026-11-07)
+
+Implementation continues in Go; the proposed Rust rewrite is deferred. The active standalone
+branch is `codex/video-sdk-core`, starting at `f9f891a`. The original handoff SHA `0a19a82` is not
+present in this repository's history. Commit `cabbfbb` has the surface-bridge implementation and
+subject; this identifies the local code baseline, not a proof of commit equivalence or a rerun of
+the historical audit below.
+
+The owner has deferred Manyfy integration work. Execute and validate within standalone Cutly only:
+do not edit the sibling consumer, create replacement module files, or run its consumer tests in this
+execution scope. Existing Cutly legacy compatibility gates remain mandatory. Manyfy acceptance is
+explicitly deferred, not passed, and must be tracked separately from standalone SDK readiness.
+
+Begin with S1 and preserve the stage dependency gates. Save independently reviewable, tested
+boundaries as local commits; no push, package publication, tag, or daemon default switch is implied.
+Current implementation and acceptance evidence is recorded in `DOCUMENT_V2_S1_EVIDENCE.md`.
 
 ## 1. Purpose and completion boundary
 
