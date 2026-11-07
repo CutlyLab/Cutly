@@ -82,8 +82,8 @@ The output path is exclusively reserved before source/tool observation or test e
 file or symlink is never replaced. Missing prerequisites and test failures are written to that same
 reserved path when report writing remains possible. Abrupt process termination or storage failure
 can leave an empty/incomplete report; never interpret its presence alone as success. Go flags,
-workspace/toolchain overrides and `CUTLY_*` opt-ins from the parent environment are removed from
-child commands. Process-group cleanup is implemented on Linux/macOS; other platforms fail closed
+workspace/toolchain overrides, `CUTLY_*` opt-ins and `GIT_*` repository/index/config overrides from
+the parent environment are removed from child commands. Process-group cleanup is implemented on Linux/macOS; other platforms fail closed
 rather than claiming equivalent runtime coverage.
 
 `.github/workflows/release-evidence.yml` provides a manual-only Linux/macOS run with read-only
@@ -126,7 +126,32 @@ cross-compilation and the roadmap's documented js/wasm subset also passed (`bw48
 subset includes both new internal packages; the pre-existing FFmpeg RSS test syscall limitation
 still prevents treating a full wasm suite as supported.
 
-Independent read-only review remains open: a verified P2 found that internal output-cap cancellation
-could be mislabeled as caller cancellation and lose the cap diagnostic. A focused repair and
-independent reproduction recheck are required before accepting this runner. A complete real long
-profile has not been run; fake-clock long-profile tests do not supply one-hour runtime evidence.
+### Independent audit closure
+
+The narrow runner audit is closed at repair commit `0f08c2e`, with no outstanding verified P0/P1/P2.
+Three P2 findings were fixed and independently retested using the unchanged external reproductions:
+
+- Internal output-cap termination now remains `failed` with its stream-specific diagnostic, rather
+  than becoming caller cancellation. Actual caller cancellation/deadline still have distinct states.
+- Tool hashing checks context, opens nonblocking on Linux/macOS, and checks descriptor regularity;
+  an executable FIFO cannot block awaiting a writer before the regular-file check.
+- Inherited `GIT_*` overrides are stripped, keeping source observations bound to the configured repo.
+
+Independent verification passed: all original `^TestAudit` overlay tests under `-race` (11.516s),
+focused normal/race/vet, the manual-workflow architecture test and scoped diff checks. Reproductions
+included real self-child output overflow, full Observe FIFO rejection, two temporary Git repositories,
+native Go nested/benchmark JSON events, and failure-report persistence. The reviewer did not modify
+repository files. S2 was outside this audit and remains blocked.
+
+Post-repair full normal/race/vet/tidy/diff gates passed (`b4tbfj8ju`); portable full builds and the
+same documented wasm subset passed (`bcmysk8zt`); TypeScript tests/pack check passed (`bk8ioxiqv`).
+
+Post-repair real smoke also passed (`bjtv9rva1`), from `10:41:18.560189Z` to `10:41:29.250953Z`:
+all four invocations passed with exit 0 and no retained-log truncation. Report:
+`/tmp/cutly-rc-smoke-audit-fixed-20261107-95292636.json` (47,147 bytes), SHA-256
+`eb934258437bab919fa7b2bb7b28a22f6bb0c629083f9b0777838dffe6a79c99`.
+Its snapshot is `d97b6fa5daaa6cc7e644327fc957b0a51a2e074b`, dirty before the repair commit,
+so it remains local integration evidence, not clean-candidate release evidence.
+
+A complete real long profile has not yet finished; fake-clock long-profile tests do not supply
+one-hour runtime evidence.
