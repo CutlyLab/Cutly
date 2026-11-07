@@ -102,6 +102,9 @@ jobs:
           go build -trimpath -ldflags='-s -w' -o "${output}/cutlyd${suffix}" ./cmd/cutlyd
           cp LICENSE "${output}/LICENSE"
           cp cmd/cutlyd/README.md "${output}/CUTLYD.md"
+          mkdir -p "${output}/deps/licenses"
+          cp deps/THIRD_PARTY_NOTICES.md deps/sbom.spdx.json deps/dependency-lock.json "${output}/deps/"
+          cp deps/licenses/* "${output}/deps/licenses/"
           if [[ "${GOOS}" = "windows" ]]; then
             cd "${RUNNER_TEMP}"
             zip -q -r "${package}.zip" "${package}"

@@ -6,7 +6,25 @@ Updated: 2026-11-07
 
 Implementation branch: `codex/video-sdk-core`
 
-Handoff base commit: `0a19a82` (`feat: expose host-bound reference surfaces`)
+Original handoff base commit: `0a19a82` (`feat: expose host-bound reference surfaces`)
+
+### Standalone execution baseline (2026-11-07)
+
+Implementation continues in Go; the proposed Rust rewrite is deferred. The active standalone
+branch is `codex/video-sdk-core`, starting at `f9f891a`. The original handoff SHA `0a19a82` is not
+present in this repository's history. Commit `cabbfbb` has the surface-bridge implementation and
+subject; this identifies the local code baseline, not a proof of commit equivalence or a rerun of
+the historical audit below.
+
+The owner has deferred Manyfy integration work. Execute and validate within standalone Cutly only:
+do not edit the sibling consumer, create replacement module files, or run its consumer tests in this
+execution scope. Existing Cutly legacy compatibility gates remain mandatory. Manyfy acceptance is
+explicitly deferred, not passed, and must be tracked separately from standalone SDK readiness.
+
+Begin with S1 and preserve the stage dependency gates. Save independently reviewable, tested
+boundaries as local commits; no push, package publication, tag, or daemon default switch is implied.
+S1 acceptance evidence is recorded in `DOCUMENT_V2_S1_EVIDENCE.md`; the active S2 ledger is
+`DOCUMENT_V2_S2_EVIDENCE.md`.
 
 ## 1. Purpose and completion boundary
 
@@ -943,12 +961,15 @@ Deferred capabilities must produce stable preflight rejection. They must not be 
 
 ## 18. Next-agent start instructions
 
-1. Confirm the branch contains `0a19a82` and the worktree has no unexpected staged files.
-2. Read this document, the owner complete plan and the existing protocol patterns before editing.
-3. Start with S1 only: create `core/renderplanv2` additively; do not alter RenderPlan v3.
-4. First freeze the profile/type/schema and a minimal canonical fixture, then implement Resolve and
-   verification against that contract.
-5. Commit in the S1 sequence, run the full S1 exit gate and obtain a read-only audit before S2.
+1. Confirm branch `codex/video-sdk-core` and inspect staged/unstaged files; preserve unrelated work.
+   Use the standalone baseline above rather than requiring the absent historical `0a19a82`.
+2. Read this document, the current stage evidence and existing protocol patterns before editing.
+   Manyfy work and consumer tests remain deferred by the owner.
+3. S1 is complete; continue S2 additively in `render/api`. Preserve legacy manifest/request/job,
+   output/evidence contracts and all existing canonical fixtures.
+4. Freeze concrete profiles/types, strict codecs, schemas and minimal canonical fixtures together;
+   separate structural identity verification from host-owned execution authorization.
+5. Run the full S2 exit gate and obtain independent read-only audit closure before S3.
 6. Update the status table below after each stage, including commit IDs and evidence paths.
 
 ## 19. Handoff status table
@@ -956,12 +977,12 @@ Deferred capabilities must produce stable preflight rejection. They must not be 
 | Stage | Status | Evidence / next action |
 | --- | --- | --- |
 | S0 Surface bridge | Complete | `0a19a82`; P0/P1/P2=0 |
-| S1 Document v2 plan | Not started | Next action: additive `core/renderplanv2` protocol + fixtures |
-| S2 Manifest/request v2 | Not started | Depends on verified S1 |
+| S1 Document v2 plan | Complete | `74edd28`, `9db5e5f`, `5e64a65`; final gates passed with documented wasm subset; independent P0/P1/P2 closure in `DOCUMENT_V2_S1_EVIDENCE.md` |
+| S2 Manifest/request v2 | Implemented; independent audit blocked | `5bb222d`, `8cb6172`, `66a0b0b`, `0951ad3`; full Go/target gates passed; reviewer service terminated before final closure; see `DOCUMENT_V2_S2_EVIDENCE.md`; do not enter S3 |
 | S3 Prepared v2 | Not started | Depends on verified S1/S2 |
 | S4 Provider bundle | Not started | Depends on restart-safe S3 |
 | S5 Assembler/Evidence v2 | Not started | Depends on real S4 providers |
 | S6 Production runtime/cache | Not started | Depends on S3-S5 |
-| S7a Mutation/project core | Not started | May run beside S1-S6; required before public edit APIs |
+| S7a Mutation/project core | In progress: independent edit/project lane | See `DOCUMENT_V2_S7A_EVIDENCE.md`; does not waive blocked S2 audit; required before public edit APIs |
 | S7 Public SDK/CLI/Agent | Not started | Depends on S6 and audited S7a |
 | S8 Player/UI/release | Not started | Depends on S6/S7 and parallel release lane |

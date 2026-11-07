@@ -4,6 +4,24 @@ This document records the release boundary for Cutly `0.1.0-rc.1`. It is an
 acceptance checklist for the restricted native hard-cut SDK, not a claim that
 Cutly is already a general nonlinear editor.
 
+## Broad Document v2 M4 tracking
+
+The active broad M4 implementation is tracked in
+[`DOCUMENT_V2_NATIVE_SDK_ROADMAP.md`](DOCUMENT_V2_NATIVE_SDK_ROADMAP.md), not by the
+restricted RC matrix below. As of 2026-11-07, S1 is accepted, S2 implementation has
+passed local gates but lacks final independent audit closure, and the independent
+S7a mutation/project lane is in progress. S3–S8 broad runtime/product acceptance
+is not complete. Manyfy integration remains explicitly deferred by the owner.
+
+Release automation in source is not execution evidence. The signed-runtime
+verifier and build-owned trust policy already exist, but tagged workflow builds
+remain development builds until approved media bundles and trust pins are supplied.
+The checked-in dependency notices/SBOM cover source dependencies, not an approved
+FFmpeg binary-distribution closure. Production signing keys, license approval,
+actual multi-platform runs and one-hour/nightly soak evidence cannot be fabricated
+from unit-test names or cross-compilation. Push, tag, publication and daemon-default
+changes still require explicit owner authorization.
+
 ## Completion matrix
 
 | M4 surface | Source status | Implemented acceptance boundary | Evidence |
