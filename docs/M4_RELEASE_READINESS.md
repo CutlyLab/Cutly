@@ -23,6 +23,10 @@ actual multi-platform runs and one-hour/nightly soak evidence cannot be fabricat
 from unit-test names or cross-compilation. Push, tag, publication and daemon-default
 changes still require explicit owner authorization.
 
+The independent restricted-RC evidence runner and its measured synthetic streaming/RSS baseline
+are tracked in [`RELEASE_EVIDENCE_RUNNER.md`](RELEASE_EVIDENCE_RUNNER.md). They are release-test
+infrastructure, not broad Document v2 runtime acceptance or a signed media-bundle claim.
+
 ## Completion matrix
 
 | M4 surface | Source status | Implemented acceptance boundary | Evidence |
