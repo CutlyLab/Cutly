@@ -87,6 +87,35 @@
       letter-spacing: -0.03em;
       text-transform: uppercase;
     }
+    .scan-line {
+      position: absolute;
+      top: 78px;
+      bottom: 0;
+      left: 0;
+      width: 4px;
+      background: #00a8e8;
+      z-index: 4;
+    }
+    .mouse {
+      position: absolute;
+      left: 1210px;
+      top: 392px;
+      width: 58px;
+      height: 76px;
+      z-index: 12;
+      transform-origin: 8px 8px;
+    }
+    .mouse svg { position: relative; z-index: 2; width: 58px; height: 76px; }
+    .mouse-ring {
+      position: absolute;
+      left: -18px;
+      top: -18px;
+      width: 56px;
+      height: 56px;
+      border: 5px solid #00a8e8;
+      border-radius: 50%;
+      opacity: 0;
+    }
     #tx-transition {
       background: #111315;
       z-index: 10;
@@ -97,15 +126,17 @@
     <div id="tx-bg" class="clip" data-start="0" data-duration="3.8" data-track-index="0"></div>
     <div id="tx-content" class="clip" data-start="0" data-duration="3.8" data-track-index="1">
       <section class="argument">
-        <span class="index">01 / REVIEWABLE EDIT</span>
-        <h2 id="tx-title" data-layout-allow-overflow>Agents propose<br />Systems verify</h2>
-        <p id="tx-sub">Atomic. Revision-checked. Reversible.</p>
+        <span class="index">01 / TYPED EDITS</span>
+        <h2 id="tx-title" data-layout-allow-overflow>Plan<br />Review<br />Apply<br />Revert</h2>
+        <p id="tx-sub">Atomic transactions with exact timeline impact.</p>
       </section>
       <section class="code-stage" id="tx-code" data-layout-allow-overflow>
         <div class="code-header"><span>transaction.v2.json</span><span class="state">ready for review</span></div>
         <pre><span class="line" id="tx-line-1">{</span><span class="line" id="tx-line-2">  <span class="key">"id"</span>: <span class="value">"trim-intro"</span>,</span><span class="line" id="tx-line-3">  <span class="key">"expected_revision"</span>: <span class="accent">8</span>,</span><span class="line" id="tx-line-4">  <span class="key">"operations"</span>: [{</span><span class="line" id="tx-line-5">    <span class="key">"op"</span>: <span class="value">"clip_trim"</span>,</span><span class="line" id="tx-line-6">    <span class="key">"clip_id"</span>: <span class="value">"clip-video-a"</span>,</span><span class="line" id="tx-line-7">    <span class="key">"duration"</span>: { <span class="key">"value"</span>: <span class="accent">5</span>, <span class="key">"rate"</span>: <span class="accent">1</span> }</span><span class="line" id="tx-line-8">  }]</span><span class="line" id="tx-line-9">}</span></pre>
-        <div class="commit" id="tx-commit" data-layout-allow-overflow>Commit exact edit</div>
+        <div class="scan-line" id="tx-scan"></div>
+        <div class="commit" id="tx-commit" data-layout-allow-overflow>Apply by ID</div>
       </section>
+      <div class="mouse" id="tx-mouse" data-layout-ignore><svg viewBox="0 0 58 76" aria-hidden="true"><path d="M5 4v52l13-12 10 25 13-6-11-24h20L5 4Z" fill="#f5f2eb" stroke="#111315" stroke-width="5" stroke-linejoin="round" /></svg><i class="mouse-ring" id="tx-mouse-ring"></i></div>
     </div>
     <div id="tx-transition" class="clip" data-start="0" data-duration="3.8" data-track-index="2" data-layout-ignore></div>
   </div>
@@ -115,7 +146,13 @@
     tl.fromTo("#tx-sub", { opacity: 0 }, { opacity: 1, duration: 0.2, ease: "power4.out" }, 0.46);
     tl.fromTo("#tx-code", { x: 140, opacity: 1 }, { x: 0, duration: 0.62, ease: "expo.out" }, 0.1);
     tl.fromTo("#tx-code .line", { opacity: 0, x: 24 }, { opacity: 1, x: 0, duration: 0.16, stagger: 0.12, ease: "power4.out" }, 0.58);
+    tl.fromTo("#tx-scan", { x: 0, opacity: 0 }, { x: 790, opacity: 1, duration: 1.28, ease: "power1.inOut" }, 0.64);
+    tl.to("#tx-scan", { opacity: 0, duration: 0.16, ease: "power4.out" }, 1.92);
     tl.fromTo("#tx-commit", { y: 112 }, { y: 0, duration: 0.3, ease: "power4.out" }, 2.34);
+    tl.fromTo("#tx-mouse", { x: 0, y: 0, scale: 0.88, opacity: 0 }, { x: 390, y: 528, scale: 1, opacity: 1, duration: 1.12, ease: "power2.inOut" }, 1.5);
+    tl.fromTo("#tx-mouse-ring", { scale: 0.25, opacity: 0.9 }, { scale: 1.25, opacity: 0, duration: 0.32, ease: "power3.out" }, 2.68);
+    tl.to("#tx-mouse", { scale: 0.9, duration: 0.08, ease: "power2.in" }, 2.68);
+    tl.to("#tx-mouse", { scale: 1, duration: 0.12, ease: "power2.out" }, 2.76);
     tl.fromTo("#tx-transition", { scaleX: 0, transformOrigin: "right center" }, { scaleX: 1, duration: 0.42, ease: "power3.in" }, 3.34);
     window.__timelines = window.__timelines || {};
     window.__timelines.transaction = tl;

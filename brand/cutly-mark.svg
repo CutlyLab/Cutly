@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
   <title id="title">Cutly mark</title>
-  <desc id="desc">A geometric C split by a precise cyan cut.</desc>
-  <path fill="#111315" d="M208 40H104c-35.346 0-64 28.654-64 64v48c0 35.346 28.654 64 64 64h104v-48h-96c-13.255 0-24-10.745-24-24v-32c0-13.255 10.745-24 24-24h96V40Z"/>
-  <path fill="#00A8E8" d="M135 88h38l-52 80H83l52-80Z"/>
+  <desc id="desc">A precision-cut C formed from two editorial frame states and a cyan edit blade.</desc>
+  <path fill="#111315" d="M216 28H104c-45.255 0-76 30.745-76 76v48c0 45.255 30.745 76 76 76h112l-24-48h-80c-21.219 0-36-14.781-36-36v-32c0-21.219 14.781-36 36-36h80l24-48Z"/>
+  <path fill="#00A8E8" d="M148 76h30l-66 104H82l66-104Z"/>
 </svg>

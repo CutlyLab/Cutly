@@ -1,6 +1,7 @@
 <div align="center">
 
-# Cutly
+<img src="brand/cutly-lockup.svg#gh-light-mode-only" alt="Cutly" width="420" />
+<img src="brand/cutly-lockup-dark.svg#gh-dark-mode-only" alt="Cutly" width="420" />
 
 **Edit deterministically. Render natively. Built for agents.**
 

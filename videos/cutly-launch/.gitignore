@@ -9,3 +9,4 @@ assets/bgm/*.log
 audio_meta.json
 bgm_status.json
 beats/assets/bgm/track.wav.json
+assets/generated/*.png

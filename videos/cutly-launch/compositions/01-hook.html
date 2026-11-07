@@ -1,137 +1,43 @@
 <template>
   <style>
-    #root {
-      position: absolute;
-      inset: 0;
-      overflow: hidden;
-      font-family: Inter, sans-serif;
-      color: #111315;
-    }
-    #hook-bg,
-    #hook-content,
-    #hook-transition {
-      position: absolute;
-      inset: 0;
-    }
-    #hook-bg {
-      background: #ece9e2;
-    }
-    #hook-content {
-      padding: 76px 88px;
-    }
-    .eyebrow {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font: 700 28px/1 "IBM Plex Mono", monospace;
-      letter-spacing: 0.02em;
-      text-transform: uppercase;
-    }
-    .eyebrow .status {
-      color: #007aa8;
-    }
-    .filmstrip {
-      position: absolute;
-      left: 88px;
-      top: 184px;
-      width: 1744px;
-      height: 612px;
-      padding: 46px 34px;
-      display: grid;
-      grid-template-columns: 1fr 1.12fr 0.84fr;
-      gap: 18px;
-      background: #111315;
-      box-shadow: 0 24px 0 rgba(17, 19, 21, 0.18);
-    }
-    .filmstrip::before,
-    .filmstrip::after {
-      content: "";
-      position: absolute;
-      left: 22px;
-      right: 22px;
-      height: 16px;
-      background: repeating-linear-gradient(90deg, #ece9e2 0 28px, transparent 28px 50px);
-    }
-    .filmstrip::before { top: 14px; }
-    .filmstrip::after { bottom: 14px; }
-    .frame {
-      position: relative;
-      overflow: hidden;
-      background: #292d30;
-      border: 2px solid #4a4f52;
-    }
-    .frame-a {
-      background:
-        linear-gradient(135deg, transparent 0 46%, #00a8e8 46% 55%, transparent 55%),
-        #292d30;
-    }
-    .frame-b {
-      display: grid;
-      place-items: center;
-      color: #f5f2eb;
-      font: 900 94px/0.86 "Archivo Black", sans-serif;
-      letter-spacing: -0.06em;
-    }
-    .frame-c {
-      background:
-        linear-gradient(90deg, #00a8e8 0 24%, transparent 24% 31%, #f5f2eb 31% 68%, transparent 68%),
-        #292d30;
-    }
-    .receipt {
-      position: absolute;
-      left: 208px;
-      right: 88px;
-      bottom: 84px;
-      height: 156px;
-      display: grid;
-      grid-template-columns: 410px 1fr 270px;
-      align-items: center;
-      background: #00a8e8;
-      border: 3px solid #111315;
-      box-shadow: -18px 18px 0 #111315;
-    }
-    .receipt strong {
-      padding-left: 42px;
-      font: 900 72px/1 "Archivo Black", sans-serif;
-      letter-spacing: -0.045em;
-    }
-    .receipt code {
-      padding: 0 34px;
-      border-left: 3px solid #111315;
-      border-right: 3px solid #111315;
-      font: 500 30px/1.4 "IBM Plex Mono", monospace;
-    }
-    .receipt span {
-      text-align: center;
-      font: 700 31px/1.2 "IBM Plex Mono", monospace;
-    }
-    #hook-transition {
-      background: #111315;
-      z-index: 10;
-    }
+    #root { position: absolute; inset: 0; overflow: hidden; background: #ece9e2; color: #111315; font-family: Inter, sans-serif; }
+    #hook-bg, #hook-content, #hook-transition { position: absolute; inset: 0; }
+    #hook-bg { background: #ece9e2; }
+    .plate { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .frame-rule { position: absolute; left: 82px; right: 82px; top: 68px; height: 4px; background: #111315; }
+    .kicker { position: absolute; left: 88px; top: 92px; padding: 18px 22px; background: #111315; color: #f5f2eb; font: 700 28px/1 "IBM Plex Mono", monospace; text-transform: uppercase; }
+    .copy { position: absolute; left: 920px; right: 82px; top: 176px; }
+    .copy h1 { font: 900 142px/0.84 "Archivo Black", sans-serif; letter-spacing: -0.065em; text-transform: uppercase; }
+    .copy h1 span { color: #007aa8; }
+    .copy p { width: 720px; margin-top: 50px; padding-top: 26px; border-top: 4px solid #111315; font: 600 39px/1.2 Inter, sans-serif; letter-spacing: -0.025em; }
+    .capabilities { position: absolute; left: 920px; right: 82px; bottom: 70px; display: grid; grid-template-columns: repeat(3, 1fr); border-top: 3px solid #111315; border-bottom: 3px solid #111315; }
+    .capabilities span { padding: 20px 18px; border-right: 3px solid #111315; font: 700 28px/1 "IBM Plex Mono", monospace; text-transform: uppercase; }
+    .capabilities span:last-child { border-right: 0; }
+    .status { position: absolute; left: 86px; bottom: 72px; width: 650px; display: flex; align-items: center; justify-content: space-between; padding: 26px 30px; background: #00a8e8; border: 3px solid #111315; box-shadow: 14px 14px 0 #111315; font: 700 28px/1 "IBM Plex Mono", monospace; text-transform: uppercase; }
+    .status strong { font: 900 44px/1 "Archivo Black", sans-serif; letter-spacing: -0.04em; }
+    #hook-transition { background: #111315; z-index: 10; transform-origin: left center; }
   </style>
   <div id="root" data-composition-id="hook" data-duration="2.8" data-width="1920" data-height="1080" data-motion-blur="on" data-motion-blur-shutter="240">
-    <div id="hook-bg" class="clip" data-start="0" data-duration="2.8" data-track-index="0"></div>
+    <div id="hook-bg" class="clip" data-start="0" data-duration="2.8" data-track-index="0"><img class="plate" id="hook-plate" src="assets/generated/native-render-gate.jpg" alt="" /></div>
     <div id="hook-content" class="clip" data-start="0" data-duration="2.8" data-track-index="1">
-      <div class="eyebrow"><span>cutly / render job 0042</span><span class="status">native output</span></div>
-      <div class="filmstrip" id="hook-filmstrip" data-layout-allow-overflow>
-        <div class="frame frame-a"></div>
-        <div class="frame frame-b">MP4</div>
-        <div class="frame frame-c"></div>
-      </div>
-      <div class="receipt" id="hook-receipt" data-layout-allow-overflow>
-        <strong>VERIFIED</strong>
-        <code>artifact.mp4 ↔ evidence.json</code>
-        <span>SHA-256<br />BOUND</span>
-      </div>
+      <div class="frame-rule" id="hook-rule"></div>
+      <div class="kicker" id="hook-kicker">Cutly / open-source SDK</div>
+      <div class="copy"><h1 id="hook-title">Video editing<br /><span>for agents.</span></h1><p id="hook-sub">Typed edits in. Native, verifiable video out.</p></div>
+      <div class="capabilities" id="hook-caps"><span>Chrome-free</span><span>Deterministic</span><span>Self-hosted</span></div>
+      <div class="status" id="hook-status"><strong>Native output</strong><span>H.264 / AAC / evidence</span></div>
     </div>
     <div id="hook-transition" class="clip" data-start="0" data-duration="2.8" data-track-index="2" data-layout-ignore></div>
   </div>
   <script>
     const tl = gsap.timeline({ paused: true });
-    tl.fromTo("#hook-filmstrip", { scale: 0.975, opacity: 1 }, { scale: 1, duration: 0.72, ease: "expo.out" }, 0);
-    tl.fromTo("#hook-receipt", { y: 80, opacity: 1 }, { y: 0, duration: 0.62, ease: "expo.out" }, 0.42);
-    tl.fromTo("#hook-transition", { xPercent: -101 }, { xPercent: 0, duration: 0.32, ease: "power3.in" }, 2.45);
+    tl.fromTo("#hook-plate", { scale: 1.08, x: -28 }, { scale: 1, x: 0, duration: 1.25, ease: "power2.out" }, 0);
+    tl.fromTo("#hook-rule", { scaleX: 0, transformOrigin: "left center" }, { scaleX: 1, duration: 0.54, ease: "power4.out" }, 0.02);
+    tl.fromTo("#hook-kicker", { x: -90, opacity: 0 }, { x: 0, opacity: 1, duration: 0.5, ease: "expo.out" }, 0.1);
+    tl.fromTo("#hook-title", { y: 130, opacity: 0 }, { y: 0, opacity: 1, duration: 0.66, ease: "expo.out" }, 0.16);
+    tl.fromTo("#hook-sub", { x: 70, opacity: 0 }, { x: 0, opacity: 1, duration: 0.44, ease: "power3.out" }, 0.52);
+    tl.fromTo("#hook-caps span", { y: 38, opacity: 0 }, { y: 0, opacity: 1, duration: 0.28, stagger: 0.08, ease: "power4.out" }, 0.72);
+    tl.fromTo("#hook-status", { y: 96, opacity: 0 }, { y: 0, opacity: 1, duration: 0.52, ease: "expo.out" }, 0.88);
+    tl.fromTo("#hook-transition", { scaleX: 0 }, { scaleX: 1, duration: 0.3, ease: "power4.in" }, 2.435);
     window.__timelines = window.__timelines || {};
     window.__timelines.hook = tl;
   </script>

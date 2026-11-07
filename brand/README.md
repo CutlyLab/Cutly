@@ -1,11 +1,11 @@
 # Cutly brand assets
 
-The Cutly mark is a geometric **C** interrupted by one exact cyan cut. It connects the product name to precise video edits without using a generic play button, clapperboard, or timeline icon.
+The Cutly mark is a geometric **C** built from two editorial frame states and joined by one exact cyan cut. Its asymmetric terminals echo in/out points without falling back to a generic play button, clapperboard, or timeline icon.
 
 ## Files
 
 - `cutly-mark.svg`: transparent standalone mark.
-- `cutly-avatar.svg`: organization/avatar treatment on bone paper.
+- `cutly-avatar.svg`: high-contrast organization/avatar treatment on deep ink.
 - `cutly-avatar.png`: 1024×1024 upload-ready GitHub Organization avatar.
 - `cutly-lockup.svg`: mark and custom outlined wordmark for light surfaces.
 - `cutly-lockup-dark.svg`: light lockup for dark surfaces.
