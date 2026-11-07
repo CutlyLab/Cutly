@@ -1,0 +1,317 @@
+{
+  "schema_version": 1,
+  "profile": "cutly.semantic.document-v2-render-plan.v1",
+  "canonical_json_profile": "cutly.json.canonical-integer.v1",
+  "document_id": "mixed-plan-document",
+  "revision": 8,
+  "document_hash": "sha256:1f3f1a7397ad3f171f0a487c5f4f0da1975674d65f1c73bec7c3c5ea24361b82",
+  "timeline_id": "timeline-main",
+  "requested_range": {
+    "start": {
+      "value": 0,
+      "rate": 1
+    },
+    "duration": {
+      "value": 10,
+      "rate": 1
+    }
+  },
+  "target": {
+    "timeline_id": "timeline-main",
+    "width": 1920,
+    "height": 1080,
+    "frame_clock": {
+      "origin": {
+        "value": -1,
+        "rate": 1
+      },
+      "frames_per_second": {
+        "value": 24,
+        "rate": 1
+      }
+    },
+    "sample_clock": {
+      "origin": {
+        "value": -1,
+        "rate": 1
+      },
+      "samples_per_second": 48000
+    },
+    "channels": 2,
+    "pixel_format": "rgba16",
+    "color_space": "linear-srgb"
+  },
+  "frame_range": {
+    "first": 24,
+    "count": 240
+  },
+  "sample_range": {
+    "first": 48000,
+    "count": 480000
+  },
+  "required_capabilities": {
+    "track_kinds": [
+      "audio",
+      "text",
+      "vector",
+      "video"
+    ],
+    "asset_kinds": [
+      "audio",
+      "font",
+      "image",
+      "text",
+      "vector"
+    ],
+    "features": [
+      "cutly.audio.gain.v1",
+      "cutly.audio.pan.v1",
+      "cutly.audio.route.v1",
+      "cutly.interpolation.hold.v1",
+      "cutly.interpolation.linear.v1",
+      "cutly.keyframes.v1",
+      "cutly.opacity.v1",
+      "cutly.text.v1",
+      "cutly.vector.path.v1"
+    ]
+  },
+  "visual": [
+    {
+      "binding": {
+        "track_id": "image-track",
+        "clip_id": "image-clip",
+        "asset_id": "image-source",
+        "track_kind": "video",
+        "asset_kind": "image",
+        "track_index": 0,
+        "clip_index": 0,
+        "timeline_range": {
+          "start": {
+            "value": 0,
+            "rate": 1
+          },
+          "duration": {
+            "value": 10,
+            "rate": 1
+          }
+        },
+        "source_range": {
+          "start": {
+            "value": 0,
+            "rate": 1
+          },
+          "duration": {
+            "value": 10,
+            "rate": 1
+          }
+        },
+        "font_asset_id": "",
+        "audio_bus_id": ""
+      },
+      "visible_timeline_range": {
+        "start": {
+          "value": 0,
+          "rate": 1
+        },
+        "duration": {
+          "value": 10,
+          "rate": 1
+        }
+      },
+      "visible_source_range": {
+        "start": {
+          "value": 0,
+          "rate": 1
+        },
+        "duration": {
+          "value": 10,
+          "rate": 1
+        }
+      }
+    },
+    {
+      "binding": {
+        "track_id": "track-text",
+        "clip_id": "clip-text",
+        "asset_id": "asset-text",
+        "track_kind": "text",
+        "asset_kind": "text",
+        "track_index": 2,
+        "clip_index": 0,
+        "timeline_range": {
+          "start": {
+            "value": 0,
+            "rate": 1
+          },
+          "duration": {
+            "value": 5,
+            "rate": 1
+          }
+        },
+        "source_range": {
+          "start": {
+            "value": 0,
+            "rate": 1
+          },
+          "duration": {
+            "value": 5,
+            "rate": 1
+          }
+        },
+        "font_asset_id": "asset-font",
+        "audio_bus_id": ""
+      },
+      "visible_timeline_range": {
+        "start": {
+          "value": 0,
+          "rate": 1
+        },
+        "duration": {
+          "value": 5,
+          "rate": 1
+        }
+      },
+      "visible_source_range": {
+        "start": {
+          "value": 0,
+          "rate": 1
+        },
+        "duration": {
+          "value": 5,
+          "rate": 1
+        }
+      }
+    },
+    {
+      "binding": {
+        "track_id": "track-vector",
+        "clip_id": "clip-vector",
+        "asset_id": "asset-vector",
+        "track_kind": "vector",
+        "asset_kind": "vector",
+        "track_index": 3,
+        "clip_index": 0,
+        "timeline_range": {
+          "start": {
+            "value": 1,
+            "rate": 1
+          },
+          "duration": {
+            "value": 4,
+            "rate": 1
+          }
+        },
+        "source_range": {
+          "start": {
+            "value": 0,
+            "rate": 1
+          },
+          "duration": {
+            "value": 4,
+            "rate": 1
+          }
+        },
+        "font_asset_id": "",
+        "audio_bus_id": ""
+      },
+      "visible_timeline_range": {
+        "start": {
+          "value": 1,
+          "rate": 1
+        },
+        "duration": {
+          "value": 4,
+          "rate": 1
+        }
+      },
+      "visible_source_range": {
+        "start": {
+          "value": 0,
+          "rate": 1
+        },
+        "duration": {
+          "value": 4,
+          "rate": 1
+        }
+      }
+    }
+  ],
+  "audio": [
+    {
+      "binding": {
+        "track_id": "track-audio",
+        "clip_id": "clip-audio",
+        "asset_id": "asset-audio",
+        "track_kind": "audio",
+        "asset_kind": "audio",
+        "track_index": 1,
+        "clip_index": 0,
+        "timeline_range": {
+          "start": {
+            "value": 0,
+            "rate": 1
+          },
+          "duration": {
+            "value": 10,
+            "rate": 1
+          }
+        },
+        "source_range": {
+          "start": {
+            "value": 0,
+            "rate": 1
+          },
+          "duration": {
+            "value": 10,
+            "rate": 1
+          }
+        },
+        "font_asset_id": "",
+        "audio_bus_id": "bus-music"
+      },
+      "visible_timeline_range": {
+        "start": {
+          "value": 0,
+          "rate": 1
+        },
+        "duration": {
+          "value": 10,
+          "rate": 1
+        }
+      },
+      "visible_source_range": {
+        "start": {
+          "value": 0,
+          "rate": 1
+        },
+        "duration": {
+          "value": 10,
+          "rate": 1
+        }
+      }
+    }
+  ],
+  "transitions": [],
+  "audio_bus_ids": [
+    "bus-master",
+    "bus-music"
+  ],
+  "resources": [
+    {
+      "asset_id": "asset-audio",
+      "kind": "audio",
+      "content_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    {
+      "asset_id": "asset-font",
+      "kind": "font",
+      "content_hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    {
+      "asset_id": "image-source",
+      "kind": "image",
+      "content_hash": ""
+    }
+  ],
+  "fingerprint": "sha256:9a685ada74129a237d5041a48bff2714324355b1a83d14a5752a6be173a7358b"
+}

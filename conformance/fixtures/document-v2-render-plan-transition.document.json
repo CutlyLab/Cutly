@@ -1,0 +1,94 @@
+{
+  "schema_version": 2,
+  "id": "transition-document",
+  "revision": 1,
+  "assets": [
+    {
+      "id": "out-asset",
+      "kind": "video",
+      "uri": "media/out.mp4"
+    },
+    {
+      "id": "in-asset",
+      "kind": "video",
+      "uri": "media/in.mp4"
+    }
+  ],
+  "timelines": [
+    {
+      "id": "main",
+      "tracks": [
+        {
+          "id": "video-track",
+          "kind": "video",
+          "clips": [
+            {
+              "id": "out",
+              "asset_id": "out-asset",
+              "timeline_range": {
+                "start": {
+                  "value": 0,
+                  "rate": 1
+                },
+                "duration": {
+                  "value": 5,
+                  "rate": 1
+                }
+              },
+              "source_range": {
+                "start": {
+                  "value": 2,
+                  "rate": 1
+                },
+                "duration": {
+                  "value": 5,
+                  "rate": 1
+                }
+              }
+            },
+            {
+              "id": "in",
+              "asset_id": "in-asset",
+              "timeline_range": {
+                "start": {
+                  "value": 5,
+                  "rate": 1
+                },
+                "duration": {
+                  "value": 5,
+                  "rate": 1
+                }
+              },
+              "source_range": {
+                "start": {
+                  "value": 2,
+                  "rate": 1
+                },
+                "duration": {
+                  "value": 5,
+                  "rate": 1
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "transitions": [
+        {
+          "id": "dissolve",
+          "profile": "cutly.transition.dissolve.v1",
+          "outgoing_clip_id": "out",
+          "incoming_clip_id": "in",
+          "pre_duration": {
+            "value": 1,
+            "rate": 1
+          },
+          "post_duration": {
+            "value": 1,
+            "rate": 1
+          }
+        }
+      ]
+    }
+  ]
+}
