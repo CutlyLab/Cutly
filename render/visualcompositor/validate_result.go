@@ -12,6 +12,7 @@ import (
 	"github.com/CutlyLab/Cutly/render/cpuraster"
 	"github.com/CutlyLab/Cutly/render/expressionlayer"
 	"github.com/CutlyLab/Cutly/render/rastercompositor"
+	"github.com/CutlyLab/Cutly/render/textlayer"
 	"github.com/CutlyLab/Cutly/render/vectorraster"
 )
 
@@ -43,12 +44,17 @@ func (program *Program) validateResult(ctx context.Context, result Result, requi
 	if err := contextError(ctx, "result"); err != nil {
 		return err
 	}
-	if result.SchemaVersion != ResultSchemaVersion || result.Profile != ProfileV1 ||
+	wantTextContract := 0
+	if program.config.Source.StaticTextV2 {
+		wantTextContract = textlayer.ContractVersion
+	}
+	if result.SchemaVersion != ResultSchemaVersion || result.Profile != profileForConfig(program.config) ||
 		result.Width != program.config.Width || result.Height != program.config.Height ||
 		result.DocumentHash != program.documentHash || result.BuildFingerprint != program.config.BuildFingerprint ||
 		result.NativeSourceContractVersion != rastercompositor.NativeSourceContractVersion ||
 		result.ExpressionContractVersion != expressionlayer.ContractVersion ||
 		result.ExpressionHandleContractVersion != expressionlayer.TransitionHandleContractVersion ||
+		result.TextContractVersion != wantTextContract ||
 		result.SurfaceProfile != cpucompositor.SurfaceProfileV1 || result.PixelHashProfile != PixelHashProfileV1 ||
 		result.RasterProfile != cpuraster.ProfileV1 || result.KernelProfile != cpucompositor.KernelProfileV1 ||
 		result.LayerOrder != LayerOrderProfile || result.TimelineID == "" || result.TimelineTime.Validate() != nil ||
@@ -84,8 +90,11 @@ func (program *Program) validateResult(ctx context.Context, result Result, requi
 		if result.Surface.Width() != result.Width || result.Surface.Height() != result.Height {
 			return compositorError(CodeSourceMismatch, "result/surface/geometry", ErrSourceMismatch)
 		}
-		actual, err := result.Surface.CanonicalHash()
-		if err != nil || actual != result.PixelHash {
+		actual, err := canonicalSurfaceHash(ctx, result.Surface, "result/surface/pixel_hash", CodeSourceMismatch, ErrSourceMismatch)
+		if err != nil {
+			return err
+		}
+		if actual != result.PixelHash {
 			return compositorError(CodeSourceMismatch, "result/surface/pixel_hash", errors.Join(ErrSourceMismatch, err))
 		}
 	}
@@ -127,6 +136,9 @@ func (program *Program) expectedResultSources(evaluated evaluator.TimelineEvalua
 				frozen.outgoingClipID != transition.Outgoing.ClipID || frozen.incomingClipID != transition.Incoming.ClipID {
 				return nil, compositorError(CodeSourceMismatch, path+"/transition_scope", ErrSourceMismatch)
 			}
+			if frozen.trackKind == documentv2.TrackKindText {
+				return nil, compositorError(CodeSourceMismatch, path+"/text_transition", ErrSourceMismatch)
+			}
 			outgoing := &transitionSourceContext{id: transition.TransitionID, index: frozen.index, profile: transition.Profile, role: expressionlayer.TransitionHandleOutgoing}
 			incoming := &transitionSourceContext{id: transition.TransitionID, index: frozen.index, profile: transition.Profile, role: expressionlayer.TransitionHandleIncoming}
 			if err := appendClip(*transition.Outgoing, outgoing, path+"/outgoing"); err != nil {
@@ -157,9 +169,18 @@ func (program *Program) validateResultSource(receipt SourceReceipt, expected exp
 			return compositorError(CodeSourceMismatch, path+"/route", ErrSourceMismatch)
 		}
 		return program.validateResultExpression(*receipt.Expression, expected.asset, receipt.Evaluation.Transition != nil, path+"/expression")
+	case SourceKindText:
+		if expected.trackKind != documentv2.TrackKindText || receipt.Text == nil || receipt.Evaluation.Transition != nil {
+			return compositorError(CodeSourceMismatch, path+"/route", ErrSourceMismatch)
+		}
+		return program.validateResultText(*receipt.Text, expected.asset, path+"/text")
 	default:
 		return compositorError(CodeSourceMismatch, path+"/kind", ErrSourceMismatch)
 	}
+}
+
+func (program *Program) validateResultText(receipt textlayer.FrameReceipt, asset frozenAsset, path string) error {
+	return program.validateTextReceiptBindings(asset, receipt.Request, receipt, path)
 }
 
 func (program *Program) validateResultNative(receipt rastercompositor.SourceReceipt, asset frozenAsset, path string) error {

@@ -3,6 +3,8 @@ package visualcompositor
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"fmt"
 	"os"
 	"testing"
 
@@ -81,6 +83,94 @@ func TestResultCanonicalFixtureStrictUnionAndRoundTrip(t *testing.T) {
 	roundTrip, err := videoedit.CanonicalJSON(decoded)
 	if err != nil || !bytes.Equal(roundTrip, want) {
 		t.Fatalf("roundtrip drift: %v\n%s", err, roundTrip)
+	}
+}
+
+func TestV2CanonicalProfileResultAndPixelGoldenClosure(t *testing.T) {
+	document := textV2VisualDocument(false)
+	config := DefaultConfigV2(2, 2)
+	config.BuildFingerprint = "visual-fixture-build-v2"
+	program, diagnostics := Compile(context.Background(), document, config)
+	if program == nil || documentv2.HasErrorDiagnostics(diagnostics) {
+		t.Fatalf("diagnostics=%+v", diagnostics)
+	}
+	surface := testSurface(t, 2, 2, []cpucompositor.Pixel{
+		{R: 50_000, A: 50_000}, {R: 40_000, A: 40_000},
+		{R: 30_000, A: 30_000}, {R: 20_000, A: 20_000},
+	})
+	result, err := program.RenderAt(context.Background(), "timeline", rt(1, 2), Providers{
+		Text: fakeTextProvider(surface, document.Assets[1].Text.Fill, nil),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	profileFixture := visualFixture(t, "profile-v2.canonical.json")
+	encodedProfile, err := videoedit.CanonicalJSON(DescriptorV2())
+	if err != nil || !bytes.Equal(encodedProfile, profileFixture) {
+		t.Fatalf("v2 profile drift: %v\nwant %s\n got %s", err, profileFixture, encodedProfile)
+	}
+	var decodedProfile ProfileDescriptor
+	if err := wirejson.Decode(profileFixture, &decodedProfile); err != nil || decodedProfile != DescriptorV2() {
+		t.Fatalf("strict v2 profile decode: decoded=%+v err=%v", decodedProfile, err)
+	}
+	if err := wirejson.Decode(withUnknownFixtureMember(profileFixture), &decodedProfile); err == nil {
+		t.Fatal("strict v2 profile accepted unknown field")
+	}
+
+	resultFixture := visualFixture(t, "result-v2.canonical.json")
+	encodedResult, err := videoedit.CanonicalJSON(result)
+	if err != nil || !bytes.Equal(encodedResult, resultFixture) {
+		t.Fatalf("v2 result drift: %v\nwant %s\n got %s", err, resultFixture, encodedResult)
+	}
+	var decodedResult Result
+	if err := wirejson.Decode(resultFixture, &decodedResult); err != nil {
+		t.Fatalf("strict v2 result decode: %v", err)
+	}
+	if len(decodedResult.Sources) != 1 || decodedResult.Sources[0].Kind != SourceKindText || decodedResult.Sources[0].Text == nil {
+		t.Fatalf("decoded v2 result=%+v", decodedResult)
+	}
+	if err := decodedResult.Sources[0].Validate(); err != nil {
+		t.Fatalf("decoded text source: %v", err)
+	}
+	if err := program.ValidateSerializedReceipt(context.Background(), decodedResult); err != nil {
+		t.Fatalf("decoded v2 serialized receipt: %v", err)
+	}
+	roundTrip, err := videoedit.CanonicalJSON(decodedResult)
+	if err != nil || !bytes.Equal(roundTrip, resultFixture) {
+		t.Fatalf("v2 result roundtrip drift: %v\n%s", err, roundTrip)
+	}
+	if err := wirejson.Decode(withUnknownFixtureMember(resultFixture), &decodedResult); err == nil {
+		t.Fatal("strict v2 result accepted unknown field")
+	}
+
+	golden := goldenVectors{SchemaVersion: 1, Profile: ProfileV2, Cases: []goldenCase{{
+		Name: "static-text", PixelHash: result.PixelHash, SourceKinds: sourceKinds(result.Sources),
+	}}}
+	encodedGolden, err := videoedit.CanonicalJSON(golden)
+	goldenFixture := visualFixture(t, "golden-v2.canonical.json")
+	if err != nil || !bytes.Equal(encodedGolden, goldenFixture) {
+		t.Fatalf("v2 golden drift: %v\nwant %s\n got %s", err, goldenFixture, encodedGolden)
+	}
+
+	assertVisualFixtureSHA256(t, "profile-v2.canonical.json", "a1f91bdb49fac2ab40c9015df31c52f69ee477bf8edabac4ad9c869bc3ab743d")
+	assertVisualFixtureSHA256(t, "result-v2.canonical.json", "9e62e5ffa15ea63603221e926e3912fb806d41cd9dadc15fe7eded3883102de5")
+	assertVisualFixtureSHA256(t, "golden-v2.canonical.json", "35bfb1e757631a52fe8c5595e91cd524f449c0efe3dbc61d5c86538f7b1a3410")
+}
+
+func withUnknownFixtureMember(raw []byte) []byte {
+	result := append([]byte(nil), raw[:len(raw)-1]...)
+	return append(result, []byte(`,"unknown_v2_member":true}`)...)
+}
+
+func assertVisualFixtureSHA256(t *testing.T, name, want string) {
+	t.Helper()
+	raw, err := os.ReadFile("testdata/" + name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := fmt.Sprintf("%x", sha256.Sum256(raw)); got != want {
+		t.Fatalf("%s SHA-256=%s want=%s", name, got, want)
 	}
 }
 

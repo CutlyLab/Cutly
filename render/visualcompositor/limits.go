@@ -43,6 +43,7 @@ type SourceCapabilities struct {
 	Image             bool `json:"image"`
 	VectorExpression  bool `json:"vector_expression"`
 	LinearVideoRetime bool `json:"linear_video_retime"`
+	StaticTextV2      bool `json:"static_text_v2,omitempty"`
 }
 
 type Config struct {
@@ -60,6 +61,14 @@ func DefaultConfig(width, height int) Config {
 		Source:         SourceCapabilities{Video: true, Image: true, VectorExpression: true},
 		NativeProfiles: rastercompositor.DefaultSourceProfiles(),
 	}
+}
+
+// DefaultConfigV2 enables the additive pinned-font static Text v2 source path. DefaultConfig
+// deliberately remains the byte-stable v1 configuration and never advertises Text support.
+func DefaultConfigV2(width, height int) Config {
+	result := DefaultConfig(width, height)
+	result.Source.StaticTextV2 = true
+	return result
 }
 
 func normalizeConfig(config Config) (Config, error) {

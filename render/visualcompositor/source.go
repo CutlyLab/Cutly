@@ -11,10 +11,12 @@ import (
 
 	"github.com/CutlyLab/Cutly/core/documentv2"
 	"github.com/CutlyLab/Cutly/core/evaluator"
+	"github.com/CutlyLab/Cutly/font/sfntglyf"
 	"github.com/CutlyLab/Cutly/media/color"
 	"github.com/CutlyLab/Cutly/render/cpucompositor"
 	"github.com/CutlyLab/Cutly/render/expressionlayer"
 	"github.com/CutlyLab/Cutly/render/rastercompositor"
+	"github.com/CutlyLab/Cutly/render/textlayer"
 	"github.com/CutlyLab/Cutly/render/vectorraster"
 )
 
@@ -50,9 +52,85 @@ func (program *Program) sourceSurface(
 			return program.expressionSource(ctx, clip, binding, evaluation, asset, providers.Expression, path+"/expression")
 		}
 		return program.expressionTransitionSource(ctx, clip, binding, evaluation, asset, *transition, providers.ExpressionHandle, path+"/expression_handle")
+	case documentv2.TrackKindText:
+		if transition != nil {
+			return nil, SourceReceipt{}, compositorError(CodeUnsupportedLayer, path+"/text_transition", ErrUnsupportedLayer)
+		}
+		if asset.kind != documentv2.AssetKindText || asset.textProfile != documentv2.TextProfilePinnedFontViewportPXV2 {
+			return nil, SourceReceipt{}, compositorError(CodeUnsupportedLayer, path+"/asset_kind", ErrUnsupportedLayer)
+		}
+		return program.textSource(ctx, clip, binding, evaluation, asset, providers.Text, path+"/text")
 	default:
 		return nil, SourceReceipt{}, compositorError(CodeUnsupportedLayer, path+"/track_kind", ErrUnsupportedLayer)
 	}
+}
+
+func (program *Program) textSource(
+	ctx context.Context,
+	clip evaluator.ClipEvaluation,
+	binding ClipBinding,
+	evaluation SourceEvaluation,
+	asset frozenAsset,
+	provider textlayer.TextLayerProvider,
+	path string,
+) (*cpucompositor.Surface, SourceReceipt, error) {
+	if nilInterface(provider) {
+		return nil, SourceReceipt{}, compositorError(CodeTextProviderUnavailable, path, ErrTextProviderUnavailable)
+	}
+	request := textlayer.Request{
+		ContractVersion: textlayer.ContractVersion, DocumentHash: program.documentHash,
+		TimelineID: binding.TimelineID, TimelineIndex: binding.TimelineIndex,
+		TrackID: binding.TrackID, TrackIndex: binding.TrackIndex, TrackKind: binding.TrackKind,
+		ClipID: binding.ClipID, ClipIndex: binding.ClipIndex,
+		AssetID: binding.AssetID, AssetIndex: binding.AssetIndex, AssetKind: binding.AssetKind,
+		FrozenTextBindingHashProfile: evaluator.FrozenTextSourceBindingHashProfileV1,
+		FrozenTextBindingHash:        asset.textBindingHash,
+		TextSemanticHashProfile:      documentv2.TextSemanticHashProfileV1, TextSemanticHash: asset.textSemanticHash,
+		LayoutInputHashProfile: documentv2.TextLayoutInputHashProfileV1, LayoutInputHash: asset.textLayoutInputHash,
+		FontAssetID: asset.textFontAssetID, FontAssetIndex: asset.textFontAssetIndex,
+		FontContentHashProfile: sfntglyf.ContentHashProfileV1, FontContentHash: asset.textFontContentHash,
+		RasterViewport: asset.viewport,
+		TimelineTime:   clip.TimelineTime, LocalTime: clip.LocalTime, SourceTime: clip.SourceTime,
+		SourceProfile: textlayer.SourceProfileV1, SelectionProfile: textlayer.SelectionProfileV1,
+		TextProfile:      documentv2.TextProfilePinnedFontViewportPXV2,
+		EvaluatorProfile: documentv2.EvaluatorTextPinnedFontViewportPXV2,
+		RasterProfile:    documentv2.TextRasterProfileSupersample8x8V1,
+		PaintProfile:     color.ProfileRGBA16SRGBPaintV1, SurfaceProfile: cpucompositor.SurfaceProfileV1,
+	}
+	if err := contextError(ctx, path); err != nil {
+		return nil, SourceReceipt{}, err
+	}
+	frame, err := callTextProvider(ctx, provider, request, path)
+	if err != nil {
+		return nil, SourceReceipt{}, providerFailure(ctx, path, err)
+	}
+	if err := contextError(ctx, path); err != nil {
+		return nil, SourceReceipt{}, err
+	}
+	receipt, err := program.validateTextFrame(ctx, asset, request, frame, path+"/response")
+	if err != nil {
+		return nil, SourceReceipt{}, err
+	}
+	result := SourceReceipt{Kind: SourceKindText, Evaluation: evaluation, Text: &receipt}
+	if err := result.Validate(); err != nil {
+		return nil, SourceReceipt{}, compositorError(CodeInvariantFailed, path+"/receipt", errors.Join(ErrInvariantFailed, err))
+	}
+	return frame.Surface, result, nil
+}
+
+func callTextProvider(
+	ctx context.Context,
+	provider textlayer.TextLayerProvider,
+	request textlayer.Request,
+	path string,
+) (frame textlayer.Frame, err error) {
+	defer func() {
+		if recover() != nil {
+			frame = textlayer.Frame{}
+			err = compositorError(CodeSourceFailed, path+"/panic", ErrSourceFailed)
+		}
+	}()
+	return provider.Frame(ctx, request)
 }
 
 func (program *Program) expectedSourceEvaluation(
@@ -268,9 +346,9 @@ func (program *Program) validateNativeFrame(
 	if err := contextError(ctx, path+"/hash"); err != nil {
 		return rastercompositor.SourceReceipt{}, err
 	}
-	actualHash, err := frame.Surface.CanonicalHash()
+	actualHash, err := canonicalSurfaceHash(ctx, frame.Surface, path+"/hash", CodeSourceInvalid, ErrSourceInvalid)
 	if err != nil {
-		return rastercompositor.SourceReceipt{}, compositorError(CodeSourceInvalid, path+"/hash", errors.Join(ErrSourceInvalid, err))
+		return rastercompositor.SourceReceipt{}, err
 	}
 	if err := contextError(ctx, path+"/hash"); err != nil {
 		return rastercompositor.SourceReceipt{}, err
@@ -373,9 +451,9 @@ func (program *Program) validateExpressionCommon(
 	if err := contextError(ctx, path+"/hash"); err != nil {
 		return ExpressionFrameReceipt{}, err
 	}
-	actualHash, err := surface.CanonicalHash()
+	actualHash, err := canonicalSurfaceHash(ctx, surface, path+"/hash", CodeSourceInvalid, ErrSourceInvalid)
 	if err != nil {
-		return ExpressionFrameReceipt{}, compositorError(CodeSourceInvalid, path+"/hash", errors.Join(ErrSourceInvalid, err))
+		return ExpressionFrameReceipt{}, err
 	}
 	if err := contextError(ctx, path+"/hash"); err != nil {
 		return ExpressionFrameReceipt{}, err
@@ -387,6 +465,37 @@ func (program *Program) validateExpressionCommon(
 		AssetSemanticHashProfile: semanticProfile, AssetSemanticHash: semanticHash,
 		RasterReceipt: raster, SurfaceIdentity: identity,
 	}, nil
+}
+
+func (program *Program) validateTextFrame(
+	ctx context.Context,
+	asset frozenAsset,
+	request textlayer.Request,
+	frame textlayer.Frame,
+	path string,
+) (textlayer.FrameReceipt, error) {
+	receipt := frame.Receipt
+	if frame.Surface == nil {
+		return textlayer.FrameReceipt{}, compositorError(CodeSourceMismatch, path+"/surface", ErrSourceMismatch)
+	}
+	if err := program.validateTextReceiptBindings(asset, request, receipt, path); err != nil {
+		return textlayer.FrameReceipt{}, err
+	}
+	if frame.Surface.Width() != int(asset.viewport.WidthPixels) ||
+		frame.Surface.Height() != int(asset.viewport.HeightPixels) {
+		return textlayer.FrameReceipt{}, compositorError(CodeSourceMismatch, path+"/identity", ErrSourceMismatch)
+	}
+	if err := program.validateSourceShape(frame.Surface.Width(), frame.Surface.Height(), path); err != nil {
+		return textlayer.FrameReceipt{}, err
+	}
+	actualHash, err := canonicalSurfaceHash(ctx, frame.Surface, path+"/hash", CodeSourceInvalid, ErrSourceInvalid)
+	if err != nil {
+		return textlayer.FrameReceipt{}, err
+	}
+	if actualHash != receipt.SurfaceIdentity.PixelHash {
+		return textlayer.FrameReceipt{}, compositorError(CodeSourceMismatch, path+"/pixel_hash", ErrSourceMismatch)
+	}
+	return receipt, nil
 }
 
 func (program *Program) validateSourceShape(width, height int, path string) error {
@@ -435,10 +544,27 @@ func providerFailure(ctx context.Context, path string, err error) error {
 		return canceled
 	}
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) ||
-		errors.Is(err, expressionlayer.ErrCanceled) {
+		errors.Is(err, expressionlayer.ErrCanceled) || errors.Is(err, textlayer.ErrCanceled) {
 		return compositorError(CodeCanceled, path, errors.Join(ErrCanceled, err))
 	}
 	return compositorError(CodeSourceFailed, path, errors.Join(ErrSourceFailed, err))
+}
+
+func canonicalSurfaceHash(
+	ctx context.Context,
+	surface *cpucompositor.Surface,
+	path string,
+	code ErrorCode,
+	cause error,
+) (string, error) {
+	actual, err := surface.CanonicalHashContext(ctx)
+	if err == nil {
+		return actual, nil
+	}
+	if canceled := contextError(ctx, path); canceled != nil {
+		return "", canceled
+	}
+	return "", compositorError(code, path, errors.Join(cause, err))
 }
 
 func nilInterface(value any) bool {

@@ -15,6 +15,7 @@ var (
 	ErrEvaluationFailed              = errors.New("visualcompositor: visual evaluation failed")
 	ErrNativeProviderUnavailable     = errors.New("visualcompositor: native source provider is unavailable")
 	ErrExpressionProviderUnavailable = errors.New("visualcompositor: expression source provider is unavailable")
+	ErrTextProviderUnavailable       = errors.New("visualcompositor: text source provider is unavailable")
 	ErrSourceFailed                  = errors.New("visualcompositor: source request failed")
 	ErrSourceInvalid                 = errors.New("visualcompositor: source response is invalid")
 	ErrSourceMismatch                = errors.New("visualcompositor: source response does not match the frozen request")
@@ -35,6 +36,7 @@ const (
 	CodeEvaluationFailed              ErrorCode = "COMPOSITOR.VISUAL_REFERENCE_V1.EVALUATION_FAILED"
 	CodeNativeProviderUnavailable     ErrorCode = "COMPOSITOR.VISUAL_REFERENCE_V1.NATIVE_PROVIDER_UNAVAILABLE"
 	CodeExpressionProviderUnavailable ErrorCode = "COMPOSITOR.VISUAL_REFERENCE_V1.EXPRESSION_PROVIDER_UNAVAILABLE"
+	CodeTextProviderUnavailable       ErrorCode = "COMPOSITOR.VISUAL_REFERENCE_V2.TEXT_PROVIDER_UNAVAILABLE"
 	CodeSourceFailed                  ErrorCode = "COMPOSITOR.VISUAL_REFERENCE_V1.SOURCE_FAILED"
 	CodeSourceInvalid                 ErrorCode = "COMPOSITOR.VISUAL_REFERENCE_V1.SOURCE_INVALID"
 	CodeSourceMismatch                ErrorCode = "COMPOSITOR.VISUAL_REFERENCE_V1.SOURCE_MISMATCH"

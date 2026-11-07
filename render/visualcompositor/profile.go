@@ -6,11 +6,13 @@ import (
 	"github.com/CutlyLab/Cutly/render/cpuraster"
 	"github.com/CutlyLab/Cutly/render/expressionlayer"
 	"github.com/CutlyLab/Cutly/render/rastercompositor"
+	"github.com/CutlyLab/Cutly/render/textlayer"
 )
 
 const (
 	ProfileSchemaVersion = 1
 	ProfileV1            = "cutly.reference-compositor.native-expression-affine-surface.v1"
+	ProfileV2            = "cutly.reference-compositor.native-expression-text-affine-surface.v2"
 	LayerOrderProfile    = evaluator.VisualLayerOrderBackgroundToForegroundV1
 	PixelHashProfileV1   = "cutly.hash.sha256.surface-rgba16be-pixels.v1"
 )
@@ -25,6 +27,8 @@ type ProfileDescriptor struct {
 	ExpressionContractVersion   int                             `json:"expression_contract_version"`
 	ExpressionHandleProfile     string                          `json:"expression_handle_profile"`
 	ExpressionHandleContract    int                             `json:"expression_handle_contract_version"`
+	TextProviderProfile         string                          `json:"text_provider_profile,omitempty"`
+	TextContractVersion         int                             `json:"text_contract_version,omitempty"`
 	SurfaceProfile              string                          `json:"surface_profile"`
 	PixelHashProfile            string                          `json:"pixel_hash_profile"`
 	RasterProfile               string                          `json:"raster_profile"`
@@ -78,3 +82,28 @@ var descriptorV1 = ProfileDescriptor{
 }
 
 func Descriptor() ProfileDescriptor { return descriptorV1 }
+
+var descriptorV2 = func() ProfileDescriptor {
+	value := descriptorV1
+	value.Profile = ProfileV2
+	value.TextProviderProfile = textlayer.ProfileV1
+	value.TextContractVersion = textlayer.ContractVersion
+	value.CapabilitySemantics = "This additive v2 Compile preserves every v1 native/vector capability and may additionally advertise only cutly.text.pinned-font-viewport-px.v2 when StaticTextV2 is enabled. Enabled Text is restricted to static frozen fill plus transform, crop and opacity; text.fill lanes, non-zero Text transitions, legacy Text and rendering extensions fail closed."
+	value.DispatchSemantics = "Freeze the canonical Document v2 asset, timeline, track, clip and transition indexes. Video/image dispatch only to native, viewport-vector only to expression, and pinned static Text v2 only to the text-layer provider. No provider chooses scope, time or z-order."
+	value.SourceValidation = "Apply all v1 validation and, for Text, require the complete textlayer request echo, frozen binding/semantic/layout/font identities, provider-authenticated assembly and raster receipts, exact viewport/static paint lineage and an independently recomputed immutable surface hash."
+	value.ClipSemantics = "Apply evaluator crop and transform through cutly.raster.cpu-affine-bilinear-linear-rgba16.v1 to native, intrinsic vector or intrinsic Text surfaces, then evaluator opacity. TextFill must exist and equal the frozen asset's static fill exactly; it is evidence only and is never reapplied after text rasterization."
+	value.TransitionSemantics = "Native and vector dissolve semantics remain v1. Any non-zero transition involving a Text track is rejected at compile and a Text transition reaching runtime fails as an invariant; zero-width records remain inert hard cuts."
+	value.CompositionSemantics = "Process evaluator layers strictly in background-to-foreground track-array order and source-over each completed target layer. Native/vector/Text interleaving, provider completion order and map iteration cannot change z-order."
+	value.ReceiptSemantics = "V2 preserves the v1 ordered evaluation union and adds an optional Text branch containing the exact textlayer FrameReceipt. Text is visible-clip-only; every scope/time/profile/identity agrees with the frozen Program. Serialized receipts remain structural claims, while live validation recomputes final pixels."
+	value.ExcludedResponsibilities = "Dynamic text paint, rich text, fallback/system fonts, bidi inference, Text transitions, media decode trust, audio, masks, output color conversion, encoding, muxing, persistence, scheduling, signatures and publication remain outside this compositor."
+	return value
+}()
+
+func DescriptorV2() ProfileDescriptor { return descriptorV2 }
+
+func profileForConfig(config Config) string {
+	if config.Source.StaticTextV2 {
+		return ProfileV2
+	}
+	return ProfileV1
+}

@@ -12,6 +12,7 @@ import (
 	"github.com/CutlyLab/Cutly/render/cpuraster"
 	"github.com/CutlyLab/Cutly/render/expressionlayer"
 	"github.com/CutlyLab/Cutly/render/rastercompositor"
+	"github.com/CutlyLab/Cutly/render/textlayer"
 )
 
 func (program *Program) RenderAt(
@@ -72,6 +73,9 @@ func (program *Program) validateRuntime(ctx context.Context, providers Providers
 		} else {
 			return Providers{}, compositorError(CodeExpressionProviderUnavailable, "providers/expression_handle", ErrExpressionProviderUnavailable)
 		}
+	}
+	if program.needsText && nilInterface(providers.Text) {
+		return Providers{}, compositorError(CodeTextProviderUnavailable, "providers/text", ErrTextProviderUnavailable)
 	}
 	return providers, nil
 }
@@ -173,22 +177,28 @@ func (program *Program) renderEvaluation(
 	if err := contextError(ctx, "hash"); err != nil {
 		return Result{}, err
 	}
-	pixelHash, err := output.CanonicalHash()
+	pixelHash, err := canonicalSurfaceHash(ctx, output, "hash", CodeKernelFailed, ErrKernelFailed)
 	if err != nil {
-		return Result{}, compositorError(CodeKernelFailed, "hash", errors.Join(ErrKernelFailed, err))
+		return Result{}, err
 	}
 	if err := contextError(ctx, "publish"); err != nil {
 		return Result{}, err
 	}
 	result := Result{
-		SchemaVersion: ResultSchemaVersion, Profile: ProfileV1,
+		SchemaVersion: ResultSchemaVersion, Profile: profileForConfig(program.config),
 		TimelineID: evaluated.TimelineID, TimelineTime: evaluated.TimelineTime,
 		Width: program.config.Width, Height: program.config.Height,
 		DocumentHash: program.documentHash, BuildFingerprint: program.config.BuildFingerprint,
 		NativeSourceContractVersion:     rastercompositor.NativeSourceContractVersion,
 		ExpressionContractVersion:       expressionlayer.ContractVersion,
 		ExpressionHandleContractVersion: expressionlayer.TransitionHandleContractVersion,
-		SurfaceProfile:                  cpucompositor.SurfaceProfileV1, PixelHashProfile: PixelHashProfileV1,
+		TextContractVersion: func() int {
+			if program.config.Source.StaticTextV2 {
+				return textlayer.ContractVersion
+			}
+			return 0
+		}(),
+		SurfaceProfile: cpucompositor.SurfaceProfileV1, PixelHashProfile: PixelHashProfileV1,
 		RasterProfile: cpuraster.ProfileV1, KernelProfile: cpucompositor.KernelProfileV1,
 		LayerOrder: LayerOrderProfile, Sources: receipts, PixelHash: pixelHash, Surface: output,
 	}
@@ -205,7 +215,7 @@ func (program *Program) renderClip(
 	transition *transitionSourceContext,
 	path string,
 ) (*cpucompositor.Surface, SourceReceipt, error) {
-	if err := validateVisualProperties(clip.Properties, path+"/properties"); err != nil {
+	if err := program.validateVisualProperties(clip, path+"/properties"); err != nil {
 		return nil, SourceReceipt{}, err
 	}
 	source, receipt, err := program.sourceSurface(ctx, clip, providers, transition, path+"/source")
@@ -260,6 +270,9 @@ func (program *Program) renderTransition(
 		frozen.incomingClipID != transition.Incoming.ClipID {
 		return nil, nil, compositorError(CodeInvariantFailed, path+"/scope", ErrInvariantFailed)
 	}
+	if frozen.trackKind == documentv2.TrackKindText {
+		return nil, nil, compositorError(CodeUnsupportedLayer, path+"/text", ErrUnsupportedLayer)
+	}
 	outgoingContext := &transitionSourceContext{
 		id: transition.TransitionID, index: frozen.index, profile: transition.Profile,
 		role: expressionlayer.TransitionHandleOutgoing,
@@ -295,11 +308,24 @@ func (program *Program) renderTransition(
 	return result, []SourceReceipt{outgoingReceipt, incomingReceipt}, nil
 }
 
-func validateVisualProperties(properties evaluator.Properties, path string) error {
+func (program *Program) validateVisualProperties(clip evaluator.ClipEvaluation, path string) error {
+	properties := clip.Properties
 	if properties.Transform == nil || properties.Crop == nil || properties.Opacity == nil ||
 		properties.AudioGain != nil || properties.AudioPan != nil || properties.AudioChannelMatrix != nil ||
-		properties.TextFill != nil || len(properties.RenderingExtensions) != 0 {
+		len(properties.RenderingExtensions) != 0 {
 		return compositorError(CodeUnsupportedLayer, path, ErrUnsupportedLayer)
+	}
+	scope, scopeOK := program.clips[clipScopeKey{timeline: clip.TimelineID, track: clip.TrackID, clip: clip.ClipID}]
+	asset, assetOK := program.assets[clip.AssetID]
+	if !scopeOK || !assetOK || scope.assetID != clip.AssetID {
+		return compositorError(CodeInvariantFailed, path+"/scope", ErrInvariantFailed)
+	}
+	if scope.trackKind == documentv2.TrackKindText {
+		if !program.config.Source.StaticTextV2 || properties.TextFill == nil || *properties.TextFill != asset.textFill {
+			return compositorError(CodeUnsupportedLayer, path+"/text_fill", ErrUnsupportedLayer)
+		}
+	} else if properties.TextFill != nil {
+		return compositorError(CodeUnsupportedLayer, path+"/text_fill", ErrUnsupportedLayer)
 	}
 	return nil
 }

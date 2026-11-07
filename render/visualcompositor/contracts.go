@@ -7,6 +7,7 @@ import (
 	"github.com/CutlyLab/Cutly/render/cpucompositor"
 	"github.com/CutlyLab/Cutly/render/expressionlayer"
 	"github.com/CutlyLab/Cutly/render/rastercompositor"
+	"github.com/CutlyLab/Cutly/render/textlayer"
 	"github.com/CutlyLab/Cutly/render/vectorraster"
 )
 
@@ -17,6 +18,7 @@ type SourceKind string
 const (
 	SourceKindNative     SourceKind = "native"
 	SourceKindExpression SourceKind = "expression"
+	SourceKindText       SourceKind = "text"
 )
 
 // ClipBinding is the exact evaluator input represented by one ordered source receipt. For a
@@ -75,13 +77,15 @@ type ExpressionFrameReceipt struct {
 	SurfaceIdentity          expressionlayer.SurfaceIdentity          `json:"surface_identity"`
 }
 
-// SourceReceipt is a strict discriminated union. Both branch keys are always serialized; exactly
-// one is a non-null object and it must agree with Kind.
+// SourceReceipt is a strict discriminated union. The two v1 branch keys remain always serialized;
+// the additive Text key is omitted for v1 byte stability. Exactly one branch is non-null and it
+// must agree with Kind.
 type SourceReceipt struct {
 	Kind       SourceKind                      `json:"kind"`
 	Evaluation SourceEvaluation                `json:"evaluation"`
 	Native     *rastercompositor.SourceReceipt `json:"native" wirejson:"nullable"`
 	Expression *ExpressionFrameReceipt         `json:"expression" wirejson:"nullable"`
+	Text       *textlayer.FrameReceipt         `json:"text,omitempty"`
 }
 
 func (value SourceReceipt) Validate() error {
@@ -98,14 +102,14 @@ func (value SourceReceipt) Validate() error {
 	}
 	switch value.Kind {
 	case SourceKindNative:
-		if value.Native == nil || value.Expression != nil {
+		if value.Native == nil || value.Expression != nil || value.Text != nil {
 			return fmt.Errorf("%w: native receipt branch", ErrSourceInvalid)
 		}
 		if !nativeRequestMatchesBinding(value.Native.Request, binding) {
 			return fmt.Errorf("%w: native evaluation binding", ErrSourceInvalid)
 		}
 	case SourceKindExpression:
-		if value.Native != nil || value.Expression == nil {
+		if value.Native != nil || value.Expression == nil || value.Text != nil {
 			return fmt.Errorf("%w: expression receipt branch", ErrSourceInvalid)
 		}
 		visible := value.Expression.VisibleRequest != nil
@@ -124,10 +128,24 @@ func (value SourceReceipt) Validate() error {
 				return fmt.Errorf("%w: transition expression binding", ErrSourceInvalid)
 			}
 		}
+	case SourceKindText:
+		if value.Native != nil || value.Expression != nil || value.Text == nil || value.Evaluation.Clip == nil ||
+			value.Evaluation.Transition != nil || value.Text.ContractVersion != textlayer.ContractVersion ||
+			!textRequestMatchesBinding(value.Text.Request, binding) {
+			return fmt.Errorf("%w: text receipt branch", ErrSourceInvalid)
+		}
 	default:
 		return fmt.Errorf("%w: source kind %q", ErrSourceInvalid, value.Kind)
 	}
 	return nil
+}
+
+func textRequestMatchesBinding(request textlayer.Request, binding ClipBinding) bool {
+	return request.TimelineID == binding.TimelineID && request.TimelineIndex == binding.TimelineIndex &&
+		request.TrackID == binding.TrackID && request.TrackIndex == binding.TrackIndex && request.TrackKind == binding.TrackKind &&
+		request.ClipID == binding.ClipID && request.ClipIndex == binding.ClipIndex &&
+		request.AssetID == binding.AssetID && request.AssetIndex == binding.AssetIndex && request.AssetKind == binding.AssetKind &&
+		request.TimelineTime == binding.TimelineTime && request.LocalTime == binding.LocalTime && request.SourceTime == binding.SourceTime
 }
 
 func nativeRequestMatchesBinding(request rastercompositor.NativeSourceRequest, binding ClipBinding) bool {
@@ -164,6 +182,7 @@ type Providers struct {
 	Native           rastercompositor.NativeSourceProvider
 	Expression       expressionlayer.ExpressionLayerProvider
 	ExpressionHandle expressionlayer.TransitionHandleProvider
+	Text             textlayer.TextLayerProvider
 }
 
 // Result binds the complete target/profile identity and ordered source union. Surface is an
@@ -180,6 +199,7 @@ type Result struct {
 	NativeSourceContractVersion     int                     `json:"native_source_contract_version"`
 	ExpressionContractVersion       int                     `json:"expression_contract_version"`
 	ExpressionHandleContractVersion int                     `json:"expression_handle_contract_version"`
+	TextContractVersion             int                     `json:"text_contract_version,omitempty"`
 	SurfaceProfile                  string                  `json:"surface_profile"`
 	PixelHashProfile                string                  `json:"pixel_hash_profile"`
 	RasterProfile                   string                  `json:"raster_profile"`

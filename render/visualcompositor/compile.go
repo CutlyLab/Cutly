@@ -19,6 +19,7 @@ const (
 	DiagnosticCodeFreezeInvalid = "COMPOSITOR.VISUAL_REFERENCE_V1.FREEZE_INVALID"
 	DiagnosticCodeAssetUnpinned = "COMPOSITOR.VISUAL_REFERENCE_V1.ASSET_UNPINNED"
 	DiagnosticCodeInvariant     = "COMPOSITOR.VISUAL_REFERENCE_V1.INVARIANT_FAILED"
+	DiagnosticCodeStaticText    = "COMPOSITOR.VISUAL_REFERENCE_V2.STATIC_TEXT_UNSUPPORTED"
 )
 
 type frozenAsset struct {
@@ -31,6 +32,14 @@ type frozenAsset struct {
 	pathCount            uint64
 	commandCount         uint64
 	conceptualEdgeCount  uint64
+	textProfile          string
+	textBindingHash      string
+	textSemanticHash     string
+	textLayoutInputHash  string
+	textFontAssetID      documentv2.ID
+	textFontAssetIndex   int
+	textFontContentHash  string
+	textFill             documentv2.ColorRGBA16
 }
 
 type clipScopeKey struct {
@@ -59,6 +68,7 @@ type frozenTransition struct {
 	trackIndex     int
 	outgoingClipID documentv2.ID
 	incomingClipID documentv2.ID
+	trackKind      documentv2.TrackKind
 }
 
 type Program struct {
@@ -73,6 +83,7 @@ type Program struct {
 	needsNative           bool
 	needsExpression       bool
 	needsExpressionHandle bool
+	needsText             bool
 }
 
 func Capabilities(config Config) (videoedit.BackendCapabilities, error) {
@@ -81,10 +92,10 @@ func Capabilities(config Config) (videoedit.BackendCapabilities, error) {
 		return videoedit.BackendCapabilities{}, err
 	}
 	result := videoedit.BackendCapabilities{
-		BackendID: BackendID, BuildFingerprint: normalized.BuildFingerprint,
+		BackendID: profileForConfig(normalized), BuildFingerprint: normalized.BuildFingerprint,
 		MaxWidth: normalized.Width, MaxHeight: normalized.Height,
 	}
-	visual := normalized.Source.Video || normalized.Source.Image || normalized.Source.VectorExpression
+	visual := normalized.Source.Video || normalized.Source.Image || normalized.Source.VectorExpression || normalized.Source.StaticTextV2
 	if normalized.Source.Video || normalized.Source.Image {
 		result.TrackKinds = append(result.TrackKinds, videoedit.TrackKind(documentv2.TrackKindVideo))
 	}
@@ -102,6 +113,14 @@ func Capabilities(config Config) (videoedit.BackendCapabilities, error) {
 			documentv2.CapabilityVectorTransitionScopeV1,
 		)
 	}
+	if normalized.Source.StaticTextV2 {
+		result.TrackKinds = append(result.TrackKinds, videoedit.TrackKind(documentv2.TrackKindText))
+		result.AssetKinds = append(result.AssetKinds,
+			videoedit.AssetKind(documentv2.AssetKindText),
+			videoedit.AssetKind(documentv2.AssetKindFont),
+		)
+		result.Features = append(result.Features, documentv2.CapabilityTextPinnedFontViewportPXV2)
+	}
 	if visual {
 		result.Features = append(result.Features,
 			documentv2.CapabilityTransformV1,
@@ -111,8 +130,10 @@ func Capabilities(config Config) (videoedit.BackendCapabilities, error) {
 			documentv2.CapabilityInterpolationHoldV1,
 			documentv2.CapabilityInterpolationLinearV1,
 			documentv2.CapabilityInterpolationCubicV1,
-			videoedit.CapabilityID(documentv2.TransitionDissolveV1),
 		)
+	}
+	if normalized.Source.Video || normalized.Source.Image || normalized.Source.VectorExpression {
+		result.Features = append(result.Features, videoedit.CapabilityID(documentv2.TransitionDissolveV1))
 	}
 	if normalized.Source.LinearVideoRetime {
 		result.Features = append(result.Features, videoedit.CapabilityVideoLinearRetime)
@@ -143,6 +164,14 @@ func Compile(ctx context.Context, document documentv2.Document, config Config) (
 			return nil, []documentv2.Diagnostic{compileDiagnostic(DiagnosticCodeCanceled, "/visual_compositor", limitErr)}
 		}
 		return nil, []documentv2.Diagnostic{compileDiagnostic(DiagnosticCodeDocumentLimit, "/"+strings.TrimPrefix(limitPath, "/"), limitErr)}
+	}
+	if normalized.Source.StaticTextV2 {
+		if subsetPath, subsetErr := validateStaticTextSubset(ctx, document); subsetErr != nil {
+			if errors.Is(subsetErr, ErrCanceled) {
+				return nil, []documentv2.Diagnostic{compileDiagnostic(DiagnosticCodeCanceled, "/visual_compositor", subsetErr)}
+			}
+			return nil, []documentv2.Diagnostic{compileDiagnostic(DiagnosticCodeStaticText, "/"+strings.TrimPrefix(subsetPath, "/"), subsetErr)}
+		}
 	}
 	compiled, snapshot, diagnostics := evaluator.CompileSnapshot(
 		ctx, document, capabilities, evaluator.SnapshotLimits{
@@ -184,12 +213,23 @@ func Compile(ctx context.Context, document documentv2.Document, config Config) (
 			entry.canonicalSourceBytes = asset.CanonicalSourceBytes
 			entry.pathCount, entry.commandCount, entry.conceptualEdgeCount = asset.PathCount, asset.CommandCount, asset.ConceptualEdgeCount
 		}
+		if asset.Kind == documentv2.AssetKindText && asset.TextProfile == documentv2.TextProfilePinnedFontViewportPXV2 {
+			entry.textProfile = asset.TextProfile
+			entry.textBindingHash = asset.TextBindingHash
+			entry.textSemanticHash = asset.TextSemanticHash
+			entry.textLayoutInputHash = asset.TextLayoutInputHash
+			entry.textFontAssetID = asset.TextFontAssetID
+			entry.textFontAssetIndex = asset.TextFontAssetIndex
+			entry.textFontContentHash = asset.TextFontContentHash
+			entry.textFill = asset.TextFill
+			entry.viewport = asset.TextViewport
+		}
 		assets[asset.ID] = entry
 	}
 	timelines := make(map[documentv2.ID]int, len(frozenTimelines))
 	clips := make(map[clipScopeKey]frozenClip)
 	clipsByID := make(map[documentv2.ID]clipScopeKey)
-	needsNative, needsExpression := false, false
+	needsNative, needsExpression, needsText := false, false, false
 	for timelineIndex, timeline := range frozenTimelines {
 		if timelineIndex&255 == 0 {
 			if err := contextError(ctx, "compile/clip_scopes"); err != nil {
@@ -240,6 +280,15 @@ func Compile(ctx context.Context, document documentv2.Document, config Config) (
 						return nil, append(diagnostics, compileDiagnostic(DiagnosticCodeInvariant, fmt.Sprintf("/assets/%d/vector", asset.index), ErrInvariantFailed))
 					}
 					needsExpression = true
+				case documentv2.TrackKindText:
+					if !normalized.Source.StaticTextV2 || clip.HasTextFillLane || asset.kind != documentv2.AssetKindText ||
+						asset.textProfile != documentv2.TextProfilePinnedFontViewportPXV2 || !canonicalSHA256(asset.textBindingHash) ||
+						!canonicalSHA256(asset.textSemanticHash) || !canonicalSHA256(asset.textLayoutInputHash) ||
+						asset.textFontAssetID == "" || asset.textFontAssetIndex < 0 || !canonicalSHA256(asset.textFontContentHash) ||
+						asset.viewport.WidthPixels == 0 || asset.viewport.HeightPixels == 0 {
+						return nil, append(diagnostics, compileDiagnostic(DiagnosticCodeStaticText, fmt.Sprintf("/timelines/%d/tracks/%d/clips/%d", timelineIndex, trackIndex, clipIndex), ErrUnsupportedLayer))
+					}
+					needsText = true
 				}
 			}
 		}
@@ -263,7 +312,11 @@ func Compile(ctx context.Context, document documentv2.Document, config Config) (
 			transitions[transitionScopeKey{timeline: timeline.ID, transition: transition.ID}] = frozenTransition{
 				index: transitionIndex, profile: transition.Profile, trackID: outgoingKey.track,
 				trackIndex: outgoing.trackIndex, outgoingClipID: transition.OutgoingClipID,
-				incomingClipID: transition.IncomingClipID,
+				incomingClipID: transition.IncomingClipID, trackKind: outgoing.trackKind,
+			}
+			if outgoing.trackKind == documentv2.TrackKindText &&
+				(transition.PreDuration.Value != 0 || transition.PostDuration.Value != 0) {
+				return nil, append(diagnostics, compileDiagnostic(DiagnosticCodeStaticText, fmt.Sprintf("/timelines/%d/transitions/%d", timelineIndex, transitionIndex), ErrUnsupportedLayer))
 			}
 			if outgoing.trackKind == documentv2.TrackKindVector &&
 				(transition.PreDuration.Value != 0 || transition.PostDuration.Value != 0) {
@@ -278,12 +331,102 @@ func Compile(ctx context.Context, document documentv2.Document, config Config) (
 		evaluator: compiled, documentHash: documentHash, config: normalized, capabilities: capabilities,
 		assets: assets, clips: clips, timelines: timelines, transitions: transitions,
 		needsNative: needsNative, needsExpression: needsExpression,
-		needsExpressionHandle: needsExpressionHandle,
+		needsExpressionHandle: needsExpressionHandle, needsText: needsText,
 	}, diagnostics
 }
 
 func compileDiagnostic(code, path string, err error) documentv2.Diagnostic {
 	return documentv2.Diagnostic{Code: code, Severity: documentv2.SeverityError, Path: path, Message: err.Error()}
+}
+
+// validateStaticTextSubset is intentionally independent of textlayer.Compile. The compositor
+// refuses dynamic paint and Text transitions before advertising or freezing its own evaluator
+// program, so a permissive or mismatched provider can never broaden this profile.
+func validateStaticTextSubset(ctx context.Context, document documentv2.Document) (string, error) {
+	if err := contextError(ctx, "compile/static_text/preflight"); err != nil {
+		return "", err
+	}
+	assets := make(map[documentv2.ID]documentv2.Asset, len(document.Assets))
+	for assetIndex, asset := range document.Assets {
+		if assetIndex&255 == 0 {
+			if err := contextError(ctx, "compile/static_text/assets"); err != nil {
+				return "", err
+			}
+		}
+		assets[asset.ID] = asset
+	}
+	for timelineIndex, timeline := range document.Timelines {
+		if timelineIndex&255 == 0 {
+			if err := contextError(ctx, "compile/static_text/timelines"); err != nil {
+				return "", err
+			}
+		}
+		clipKinds := make(map[documentv2.ID]documentv2.TrackKind)
+		for trackIndex, track := range timeline.Tracks {
+			if trackIndex&255 == 0 {
+				if err := contextError(ctx, "compile/static_text/tracks"); err != nil {
+					return "", err
+				}
+			}
+			for clipIndex, clip := range track.Clips {
+				if clipIndex&255 == 0 {
+					if err := contextError(ctx, "compile/static_text/clips"); err != nil {
+						return "", err
+					}
+				}
+				clipKinds[clip.ID] = track.Kind
+				if track.Kind != documentv2.TrackKindText || clip.Disabled {
+					continue
+				}
+				path := fmt.Sprintf("document/timelines/%d/tracks/%d/clips/%d", timelineIndex, trackIndex, clipIndex)
+				asset, exists := assets[clip.AssetID]
+				if !exists || asset.Kind != documentv2.AssetKindText || asset.Text == nil ||
+					asset.Text.Profile != documentv2.TextProfilePinnedFontViewportPXV2 {
+					return path + "/asset_id", ErrUnsupportedLayer
+				}
+				for laneIndex, lane := range clip.KeyframeLanes {
+					if laneIndex&255 == 0 {
+						if err := contextError(ctx, "compile/static_text/keyframe_lanes"); err != nil {
+							return "", err
+						}
+					}
+					switch lane.Target {
+					case documentv2.KeyframeTargetTransformPosition,
+						documentv2.KeyframeTargetTransformScale,
+						documentv2.KeyframeTargetTransformRotation,
+						documentv2.KeyframeTargetTransformAnchor,
+						documentv2.KeyframeTargetCrop,
+						documentv2.KeyframeTargetOpacity:
+						// Static Text accepts the same evaluator-owned visual lanes as other
+						// compositor sources. Paint remains frozen in the Text asset.
+					default:
+						return fmt.Sprintf("%s/keyframe_lanes/%d/target", path, laneIndex), ErrUnsupportedLayer
+					}
+				}
+				if clip.PropertySet != nil {
+					if clip.PropertySet.AudioGain != nil || clip.PropertySet.AudioPan != nil || clip.PropertySet.AudioChannelMatrix != nil ||
+						len(clip.PropertySet.Extensions) != 0 {
+						return path + "/property_set", ErrUnsupportedLayer
+					}
+				}
+			}
+		}
+		for transitionIndex, transition := range timeline.Transitions {
+			if transitionIndex&255 == 0 {
+				if err := contextError(ctx, "compile/static_text/transitions"); err != nil {
+					return "", err
+				}
+			}
+			if transition.PreDuration.Value == 0 && transition.PostDuration.Value == 0 {
+				continue
+			}
+			if clipKinds[transition.OutgoingClipID] == documentv2.TrackKindText ||
+				clipKinds[transition.IncomingClipID] == documentv2.TrackKindText {
+				return fmt.Sprintf("document/timelines/%d/transitions/%d", timelineIndex, transitionIndex), ErrUnsupportedLayer
+			}
+		}
+	}
+	return "", contextError(ctx, "compile/static_text/publish")
 }
 
 func (program *Program) DocumentHash() string {
