@@ -111,6 +111,7 @@ type layoutOutline struct {
 
 type Layout struct {
 	viewport   documentv2.RasterViewport
+	fontSize   documentv2.Rational
 	placements []GlyphPlacement
 	outlines   []layoutOutline
 	receipt    Receipt
@@ -135,6 +136,16 @@ func (value *Layout) Receipt() Receipt {
 		return Receipt{}
 	}
 	return value.receipt
+}
+
+// FontSize returns the exact font-size value used to build this immutable Layout. Retaining the
+// value lets a downstream live-binding adapter distinguish layouts whose scaled outlines happen
+// to be identical, such as empty or all-zero glyphs.
+func (value *Layout) FontSize() documentv2.Rational {
+	if value == nil {
+		return documentv2.Rational{}
+	}
+	return value.fontSize
 }
 
 func (value ReadView) Viewport() documentv2.RasterViewport {

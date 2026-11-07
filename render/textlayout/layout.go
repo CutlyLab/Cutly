@@ -147,6 +147,7 @@ func materializeLayout(
 ) (*Layout, error) {
 	result := &Layout{
 		viewport:   input.Viewport,
+		fontSize:   input.FontSize,
 		placements: make([]GlyphPlacement, int(measure.glyphs)),
 		outlines:   make([]layoutOutline, int(measure.uniqueGlyphs)),
 		receipt:    receipt,

@@ -13,6 +13,9 @@ import (
 func TestBuildLTRPlacementScalingAndYUpMapping(t *testing.T) {
 	input := testInput()
 	layout, receipt := buildTestLayout(t, input, Limits{})
+	if got := layout.FontSize(); got != input.FontSize {
+		t.Fatalf("font size=%+v want %+v", got, input.FontSize)
+	}
 	placements := placementsForTest(t, layout)
 	want := []GlyphPlacement{
 		{LineIndex: 0, GlyphIndex: 0, GlyphID: 10, ClusterByteOffset: 0, OriginX: -64, BaselineY: 3008},
