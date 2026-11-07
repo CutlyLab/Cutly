@@ -654,7 +654,23 @@ func stripIntent(doc *d.Document) {
 			tr.Metadata = nil
 			tr.Annotations = nil
 			for k := range tr.Clips {
-				tr.Clips[k].Annotations = nil
+				c := &tr.Clips[k]
+				c.Annotations = nil
+				if p := c.PropertySet; p != nil {
+					// Extensions explicitly declare whether they affect rendering.
+					// Keep unknown rendering extensions in both domain projections
+					// conservatively, but never promote intent-only values to pixels/PCM.
+					var rendering []d.ExtensionProperty
+					for _, extension := range p.Extensions {
+						if extension.AffectsRendering {
+							rendering = append(rendering, extension)
+						}
+					}
+					p.Extensions = rendering
+					if reflect.DeepEqual(*p, d.PropertySet{}) {
+						c.PropertySet = nil
+					}
+				}
 			}
 		}
 	}

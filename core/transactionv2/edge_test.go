@@ -140,6 +140,93 @@ func TestRevisionOverflowAndShape(t *testing.T) {
 		t.Fatal("null required keyframes accepted")
 	}
 }
+func TestExtensionRenderingIntent(t *testing.T) {
+	intent := d.ExtensionProperty{Namespace: "cutly.note.v1", Value: json.RawMessage(`{"note":"intent only"}`)}
+	for _, kind := range []d.TrackKind{d.TrackKindVideo, d.TrackKindAudio} {
+		t.Run(string(kind), func(t *testing.T) {
+			doc := base()
+			if kind == d.TrackKindAudio {
+				doc.Assets[0].Kind = d.AssetKindAudio
+				doc.Timelines[0].Tracks[0].Kind = kind
+			}
+			for _, replaceClip := range []bool{false, true} {
+				properties := &d.PropertySet{Extensions: []d.ExtensionProperty{intent}}
+				op := Operation{Kind: PropertySet, Properties: &PropertiesEdit{ClipID: "c", Value: properties}}
+				if replaceClip {
+					value := doc.Timelines[0].Tracks[0].Clips[0]
+					value.PropertySet = properties
+					op = Operation{Kind: ClipReplace, Clip: &ClipEdit{TrackID: "tr", ClipID: "c", Position: ptr(0), Value: &value}}
+				}
+				r := roundtrip(t, doc, op)
+				if !r.Impact.IdentityChanged || r.Impact.RenderRequired || r.Impact.Visual || r.Impact.Audio || len(r.Impact.TimelineIDs) != 0 {
+					t.Fatalf("intent-only extension impact %+v", r.Impact)
+				}
+				if len(r.Document.Timelines[0].Tracks[0].Clips[0].PropertySet.Extensions) != 1 {
+					t.Fatal("impact projection modified committed extension")
+				}
+			}
+			properties := &d.PropertySet{Extensions: []d.ExtensionProperty{intent}}
+			if kind == d.TrackKindAudio {
+				properties.AudioGain = &d.AudioGainProperty{Linear: rat(2)}
+			} else {
+				properties.Opacity = &d.OpacityProperty{Value: rat(0)}
+			}
+			mixed := roundtrip(t, doc, Operation{Kind: PropertySet, Properties: &PropertiesEdit{ClipID: "c", Value: properties}})
+			if !mixed.Impact.RenderRequired || mixed.Impact.Audio != (kind == d.TrackKindAudio) || mixed.Impact.Visual != (kind == d.TrackKindVideo) {
+				t.Fatalf("mixed typed/intent impact %+v", mixed.Impact)
+			}
+			rendering := intent
+			rendering.AffectsRendering = true
+			rendering.RequiredCapability = "cutly.custom.render.v1"
+			properties = &d.PropertySet{Extensions: []d.ExtensionProperty{intent, rendering}}
+			// Namespaces must be unique, including nonrendering entries.
+			properties.Extensions[1].Namespace = "cutly.render.v1"
+			r := roundtrip(t, doc, Operation{Kind: PropertySet, Properties: &PropertiesEdit{ClipID: "c", Value: properties}})
+			if !r.Impact.RenderRequired || !r.Impact.Audio || (kind == d.TrackKindVideo && !r.Impact.Visual) {
+				t.Fatalf("rendering extension impact %+v", r.Impact)
+			}
+		})
+	}
+	// Assets/buses have no ExtensionProperty fields. Their analogous intent
+	// boundaries are asset metadata and bus display names; typed replacement
+	// must retain those in identity while excluding them from both projections.
+	doc := base()
+	asset := doc.Assets[0]
+	asset.Metadata = map[string]json.RawMessage{"intent": json.RawMessage(`1.25`)}
+	r := roundtrip(t, doc, Operation{Kind: AssetReplace, Asset: &AssetEdit{AssetID: asset.ID, Position: ptr(0), Value: &asset}})
+	if r.Impact.RenderRequired || len(r.Impact.TimelineIDs) != 0 {
+		t.Fatalf("asset metadata impact %+v", r.Impact)
+	}
+	doc.AudioBuses = []d.AudioBus{{ID: "master", Kind: d.AudioBusMaster, Properties: d.AudioBusProperties{GainLinear: rat(1), Pan: rat(0)}}}
+	bus := doc.AudioBuses[0]
+	bus.Name = "intent only"
+	r = roundtrip(t, doc, Operation{Kind: BusReplace, Bus: &BusEdit{BusID: bus.ID, Position: ptr(0), Value: &bus}})
+	if r.Impact.RenderRequired || len(r.Impact.TimelineIDs) != 0 {
+		t.Fatalf("bus name impact %+v", r.Impact)
+	}
+}
+
+func TestUnicodeEscapeAllocationBudget(t *testing.T) {
+	for _, scalar := range []string{" ", " ", "<", ">", "&"} {
+		t.Run(scalar, func(t *testing.T) {
+			typed := strings.Repeat(scalar, 1024)
+			raw := json.RawMessage(`"` + typed + `"`)
+			for _, value := range []any{typed, raw} {
+				encoded, err := json.Marshal(value)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err = boundedValue(value, len(encoded)-1); err == nil {
+					t.Fatalf("budget undercounts escaped %T", value)
+				}
+				if err = boundedValue(value, len(encoded)); err != nil {
+					t.Fatalf("exact escaped budget %T: %v", value, err)
+				}
+			}
+		})
+	}
+}
+
 func FuzzDecode(f *testing.F) {
 	f.Add([]byte(`{}`))
 	f.Add([]byte(`{"schema_version":2}`))
