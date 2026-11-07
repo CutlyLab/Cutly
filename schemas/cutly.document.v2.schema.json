@@ -1,0 +1,514 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.cutly.dev/cutly.document.v2.schema.json",
+  "title": "Cutly Document v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "revision"],
+  "properties": {
+    "schema_version": {"type": "integer", "minimum": 2, "maximum": 2, "const": 2},
+    "id": {"$ref": "#/$defs/id"},
+    "revision": {"$ref": "#/$defs/revision"},
+    "assets": {"type": "array", "items": {"$ref": "#/$defs/asset"}},
+    "timelines": {"type": "array", "items": {"$ref": "#/$defs/timeline"}},
+    "audio_buses": {"type": "array", "items": {"$ref": "#/$defs/audioBus"}},
+    "annotations": {"type": "array", "items": {"$ref": "#/$defs/annotation"}},
+    "metadata": {"$ref": "#/$defs/metadata"}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "\\S"},
+    "revision": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615
+    },
+    "int64": {
+      "type": "integer",
+      "minimum": -9223372036854775808,
+      "maximum": 9223372036854775807
+    },
+    "positiveInt64": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9223372036854775807
+    },
+    "uint16": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 65535
+    },
+    "metadata": {
+      "$comment": "Metadata is non-rendering intent. Pixel/PCM semantics require a typed field or an affects_rendering extension capability.",
+      "type": "object",
+      "propertyNames": {"pattern": "\\S"},
+      "additionalProperties": true
+    },
+    "rational": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["numerator", "denominator"],
+      "properties": {
+        "numerator": {"$ref": "#/$defs/int64"},
+        "denominator": {"$ref": "#/$defs/positiveInt64"}
+      }
+    },
+    "rationalTime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "rate"],
+      "properties": {
+        "value": {"$ref": "#/$defs/int64"},
+        "rate": {"$ref": "#/$defs/positiveInt64"}
+      }
+    },
+    "timeRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "duration"],
+      "properties": {
+        "start": {"$ref": "#/$defs/rationalTime"},
+        "duration": {"$ref": "#/$defs/rationalTime"}
+      }
+    },
+    "point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": {"$ref": "#/$defs/rational"},
+        "y": {"$ref": "#/$defs/rational"}
+      }
+    },
+    "rect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "width", "height"],
+      "properties": {
+        "x": {"$ref": "#/$defs/rational"},
+        "y": {"$ref": "#/$defs/rational"},
+        "width": {"$ref": "#/$defs/rational"},
+        "height": {"$ref": "#/$defs/rational"}
+      }
+    },
+    "color": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["r", "g", "b", "a"],
+      "properties": {
+        "r": {"$ref": "#/$defs/uint16"},
+        "g": {"$ref": "#/$defs/uint16"},
+        "b": {"$ref": "#/$defs/uint16"},
+        "a": {"$ref": "#/$defs/uint16"}
+      }
+    },
+    "textSourceLegacyV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "font_asset_id", "font_size", "fill", "language", "direction", "alignment"],
+      "properties": {
+        "profile": {"const": ""},
+        "text": {"type": "string"},
+        "font_asset_id": {"$ref": "#/$defs/id"},
+        "font_size": {"$ref": "#/$defs/rational"},
+        "fill": {"$ref": "#/$defs/color"},
+        "language": {"type": "string", "pattern": "^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$"},
+        "script": {"const": ""},
+        "direction": {"enum": ["ltr", "rtl"]},
+        "alignment": {"enum": ["start", "center", "end"]}
+      }
+    },
+    "textSourcePinnedFontViewportPXV2": {
+      "$comment": "Pinned Unicode 17 validation, explicit single-script horizontal run input, no normalization/fallback/automatic wrapping, and an intrinsic top-down square-pixel viewport. Rendering still requires a separately attested shape-provider profile and dependency digest.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "text", "font_asset_id", "font_size", "line_height", "viewport", "fill", "language", "script", "direction", "alignment"],
+      "properties": {
+        "profile": {"const": "cutly.text.pinned-font-viewport-px.v2"},
+        "text": {"type": "string"},
+        "font_asset_id": {"$ref": "#/$defs/id"},
+        "font_size": {"$ref": "#/$defs/rational"},
+        "line_height": {"$ref": "#/$defs/rational"},
+        "viewport": {"$ref": "#/$defs/rasterViewport"},
+        "fill": {"$ref": "#/$defs/color"},
+        "language": {"type": "string", "pattern": "^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$"},
+        "script": {"enum": ["Latn", "Hani", "Arab"]},
+        "direction": {"enum": ["ltr", "rtl"]},
+        "alignment": {"enum": ["start", "center", "end"]}
+      }
+    },
+    "textSource": {
+      "oneOf": [
+        {"$ref": "#/$defs/textSourceLegacyV1"},
+        {"$ref": "#/$defs/textSourcePinnedFontViewportPXV2"}
+      ]
+    },
+    "vectorCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op"],
+      "properties": {
+        "op": {"enum": ["move_to", "line_to", "cubic_to", "close"]},
+        "points": {"type": "array", "items": {"$ref": "#/$defs/point"}, "maxItems": 3}
+      },
+      "allOf": [
+        {"if": {"properties": {"op": {"enum": ["move_to", "line_to"]}}}, "then": {"required": ["points"], "properties": {"points": {"minItems": 1, "maxItems": 1}}}},
+        {"if": {"properties": {"op": {"const": "cubic_to"}}}, "then": {"required": ["points"], "properties": {"points": {"minItems": 3, "maxItems": 3}}}},
+        {"if": {"properties": {"op": {"const": "close"}}}, "then": {"not": {"required": ["points"]}}}
+      ]
+    },
+    "vectorCommandLinear": {
+      "allOf": [
+        {"$ref": "#/$defs/vectorCommand"},
+        {"properties": {"op": {"enum": ["move_to", "line_to", "close"]}}}
+      ]
+    },
+    "vectorStroke": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["color", "width", "line_cap", "line_join", "miter_limit"],
+      "properties": {
+        "color": {"$ref": "#/$defs/color"},
+        "width": {"$ref": "#/$defs/rational"},
+        "line_cap": {"enum": ["butt", "round", "square"]},
+        "line_join": {"enum": ["miter", "round", "bevel"]},
+        "miter_limit": {"$ref": "#/$defs/rational"}
+      }
+    },
+    "vectorPath": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "commands", "fill_rule"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "commands": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/vectorCommand"}},
+        "fill_rule": {"enum": ["nonzero", "evenodd"]},
+        "fill": {"$ref": "#/$defs/color"},
+        "stroke": {"$ref": "#/$defs/vectorStroke"}
+      },
+      "anyOf": [{"required": ["fill"]}, {"required": ["stroke"]}],
+      "allOf": [
+        {"if": {"not": {"required": ["fill"]}}, "then": {"properties": {"fill_rule": {"const": "nonzero"}}}},
+        {"if": {"required": ["stroke"], "properties": {"stroke": {"properties": {"line_join": {"enum": ["round", "bevel"]}}}}}, "then": {"properties": {"stroke": {"properties": {"miter_limit": {"const": {"numerator": 4, "denominator": 1}}}}}}}
+      ]
+    },
+    "vectorPathFillLinear": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "commands", "fill_rule", "fill"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "commands": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/vectorCommandLinear"}},
+        "fill_rule": {"enum": ["nonzero", "evenodd"]},
+        "fill": {"$ref": "#/$defs/color"}
+      }
+    },
+    "rasterViewport": {
+      "$comment": "Top-down square-pixel edge coordinates with no physical-size or host-DPI meaning.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width_pixels", "height_pixels"],
+      "properties": {
+        "width_pixels": {"type": "integer", "minimum": 1, "maximum": 65536},
+        "height_pixels": {"type": "integer", "minimum": 1, "maximum": 65536}
+      }
+    },
+    "vectorSourceV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "view_box", "paths"],
+      "properties": {
+        "profile": {"const": "cutly.vector.path.v1"},
+        "view_box": {"$ref": "#/$defs/rect"},
+        "paths": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/vectorPath"}}
+      }
+    },
+    "vectorSourceViewportPXV2": {
+      "$comment": "Fixed xMidYMid meet mapping from viewBox user units into the intrinsic viewport; transparent letterbox and viewport clip. Paths paint source-over in array order; open fill subpaths are conceptually closed to their most recent move_to.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "view_box", "viewport", "paths"],
+      "properties": {
+        "profile": {"const": "cutly.vector.path-viewport-px.v2"},
+        "view_box": {"$ref": "#/$defs/rect"},
+        "viewport": {"$ref": "#/$defs/rasterViewport"},
+        "paths": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/vectorPathFillLinear"}}
+      }
+    },
+    "vectorSource": {
+      "oneOf": [
+        {"$ref": "#/$defs/vectorSourceV1"},
+        {"$ref": "#/$defs/vectorSourceViewportPXV2"}
+      ]
+    },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "kind": {"enum": ["video", "audio", "image", "font", "data", "text", "vector"]},
+        "uri": {"type": "string"},
+        "content_hash": {"type": "string", "pattern": "^(?:|sha256:[0-9a-f]{64})$"},
+        "duration": {"$ref": "#/$defs/rationalTime"},
+        "text": {"$ref": "#/$defs/textSource"},
+        "vector": {"$ref": "#/$defs/vectorSource"},
+        "metadata": {"$ref": "#/$defs/metadata"}
+      },
+      "oneOf": [
+        {
+          "properties": {"kind": {"const": "text"}},
+          "required": ["text"],
+          "allOf": [
+            {"properties": {"uri": {"const": ""}, "content_hash": {"const": ""}}},
+            {"not": {"required": ["vector"]}}
+          ]
+        },
+        {
+          "properties": {"kind": {"const": "vector"}},
+          "required": ["vector"],
+          "allOf": [
+            {"properties": {"uri": {"const": ""}, "content_hash": {"const": ""}}},
+            {"not": {"required": ["text"]}}
+          ]
+        },
+        {
+          "properties": {"kind": {"enum": ["video", "audio", "image", "font", "data"]}},
+          "anyOf": [
+            {"required": ["uri"], "properties": {"uri": {"pattern": "\\S"}}},
+            {"required": ["content_hash"], "properties": {"content_hash": {"pattern": "^sha256:[0-9a-f]{64}$"}}}
+          ],
+          "not": {"anyOf": [{"required": ["text"]}, {"required": ["vector"]}]}
+        }
+      ],
+      "allOf": [
+        {"if": {"properties": {"kind": {"const": "font"}}}, "then": {"required": ["content_hash"], "properties": {"content_hash": {"pattern": "^sha256:[0-9a-f]{64}$"}}}}
+      ]
+    },
+    "transform": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["position", "scale", "rotation_degrees", "anchor"],
+      "properties": {
+        "position": {"$ref": "#/$defs/point"},
+        "scale": {"$ref": "#/$defs/point"},
+        "rotation_degrees": {"$ref": "#/$defs/rational"},
+        "anchor": {"$ref": "#/$defs/point"}
+      }
+    },
+    "opacity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value"],
+      "properties": {"value": {"$ref": "#/$defs/rational"}}
+    },
+    "crop": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rect"],
+      "properties": {"rect": {"$ref": "#/$defs/rect"}}
+    },
+    "audioGain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["linear"],
+      "properties": {"linear": {"$ref": "#/$defs/rational"}}
+    },
+    "audioPan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value"],
+      "properties": {"value": {"$ref": "#/$defs/rational"}}
+    },
+    "audioChannelMatrix": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_layout", "source_channels", "left_coefficients", "right_coefficients"],
+      "properties": {
+        "source_layout": {"type": "string", "pattern": "\\S"},
+        "source_channels": {
+          "type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,15}$"}
+        },
+        "left_coefficients": {"type": "array", "minItems": 1, "maxItems": 32, "items": {"$ref": "#/$defs/rational"}},
+        "right_coefficients": {"type": "array", "minItems": 1, "maxItems": 32, "items": {"$ref": "#/$defs/rational"}}
+      }
+    },
+    "audioSamplePeakLimiter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ceiling_linear"],
+      "properties": {"ceiling_linear": {"$ref": "#/$defs/rational"}}
+    },
+    "extension": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["namespace", "affects_rendering", "value"],
+      "properties": {
+        "namespace": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*\\.v[1-9][0-9]*$"},
+        "affects_rendering": {"type": "boolean"},
+        "required_capability": {"type": "string", "pattern": "^(?:|[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*\\.v[1-9][0-9]*)$"},
+        "value": {"not": {"type": "null"}}
+      },
+      "allOf": [
+        {"if": {"properties": {"affects_rendering": {"const": true}}}, "then": {"required": ["required_capability"], "properties": {"required_capability": {"pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*\\.v[1-9][0-9]*$"}}}},
+        {"if": {"properties": {"affects_rendering": {"const": false}}}, "then": {"properties": {"required_capability": {"const": ""}}}}
+      ]
+    },
+    "propertySet": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "transform": {"$ref": "#/$defs/transform"},
+        "opacity": {"$ref": "#/$defs/opacity"},
+        "crop": {"$ref": "#/$defs/crop"},
+        "audio_gain": {"$ref": "#/$defs/audioGain"},
+        "audio_pan": {"$ref": "#/$defs/audioPan"},
+        "audio_channel_matrix": {"$ref": "#/$defs/audioChannelMatrix"},
+        "extensions": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/extension"}}
+      }
+    },
+    "keyframeValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "scalar": {"$ref": "#/$defs/rational"},
+        "point": {"$ref": "#/$defs/point"},
+        "rect": {"$ref": "#/$defs/rect"},
+        "color": {"$ref": "#/$defs/color"}
+      },
+      "oneOf": [
+        {"required": ["scalar"]},
+        {"required": ["point"]},
+        {"required": ["rect"]},
+        {"required": ["color"]}
+      ]
+    },
+    "bezier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x1", "y1", "x2", "y2"],
+      "properties": {
+        "x1": {"$ref": "#/$defs/rational"},
+        "y1": {"$ref": "#/$defs/rational"},
+        "x2": {"$ref": "#/$defs/rational"},
+        "y2": {"$ref": "#/$defs/rational"}
+      }
+    },
+    "keyframe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["offset", "value"],
+      "properties": {
+        "offset": {"$ref": "#/$defs/rationalTime"},
+        "value": {"$ref": "#/$defs/keyframeValue"},
+        "interpolation": {"enum": ["", "hold", "linear", "cubic_bezier"]},
+        "easing": {"$ref": "#/$defs/bezier"}
+      }
+    },
+    "keyframeLane": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "target", "value_type", "keyframes"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "target": {"enum": ["transform.position", "transform.scale", "transform.rotation_degrees", "transform.anchor", "opacity.value", "crop.rect", "audio_gain.linear", "audio_pan.value", "text.fill"]},
+        "value_type": {"enum": ["scalar", "point", "rect", "color"]},
+        "keyframes": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/keyframe"}}
+      },
+      "allOf": [
+        {"if": {"properties": {"value_type": {"const": "color"}}}, "then": {"properties": {"keyframes": {"items": {"properties": {"interpolation": {"enum": ["", "hold"]}}}}}}}
+      ]
+    },
+    "clip": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "asset_id", "timeline_range", "source_range"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "asset_id": {"$ref": "#/$defs/id"},
+        "timeline_range": {"$ref": "#/$defs/timeRange"},
+        "source_range": {"$ref": "#/$defs/timeRange"},
+        "disabled": {"type": "boolean"},
+        "property_set": {"$ref": "#/$defs/propertySet"},
+        "keyframe_lanes": {"type": "array", "items": {"$ref": "#/$defs/keyframeLane"}},
+        "annotations": {"type": "array", "items": {"$ref": "#/$defs/annotation"}}
+      }
+    },
+    "track": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "kind": {"enum": ["video", "audio", "text", "vector", "annotation"]},
+        "name": {"type": "string"},
+        "clips": {"type": "array", "items": {"$ref": "#/$defs/clip"}},
+        "audio_bus_id": {"type": "string"},
+        "annotations": {"type": "array", "items": {"$ref": "#/$defs/annotation"}},
+        "metadata": {"$ref": "#/$defs/metadata"}
+      }
+    },
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "profile", "outgoing_clip_id", "incoming_clip_id", "pre_duration", "post_duration"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "profile": {"const": "cutly.transition.dissolve.v1"},
+        "outgoing_clip_id": {"$ref": "#/$defs/id"},
+        "incoming_clip_id": {"$ref": "#/$defs/id"},
+        "pre_duration": {"$ref": "#/$defs/rationalTime"},
+        "post_duration": {"$ref": "#/$defs/rationalTime"}
+      }
+    },
+    "timeline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "name": {"type": "string"},
+        "tracks": {"type": "array", "items": {"$ref": "#/$defs/track"}},
+        "transitions": {"type": "array", "items": {"$ref": "#/$defs/transition"}},
+        "annotations": {"type": "array", "items": {"$ref": "#/$defs/annotation"}},
+        "metadata": {"$ref": "#/$defs/metadata"}
+      }
+    },
+    "audioBusProperties": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gain_linear", "pan"],
+      "properties": {
+        "gain_linear": {"$ref": "#/$defs/rational"},
+        "pan": {"$ref": "#/$defs/rational"},
+        "sample_peak_limiter": {"$ref": "#/$defs/audioSamplePeakLimiter"}
+      }
+    },
+    "audioBus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "properties"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "kind": {"enum": ["master", "group"]},
+        "name": {"type": "string"},
+        "parent_bus_id": {"type": "string"},
+        "properties": {"$ref": "#/$defs/audioBusProperties"}
+      }
+    },
+    "annotation": {
+      "$comment": "Annotations and annotation tracks never affect core rendering.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "namespace", "value"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "namespace": {"type": "string", "pattern": "\\S"},
+        "key": {"type": "string"},
+        "range": {"$ref": "#/$defs/timeRange"},
+        "value": {}
+      }
+    }
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "profile": "cutly.evaluator.keyframe-endpoint-clamp.v1",
+  "lane": {
+    "id": "lane-cubic-scalar",
+    "target": "opacity.value",
+    "value_type": "scalar",
+    "keyframes": [
+      {
+        "offset": {"value": 0, "rate": 1},
+        "value": {"scalar": {"numerator": 0, "denominator": 1}},
+        "interpolation": "cubic_bezier",
+        "easing": {
+          "x1": {"numerator": 1, "denominator": 4},
+          "y1": {"numerator": 0, "denominator": 1},
+          "x2": {"numerator": 3, "denominator": 4},
+          "y2": {"numerator": 1, "denominator": 1}
+        }
+      },
+      {
+        "offset": {"value": 1, "rate": 1},
+        "value": {"scalar": {"numerator": 1, "denominator": 1}}
+      }
+    ]
+  },
+  "samples": [
+    {
+      "at": {"value": -1, "rate": 1},
+      "value": {"numerator": "0", "denominator": "1"}
+    },
+    {
+      "at": {"value": 0, "rate": 1},
+      "value": {"numerator": "0", "denominator": "1"}
+    },
+    {
+      "at": {"value": 1, "rate": 3},
+      "value": {
+        "numerator": "2729708206219364259465419",
+        "denominator": "9671406556917033397649408"
+      }
+    },
+    {
+      "at": {"value": 1, "rate": 2},
+      "value": {"numerator": "1", "denominator": "2"}
+    },
+    {
+      "at": {"value": 1, "rate": 1},
+      "value": {"numerator": "1", "denominator": "1"}
+    },
+    {
+      "at": {"value": 2, "rate": 1},
+      "value": {"numerator": "1", "denominator": "1"}
+    }
+  ]
+}

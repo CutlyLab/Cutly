@@ -1,0 +1,173 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.cutly.dev/render-plan/v3",
+  "title": "Cutly Semantic RenderPlan v3",
+  "description": "Backend-neutral semantic plan with composition-wide clocks and URI-free resources.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "semantic_profile",
+    "document_id",
+    "revision",
+    "document_hash",
+    "timeline_id",
+    "requested_range",
+    "target",
+    "frame_range",
+    "sample_range",
+    "required_capabilities",
+    "fingerprint"
+  ],
+  "properties": {
+    "schema_version": {"const": 3},
+    "semantic_profile": {"const": "cutly.semantic.v1"},
+    "document_id": {"$ref": "#/$defs/id"},
+    "revision": {"type": "integer", "minimum": 0, "maximum": 18446744073709551615},
+    "document_hash": {"$ref": "#/$defs/digest"},
+    "timeline_id": {"$ref": "#/$defs/id"},
+    "requested_range": {"$ref": "#/$defs/positiveTimeRange"},
+    "target": {"$ref": "#/$defs/renderTarget"},
+    "frame_range": {"$ref": "#/$defs/tickRange"},
+    "sample_range": {"$ref": "#/$defs/tickRange"},
+    "required_capabilities": {"$ref": "#/$defs/capabilityRequirements"},
+    "video": {"type": "array", "items": {"$ref": "#/$defs/plannedClip"}},
+    "audio": {"type": "array", "items": {"$ref": "#/$defs/plannedClip"}},
+    "resources": {"type": "array", "items": {"$ref": "#/$defs/resourceRef"}},
+    "fingerprint": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "\\S"},
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "rationalTime": {
+      "$ref": "https://schemas.cutly.dev/document/v1#/$defs/rationalTime"
+    },
+    "positiveTimeRange": {
+      "$ref": "https://schemas.cutly.dev/document/v1#/$defs/positiveTimeRange"
+    },
+    "extensions": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "frameClock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["origin", "frames_per_second"],
+      "properties": {
+        "origin": {"$ref": "#/$defs/rationalTime"},
+        "frames_per_second": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["value", "rate"],
+          "properties": {
+            "value": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807},
+            "rate": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807}
+          }
+        }
+      }
+    },
+    "sampleClock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["origin", "samples_per_second"],
+      "properties": {
+        "origin": {"$ref": "#/$defs/rationalTime"},
+        "samples_per_second": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807}
+      }
+    },
+    "renderTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["timeline_id", "width", "height", "frame_clock", "sample_clock", "channels", "pixel_format", "color_space"],
+      "properties": {
+        "timeline_id": {"$ref": "#/$defs/id"},
+        "width": {"type": "integer", "minimum": 1, "maximum": 2147483647},
+        "height": {"type": "integer", "minimum": 1, "maximum": 2147483647},
+        "frame_clock": {"$ref": "#/$defs/frameClock"},
+        "sample_clock": {"$ref": "#/$defs/sampleClock"},
+        "channels": {"type": "integer", "minimum": 1, "maximum": 2147483647},
+        "pixel_format": {"type": "string", "minLength": 1},
+        "color_space": {"type": "string", "minLength": 1}
+      }
+    },
+    "tickRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["first", "count"],
+      "properties": {
+        "first": {"type": "integer", "minimum": -9223372036854775808, "maximum": 9223372036854775807},
+        "count": {"type": "integer", "minimum": 0, "maximum": 9223372036854775807}
+      }
+    },
+    "capabilityRequirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "track_kinds": {
+          "type": "array",
+          "items": {"enum": ["video", "audio"]},
+          "uniqueItems": true
+        },
+        "asset_kinds": {
+          "type": "array",
+          "items": {"enum": ["video", "audio", "image", "font", "data"]},
+          "uniqueItems": true
+        },
+        "features": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "video.linear_retime.v1",
+              "audio.linear_retime.v1",
+              "audio.time_stretch_preserve_pitch.v1"
+            ]
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "plannedClip": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "track_id",
+        "clip_id",
+        "asset_id",
+        "track_index",
+        "clip_index",
+        "timeline_range",
+        "source_range",
+        "visible_timeline_range",
+        "visible_source_range"
+      ],
+      "properties": {
+        "track_id": {"$ref": "#/$defs/id"},
+        "clip_id": {"$ref": "#/$defs/id"},
+        "asset_id": {"$ref": "#/$defs/id"},
+        "track_index": {"type": "integer", "minimum": 0, "maximum": 2147483647},
+        "clip_index": {"type": "integer", "minimum": 0, "maximum": 2147483647},
+        "timeline_range": {"$ref": "#/$defs/positiveTimeRange"},
+        "source_range": {"$ref": "#/$defs/positiveTimeRange"},
+        "visible_timeline_range": {"$ref": "#/$defs/positiveTimeRange"},
+        "visible_source_range": {"$ref": "#/$defs/positiveTimeRange"},
+        "properties": {"$ref": "#/$defs/extensions"}
+      }
+    },
+    "resourceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["asset_id", "kind"],
+      "properties": {
+        "asset_id": {"$ref": "#/$defs/id"},
+        "kind": {"enum": ["video", "audio", "image", "font", "data"]},
+        "content_hash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    }
+  }
+}

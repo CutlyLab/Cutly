@@ -1,0 +1,1 @@
+{"expected_revision":7,"id":"tx-delete-video","idempotency_key":"fixture-delete-video-r7","operations":[{"clip_id":"clip-video","id":"delete-video","op":"delete"}]}

@@ -1,0 +1,30 @@
+{
+  "schema_version": 2,
+  "resource": {
+    "asset_id": "",
+    "content_hash": "not-a-digest",
+    "size_bytes": 0
+  },
+  "probe": {
+    "implementation": "",
+    "build_fingerprint": "bad",
+    "options_fingerprint": "bad"
+  },
+  "container": {
+    "format_name": "",
+    "start_time": {"value": 0, "rate": 0},
+    "bit_rate": -1,
+    "seekable": false
+  },
+  "duration": {"value": -1, "rate": 1},
+  "streams": [
+    {
+      "index": -1,
+      "kind": "subtitle",
+      "codec": "",
+      "time_base": {"value": 0, "rate": 1},
+      "start_pts": 0,
+      "duration_pts": -1
+    }
+  ]
+}

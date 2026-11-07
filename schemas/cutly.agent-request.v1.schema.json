@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.cutly.dev/agent-request/v1",
+  "title": "Cutly Agent Request v1",
+  "description": "Transport-neutral request shared by the public project, edit and render tool surfaces.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocol_version", "request_id", "tool", "action", "payload"],
+  "properties": {
+    "protocol_version": {"const": 1},
+    "request_id": {"$ref": "#/$defs/identity"},
+    "tool": {"enum": ["cutly_project", "cutly_edit", "cutly_render"]},
+    "action": {"$ref": "#/$defs/action"},
+    "project_id": {"$ref": "#/$defs/identity"},
+    "payload": {"type": "object"}
+  },
+  "allOf": [
+    {
+      "oneOf": [
+        {"properties": {"tool": {"const": "cutly_project"}, "action": {"enum": ["inspect", "status", "history", "capabilities"]}}},
+        {"properties": {"tool": {"const": "cutly_edit"}, "action": {"enum": ["plan", "apply", "discard", "revert"]}}},
+        {"properties": {"tool": {"const": "cutly_render"}, "action": {"enum": ["plan", "prepare", "preflight", "frame", "render", "status", "history", "cancel"]}}}
+      ]
+    },
+    {
+      "if": {"not": {"properties": {"action": {"const": "capabilities"}}, "required": ["action"]}},
+      "then": {"required": ["project_id"]}
+    }
+  ],
+  "$defs": {
+    "identity": {"type": "string", "minLength": 1, "maxLength": 4096, "pattern": "[^\\t\\n\\r ]"},
+    "action": {"type": "string", "minLength": 1, "maxLength": 4096, "pattern": "[^\\t\\n\\r ]"}
+  }
+}

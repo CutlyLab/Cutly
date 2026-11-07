@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.cutly.dev/render-job/v1",
+  "title": "Cutly RenderJob v1",
+  "description": "One idempotent full-plan or chunk execution request bound to frozen semantic and execution fingerprints.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "idempotency_key",
+    "plan_fingerprint",
+    "execution_manifest_fingerprint",
+    "timeline_range",
+    "frame_range",
+    "sample_range",
+    "artifact_uri"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "id": {"$ref": "#/$defs/nonBlank"},
+    "idempotency_key": {"$ref": "#/$defs/nonBlank"},
+    "plan_fingerprint": {"$ref": "#/$defs/digest"},
+    "execution_manifest_fingerprint": {"$ref": "#/$defs/digest"},
+    "timeline_range": {"$ref": "https://schemas.cutly.dev/document/v1#/$defs/positiveTimeRange"},
+    "frame_range": {"$ref": "#/$defs/tickRange"},
+    "sample_range": {"$ref": "#/$defs/tickRange"},
+    "artifact_uri": {
+      "description": "Controlled publication destination authorized by the scheduler; not part of the semantic RenderPlan.",
+      "type": "string",
+      "pattern": "^file:///[^/?#][^?#]*$",
+      "not": {"pattern": "(^|/)\\.\\.?(/|$)"}
+    }
+  },
+  "anyOf": [
+    {"properties": {"frame_range": {"properties": {"count": {"minimum": 1}}}}},
+    {"properties": {"sample_range": {"properties": {"count": {"minimum": 1}}}}}
+  ],
+  "$defs": {
+    "nonBlank": {"type": "string", "pattern": "\\S"},
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "tickRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["first", "count"],
+      "properties": {
+        "first": {"type": "integer", "minimum": -9223372036854775808, "maximum": 9223372036854775807},
+        "count": {"type": "integer", "minimum": 0, "maximum": 9223372036854775807}
+      }
+    }
+  }
+}

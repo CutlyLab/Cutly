@@ -1,0 +1,63 @@
+{
+  "streams": [
+    {
+      "index": 0,
+      "codec_name": "h264",
+      "codec_type": "video",
+      "width": 1920,
+      "height": 1080,
+      "sample_aspect_ratio": "1:1",
+      "display_aspect_ratio": "16:9",
+      "pix_fmt": "yuv420p",
+      "color_range": "tv",
+      "color_space": "bt709",
+      "color_transfer": "bt709",
+      "color_primaries": "bt709",
+      "chroma_location": "left",
+      "r_frame_rate": "30000/1001",
+      "avg_frame_rate": "30000/1001",
+      "time_base": "1/30000",
+      "start_pts": -1001,
+      "start_time": "-0.033367",
+      "duration_ts": 60060,
+      "duration": "2.002000",
+      "tags": {"rotate": "270"},
+      "side_data_list": [
+        {"side_data_type": "Display Matrix", "rotation": -90},
+        {"side_data_type": "Mastering display metadata", "red_x": "34000/50000"},
+        {"side_data_type": "Content light level metadata", "max_content": 1000, "max_average": 400}
+      ]
+    },
+    {
+      "index": 1,
+      "codec_name": "aac",
+      "codec_type": "audio",
+      "sample_fmt": "fltp",
+      "sample_rate": "48000",
+      "channels": 2,
+      "channel_layout": "stereo",
+      "bits_per_raw_sample": "32",
+      "time_base": "1/48000",
+      "start_pts": 0,
+      "start_time": "0.000000",
+      "duration_ts": 96096,
+      "duration": "2.002000",
+      "initial_padding": 1024,
+      "trailing_padding": 128
+    },
+    {
+      "index": 2,
+      "codec_name": "mov_text",
+      "codec_type": "subtitle",
+      "time_base": "1/1000",
+      "start_pts": 0,
+      "duration_ts": 2002
+    }
+  ],
+  "format": {
+    "format_name": "mov,mp4,m4a,3gp,3g2,mj2",
+    "start_time": "-0.033367",
+    "duration": "2.002000",
+    "bit_rate": "838860"
+  }
+}

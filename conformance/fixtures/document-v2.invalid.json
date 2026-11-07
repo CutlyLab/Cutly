@@ -1,0 +1,18 @@
+{
+  "schema_version": 2,
+  "id": "invalid-document-v2",
+  "revision": 0,
+  "assets": [{
+    "id": "asset-text",
+    "kind": "text",
+    "text": {
+      "text": "missing pinned font",
+      "font_asset_id": "font-does-not-exist",
+      "font_size": {"numerator": 24, "denominator": 1},
+      "fill": {"r": 65535, "g": 65535, "b": 65535, "a": 65535},
+      "language": "en",
+      "direction": "ltr",
+      "alignment": "start"
+    }
+  }]
+}

@@ -1,0 +1,221 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.cutly.dev/probe-manifest/v1",
+  "title": "Cutly ProbeManifest v1",
+  "description": "Backend-neutral facts for one immutable media resource and one pinned probe build/options profile.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "resource", "probe", "container", "duration", "streams"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "resource": {"$ref": "#/$defs/resourceIdentity"},
+    "probe": {"$ref": "#/$defs/probeIdentity"},
+    "container": {"$ref": "#/$defs/containerInfo"},
+    "duration": {"$ref": "#/$defs/nonNegativeTime"},
+    "streams": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/stream"}
+    }
+  },
+  "$defs": {
+    "id": {"type": "string", "minLength": 1},
+    "digest": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]*:[0-9a-f]{16,}$"
+    },
+    "rationalTime": {
+      "$ref": "https://schemas.cutly.dev/document/v1#/$defs/rationalTime"
+    },
+    "nonNegativeTime": {
+      "$ref": "https://schemas.cutly.dev/document/v1#/$defs/nonNegativeTime"
+    },
+    "positiveTime": {
+      "$ref": "https://schemas.cutly.dev/document/v1#/$defs/positiveTime"
+    },
+    "resourceIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["asset_id", "content_hash", "size_bytes"],
+      "properties": {
+        "asset_id": {"$ref": "#/$defs/id"},
+        "content_hash": {"$ref": "#/$defs/digest"},
+        "size_bytes": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807}
+      }
+    },
+    "probeIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["implementation", "build_fingerprint", "options_fingerprint"],
+      "properties": {
+        "implementation": {"type": "string", "minLength": 1},
+        "build_fingerprint": {"$ref": "#/$defs/digest"},
+        "options_fingerprint": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "containerInfo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["format_name", "start_time", "seekable"],
+      "properties": {
+        "format_name": {"type": "string", "minLength": 1},
+        "start_time": {"$ref": "#/$defs/rationalTime"},
+        "bit_rate": {"type": "integer", "minimum": 0, "maximum": 9223372036854775807},
+        "seekable": {"type": "boolean"}
+      }
+    },
+    "stream": {
+      "oneOf": [
+        {"$ref": "#/$defs/videoStreamEnvelope"},
+        {"$ref": "#/$defs/audioStreamEnvelope"}
+      ]
+    },
+    "videoStreamEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["index", "kind", "codec", "time_base", "start_pts", "video"],
+      "properties": {
+        "index": {"type": "integer", "minimum": 0, "maximum": 2147483647},
+        "kind": {"const": "video"},
+        "codec": {"type": "string", "minLength": 1},
+        "time_base": {"$ref": "#/$defs/positiveTime"},
+        "start_pts": {"type": "integer", "minimum": -9223372036854775808, "maximum": 9223372036854775807},
+        "duration_pts": {"type": "integer", "minimum": 0, "maximum": 9223372036854775807},
+        "video": {"$ref": "#/$defs/videoStream"}
+      }
+    },
+    "audioStreamEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["index", "kind", "codec", "time_base", "start_pts", "audio"],
+      "properties": {
+        "index": {"type": "integer", "minimum": 0, "maximum": 2147483647},
+        "kind": {"const": "audio"},
+        "codec": {"type": "string", "minLength": 1},
+        "time_base": {"$ref": "#/$defs/positiveTime"},
+        "start_pts": {"type": "integer", "minimum": -9223372036854775808, "maximum": 9223372036854775807},
+        "duration_pts": {"type": "integer", "minimum": 0, "maximum": 9223372036854775807},
+        "audio": {"$ref": "#/$defs/audioStream"}
+      }
+    },
+    "ratio": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["numerator", "denominator"],
+      "properties": {
+        "numerator": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807},
+        "denominator": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807}
+      }
+    },
+    "videoStream": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "width",
+        "height",
+        "rotation_degrees",
+        "pixel_format",
+        "has_alpha",
+        "frame_rate_mode",
+        "keyframes",
+        "color"
+      ],
+      "properties": {
+        "width": {"type": "integer", "minimum": 1, "maximum": 2147483647},
+        "height": {"type": "integer", "minimum": 1, "maximum": 2147483647},
+        "rotation_degrees": {"type": "integer", "minimum": -180, "maximum": 180},
+        "sample_aspect_ratio": {"$ref": "#/$defs/ratio"},
+        "display_aspect_ratio": {"$ref": "#/$defs/ratio"},
+        "pixel_format": {"type": "string", "minLength": 1},
+        "has_alpha": {"type": "boolean"},
+        "frame_rate_mode": {"enum": ["unknown", "cfr", "vfr"]},
+        "average_frame_rate": {
+          "description": "Required for CFR/VFR; optional when frame_rate_mode is unknown.",
+          "$ref": "#/$defs/positiveTime"
+        },
+        "keyframes": {"$ref": "#/$defs/keyframeSummary"},
+        "color": {"$ref": "#/$defs/colorMetadata"},
+        "hdr": {"$ref": "#/$defs/hdrMetadata"}
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"frame_rate_mode": {"enum": ["cfr", "vfr"]}},
+            "required": ["frame_rate_mode"]
+          },
+          "then": {"required": ["average_frame_rate"]}
+        }
+      ]
+    },
+    "keyframeSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["complete", "count"],
+      "properties": {
+        "complete": {"type": "boolean"},
+        "count": {"type": "integer", "minimum": 0, "maximum": 9223372036854775807},
+        "first_pts": {"type": "integer", "minimum": -9223372036854775808, "maximum": 9223372036854775807},
+        "last_pts": {"type": "integer", "minimum": -9223372036854775808, "maximum": 9223372036854775807},
+        "index_hash": {"$ref": "#/$defs/digest"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"count": {"const": 0}}, "required": ["count"]},
+          "then": {"not": {"anyOf": [{"required": ["first_pts"]}, {"required": ["last_pts"]}]}}
+        },
+        {
+          "if": {"properties": {"count": {"minimum": 1}}, "required": ["count"]},
+          "then": {"required": ["first_pts", "last_pts"]}
+        },
+        {
+          "if": {"properties": {"complete": {"const": true}}, "required": ["complete"]},
+          "then": {"required": ["index_hash"]}
+        }
+      ]
+    },
+    "colorMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["range"],
+      "properties": {
+        "primaries": {"type": "string"},
+        "transfer": {"type": "string"},
+        "matrix": {"type": "string"},
+        "range": {"enum": ["unknown", "limited", "full"]},
+        "chroma_location": {"type": "string"}
+      }
+    },
+    "hdrMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["format"],
+      "properties": {
+        "format": {"type": "string", "minLength": 1},
+        "mastering_display": {"type": "string"},
+        "max_content_light_level": {"type": "integer", "minimum": 0, "maximum": 9223372036854775807},
+        "max_frame_average_light_level": {"type": "integer", "minimum": 0, "maximum": 9223372036854775807}
+      }
+    },
+    "audioStream": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sample_rate",
+        "channels",
+        "channel_layout",
+        "sample_format",
+        "encoder_delay_samples",
+        "padding_samples"
+      ],
+      "properties": {
+        "sample_rate": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807},
+        "channels": {"type": "integer", "minimum": 1, "maximum": 2147483647},
+        "channel_layout": {"type": "string", "minLength": 1},
+        "sample_format": {"type": "string", "minLength": 1},
+        "bits_per_sample": {"type": "integer", "minimum": 0, "maximum": 2147483647},
+        "encoder_delay_samples": {"type": "integer", "minimum": 0, "maximum": 9223372036854775807},
+        "padding_samples": {"type": "integer", "minimum": 0, "maximum": 9223372036854775807}
+      }
+    }
+  }
+}

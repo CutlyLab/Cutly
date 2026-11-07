@@ -1,0 +1,74 @@
+{
+  "schema_version": 2,
+  "id": "audio-processing-v1",
+  "revision": 1,
+  "assets": [
+    {
+      "id": "audio-surround",
+      "kind": "audio",
+      "uri": "surround.wav",
+      "duration": {"value": 10, "rate": 1}
+    }
+  ],
+  "audio_buses": [
+    {
+      "id": "master",
+      "kind": "master",
+      "properties": {
+        "gain_linear": {"numerator": 1, "denominator": 1},
+        "pan": {"numerator": 0, "denominator": 1},
+        "sample_peak_limiter": {
+          "ceiling_linear": {"numerator": 19, "denominator": 20}
+        }
+      }
+    }
+  ],
+  "timelines": [
+    {
+      "id": "timeline",
+      "tracks": [
+        {
+          "id": "audio-track",
+          "kind": "audio",
+          "audio_bus_id": "master",
+          "clips": [
+            {
+              "id": "audio-clip",
+              "asset_id": "audio-surround",
+              "timeline_range": {
+                "start": {"value": 0, "rate": 1},
+                "duration": {"value": 4, "rate": 1}
+              },
+              "source_range": {
+                "start": {"value": 0, "rate": 1},
+                "duration": {"value": 4, "rate": 1}
+              },
+              "property_set": {
+                "audio_channel_matrix": {
+                  "source_layout": "5.1(side)",
+                  "source_channels": ["FL", "FR", "FC", "LFE", "SL", "SR"],
+                  "left_coefficients": [
+                    {"numerator": 1, "denominator": 1},
+                    {"numerator": 0, "denominator": 1},
+                    {"numerator": 1, "denominator": 2},
+                    {"numerator": 0, "denominator": 1},
+                    {"numerator": 1, "denominator": 2},
+                    {"numerator": 0, "denominator": 1}
+                  ],
+                  "right_coefficients": [
+                    {"numerator": 0, "denominator": 1},
+                    {"numerator": 1, "denominator": 1},
+                    {"numerator": 1, "denominator": 2},
+                    {"numerator": 0, "denominator": 1},
+                    {"numerator": 0, "denominator": 1},
+                    {"numerator": 1, "denominator": 2}
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
