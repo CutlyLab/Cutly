@@ -153,17 +153,33 @@ all four invocations passed with exit 0 and no retained-log truncation. Report:
 Its snapshot is `d97b6fa5daaa6cc7e644327fc957b0a51a2e074b`, dirty before the repair commit,
 so it remains local integration evidence, not clean-candidate release evidence.
 
-### Long observation in progress
+### Completed local long observation
 
-A complete real long profile has not yet finished; fake-clock long-profile tests do not supply
-one-hour runtime evidence. The first local launch (`bzwhxysiv`) was deliberately canceled after
-noticing its terminal launcher had a ten-minute timeout, insufficient for the profile. It exited 1
-and retained a `canceled` report at `/tmp/cutly-rc-long-audited-20261107-95292636.json`; it is not a
-successful long observation.
+The first local launch (`bzwhxysiv`) was deliberately canceled after noticing its terminal launcher
+had a ten-minute timeout, insufficient for the profile. It exited 1 and retained a `canceled` report
+at `/tmp/cutly-rc-long-audited-20261107-95292636.json`; that attempt is not successful evidence.
 
-The replacement uses a locally built runner from `0f08c2e` (source HEAD `bf64a4f`, with unrelated
-working-tree changes reported as dirty), an independent launcher, and the runner's own 100-minute
-budget. It writes `/tmp/cutly-rc-long-20261107-95292636-v2.json`, with local `.log` and `.exit.json`
-companions. Completion is pending; the report and exit status must be inspected before claiming
-any fault-round, measurement or hour-long acceptance. No workflow dispatch or external publication
-was performed.
+The replacement used the locally built runner from `0f08c2e`, an independent launcher, and the
+runner's own 100-minute budget. On 2026-11-07 it exited 0 and reported `passed`, starting at
+`10:44:43.868972Z` and finishing at `11:55:44.354663Z`. The report was inspected after completion:
+
+- 227/227 command invocations passed.
+- 100/100 injected fault rounds completed.
+- The existing ten-run real-media decoded-root comparison passed (10/10 runs).
+- 61/61 paired fresh recovery observations completed; observation duration was
+  3,964.012241833 seconds (about 66 minutes), including 60 pauses totaling 3,600.244143667 seconds.
+- Synthetic 4096MiB streaming: 2,017,170,875 ns/op, 2129.20 MB/s, 167,736 B/op, 58 allocs/op.
+- Synthetic reader-process MaxRSS: 8,945,664 bytes for 16MiB input; 8,978,432 bytes for 256MiB input.
+
+Local report: `/tmp/cutly-rc-long-20261107-95292636-v2.json`, 2,568,655 bytes, SHA-256
+`35cfe71cc41d2b4e19123f787a19326ed0ec91a23b1af4ea5fb1f942a21f093a`.
+The `.exit.json` companion records exit 0. These `/tmp` files are local, not durable distribution.
+
+Important attribution limitation: the pre-test snapshot was
+`bf64a4f391a14be141befbbf2d0d208308616182`, dirty, on Darwin arm64. The run remained in the original
+shared checkout while another session committed/merged changes and switched its branch. The runner
+records only a pre-test snapshot, not immutable test-source content for every invocation. Thus this
+is successful local execution/observation evidence, **not clean fixed-revision release acceptance**.
+It must be repeated against an isolated stable candidate before making that claim. It is also not
+single-daemon continuous memory evidence, broad Document v2 mixed-media acceptance, or signed media
+bundle approval. No workflow dispatch or external publication was performed.
