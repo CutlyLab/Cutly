@@ -27,6 +27,7 @@ const (
 	CapabilityVectorPathV1               videoedit.CapabilityID = videoedit.CapabilityID(VectorProfilePathV1)
 	CapabilityVectorPathViewportPXV2     videoedit.CapabilityID = videoedit.CapabilityID(VectorProfilePathViewportPXV2)
 	CapabilityVectorTransitionScopeV1    videoedit.CapabilityID = videoedit.CapabilityID(VectorTransitionScopeProfileV1)
+	CapabilityTextTransitionScopeV1      videoedit.CapabilityID = videoedit.CapabilityID(TextTransitionScopeProfileV1)
 )
 
 const (
@@ -90,6 +91,9 @@ func RequiredCapabilities(document Document) (CapabilityRequirements, []Diagnost
 				if outgoingOK && incomingOK && outgoing.track == TrackKindVector && incoming.track == TrackKindVector &&
 					vectorTransitionAsset(outgoing.asset) && vectorTransitionAsset(incoming.asset) {
 					addFeature(CapabilityVectorTransitionScopeV1)
+				} else if outgoingOK && incomingOK && outgoing.track == TrackKindText && incoming.track == TrackKindText &&
+					textTransitionAsset(outgoing.asset) && textTransitionAsset(incoming.asset) {
+					addFeature(CapabilityTextTransitionScopeV1)
 				}
 			}
 		}

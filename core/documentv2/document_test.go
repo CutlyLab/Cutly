@@ -257,7 +257,7 @@ func TestAudioBusVectorAndExtensionFailClosedContracts(t *testing.T) {
 	})
 	for _, namespace := range []string{
 		PropertyOpacityV1, string(CapabilityTextV1), VectorProfilePathViewportPXV2, EvaluatorVectorPathViewportPXV2, VectorProfilePathV1,
-		TransitionDissolveV1, string(CapabilityInterpolationLinearV1), InterpolationNumericProfileV1,
+		TransitionDissolveV1, TextTransitionScopeProfileV1, string(CapabilityInterpolationLinearV1), InterpolationNumericProfileV1,
 		AudioGraphProfileV1, EvaluatorAudioGraphV1, PropertyAudioChannelMatrixV1,
 		EvaluatorAudioChannelMatrixV1, PropertyAudioSamplePeakLimiterV1, EvaluatorAudioSamplePeakLimiterV1,
 	} {
@@ -279,6 +279,7 @@ func TestAudioBusVectorAndExtensionFailClosedContracts(t *testing.T) {
 		CapabilityOpacityV1,
 		CapabilityAudioChannelMatrixV1,
 		CapabilityAudioSamplePeakLimiterV1,
+		CapabilityTextTransitionScopeV1,
 		videoedit.CapabilityVideoLinearRetime,
 		videoedit.CapabilityAudioVarispeed,
 		videoedit.CapabilityAudioTimeStretch,

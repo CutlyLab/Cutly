@@ -65,6 +65,131 @@ func TestTextPinnedFontViewportV2ValidationAndCapabilities(t *testing.T) {
 	}
 }
 
+func TestTextPinnedFontViewportV2TransitionSchemaAndHardCutCapabilities(t *testing.T) {
+	document := textV2Document("Cutly", TextScriptLatin, TextDirectionLTR)
+	track := &document.Timelines[0].Tracks[0]
+	track.Clips[0].TimelineRange = testRange(0, 2)
+	track.Clips[0].SourceRange = testRange(0, 2)
+	incoming := track.Clips[0]
+	incoming.ID = "text-clip-incoming"
+	incoming.TimelineRange = testRange(2, 2)
+	incoming.SourceRange = testRange(0, 2)
+	track.Clips = append(track.Clips, incoming)
+	document.Timelines[0].Transitions = []Transition{{
+		ID: "text-cut", Profile: TransitionDissolveV1,
+		OutgoingClipID: track.Clips[0].ID, IncomingClipID: incoming.ID,
+		PreDuration: RationalTime{Value: 0, Rate: 1}, PostDuration: RationalTime{Value: 0, Rate: 1},
+	}}
+
+	assertNoDiagnostics(t, Validate(document))
+	required, diagnostics := RequiredCapabilities(document)
+	if HasErrorDiagnostics(diagnostics) || !slices.Equal(required.Features, []videoedit.CapabilityID{
+		CapabilityTextPinnedFontViewportPXV2,
+	}) {
+		t.Fatalf("hard-cut requirements=%+v diagnostics=%+v", required, diagnostics)
+	}
+
+	document.Timelines[0].Transitions[0].PreDuration = RationalTime{Value: 1, Rate: 2}
+	document.Timelines[0].Transitions[0].PostDuration = RationalTime{Value: 1, Rate: 2}
+	assertNoDiagnostics(t, Validate(document))
+	required, diagnostics = RequiredCapabilities(document)
+	if HasErrorDiagnostics(diagnostics) || !slices.Equal(required.Features, []videoedit.CapabilityID{
+		CapabilityTextPinnedFontViewportPXV2, CapabilityTextTransitionScopeV1,
+		videoedit.CapabilityID(TransitionDissolveV1),
+	}) {
+		t.Fatalf("dissolve requirements=%+v diagnostics=%+v", required, diagnostics)
+	}
+	withoutScope := videoedit.BackendCapabilities{
+		BackendID:  "text-transition-without-scope",
+		TrackKinds: []videoedit.TrackKind{videoedit.TrackKind(TrackKindText)},
+		AssetKinds: []videoedit.AssetKind{videoedit.AssetKind(AssetKindFont), videoedit.AssetKind(AssetKindText)},
+		Features: []videoedit.CapabilityID{
+			CapabilityTextPinnedFontViewportPXV2, videoedit.CapabilityID(TransitionDissolveV1),
+		},
+	}
+	if diagnostics := PreflightCapabilities(document, withoutScope); !HasErrorDiagnostics(diagnostics) {
+		t.Fatalf("backend without Text transition scope accepted dissolve: %+v", diagnostics)
+	}
+	withoutScope.Features = append(withoutScope.Features, CapabilityTextTransitionScopeV1)
+	if diagnostics := PreflightCapabilities(document, withoutScope); HasErrorDiagnostics(diagnostics) {
+		t.Fatalf("backend with Text transition scope rejected dissolve: %+v", diagnostics)
+	}
+
+	legacy := document
+	legacy.Assets = append([]Asset(nil), document.Assets...)
+	legacyText := *document.Assets[1].Text
+	legacyText.Profile = ""
+	legacyText.LineHeight = nil
+	legacyText.Viewport = nil
+	legacyText.Script = ""
+	legacy.Assets[1].Text = &legacyText
+	assertDiagnostic(t, Validate(legacy), CodeTransitionInvalid, "/timelines/0/transitions/0")
+}
+
+func TestTextTransitionScopeDescriptorAndCatalogV4AreDefensive(t *testing.T) {
+	descriptor := TextTransitionScope()
+	if descriptor.Profile != TextTransitionScopeProfileV1 ||
+		descriptor.RequiredCapability != string(CapabilityTextTransitionScopeV1) ||
+		descriptor.BaseTransitionProfile != TransitionDissolveV1 ||
+		descriptor.TextProfile != TextProfilePinnedFontViewportPXV2 {
+		t.Fatalf("descriptor=%+v", descriptor)
+	}
+	encoded, err := videoedit.CanonicalJSON(descriptor)
+	if err != nil || len(encoded) == 0 {
+		t.Fatalf("canonical descriptor bytes=%d err=%v", len(encoded), err)
+	}
+	descriptorFixture, err := os.ReadFile("testdata/text-transition-scope-v1.canonical.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	descriptorFixture = bytes.TrimSpace(descriptorFixture)
+	if !bytes.Equal(encoded, descriptorFixture) {
+		t.Fatalf("Text transition descriptor drift\nwant=%s\ngot=%s", descriptorFixture, encoded)
+	}
+	descriptorDigest := sha256.Sum256(encoded)
+	if got := "sha256:" + hex.EncodeToString(descriptorDigest[:]); got != "sha256:3c72e31c0136e08a3f0d7b6772cb5cf04ebac0b2bfd2f6673b4b200bc15de7f7" {
+		t.Fatalf("Text transition descriptor hash=%q", got)
+	}
+	var decoded TextTransitionScopeDescriptor
+	if err := wirejson.Decode(encoded, &decoded); err != nil || decoded != descriptor {
+		t.Fatalf("strict descriptor decode=%+v err=%v", decoded, err)
+	}
+
+	v3Before, err := videoedit.CanonicalJSON(SemanticDescriptorsV3())
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalog := SemanticDescriptorsV4()
+	if catalog.SchemaVersion != DescriptorCatalogVersionV4 || len(catalog.TextTransitionScopes) != 1 ||
+		catalog.TextTransitionScopes[0] != descriptor || len(catalog.TransitionScopes) != 1 {
+		t.Fatalf("catalog=%+v", catalog)
+	}
+	catalogEncoded, err := videoedit.CanonicalJSON(catalog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalogFixture, err := os.ReadFile("testdata/semantic-descriptors-v4.canonical.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalogFixture = bytes.TrimSpace(catalogFixture)
+	if !bytes.Equal(catalogEncoded, catalogFixture) {
+		t.Fatalf("semantic descriptor catalog v4 drift\nwant=%s\ngot=%s", catalogFixture, catalogEncoded)
+	}
+	catalogDigest := sha256.Sum256(catalogEncoded)
+	if got := "sha256:" + hex.EncodeToString(catalogDigest[:]); got != "sha256:f32054a8b470955c62e8345f0bcceeb6decef5a031456a9db795fd0f43d35f69" {
+		t.Fatalf("semantic descriptor catalog v4 hash=%q", got)
+	}
+	catalog.TextTransitionScopes[0].Profile = "mutated"
+	if SemanticDescriptorsV4().TextTransitionScopes[0].Profile != TextTransitionScopeProfileV1 {
+		t.Fatal("catalog v4 aliases caller storage")
+	}
+	v3After, err := videoedit.CanonicalJSON(SemanticDescriptorsV3())
+	if err != nil || !bytes.Equal(v3Before, v3After) {
+		t.Fatalf("catalog v3 drifted after v4 discovery: err=%v", err)
+	}
+}
+
 func TestTextPinnedFontViewportV2RejectsAmbiguousOrUnboundedSources(t *testing.T) {
 	tests := []struct {
 		name string

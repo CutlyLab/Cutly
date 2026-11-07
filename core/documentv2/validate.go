@@ -812,7 +812,7 @@ func (validator *documentValidator) validateTransitions(timeline Timeline, path 
 			continue
 		}
 		if !validator.validTransitionPair(outgoing, incoming) || outgoing.track.ID != incoming.track.ID || incoming.clipIndex != outgoing.clipIndex+1 {
-			validator.add(CodeTransitionInvalid, transitionPath, "transition must connect adjacent clips on one video track or one viewport-px vector track")
+			validator.add(CodeTransitionInvalid, transitionPath, "transition must connect adjacent clips on one video track, one pinned viewport-px text track, or one viewport-px vector track")
 			continue
 		}
 		if outgoing.clip.Disabled || incoming.clip.Disabled {
@@ -909,6 +909,10 @@ func (validator *documentValidator) validTransitionPair(outgoing, incoming clipL
 	switch outgoing.track.Kind {
 	case TrackKindVideo:
 		return true
+	case TrackKindText:
+		outgoingAsset, outgoingOK := validator.assets[outgoing.clip.AssetID]
+		incomingAsset, incomingOK := validator.assets[incoming.clip.AssetID]
+		return outgoingOK && incomingOK && textTransitionAsset(outgoingAsset) && textTransitionAsset(incomingAsset)
 	case TrackKindVector:
 		outgoingAsset, outgoingOK := validator.assets[outgoing.clip.AssetID]
 		incomingAsset, incomingOK := validator.assets[incoming.clip.AssetID]
@@ -922,8 +926,12 @@ func vectorTransitionAsset(asset Asset) bool {
 	return asset.Kind == AssetKindVector && asset.Vector != nil && asset.Vector.Profile == VectorProfilePathViewportPXV2
 }
 
+func textTransitionAsset(asset Asset) bool {
+	return asset.Kind == AssetKindText && asset.Text != nil && asset.Text.Profile == TextProfilePinnedFontViewportPXV2
+}
+
 func staticTransitionAsset(asset Asset) bool {
-	return asset.Kind == AssetKindImage || vectorTransitionAsset(asset)
+	return asset.Kind == AssetKindImage || textTransitionAsset(asset) || vectorTransitionAsset(asset)
 }
 
 func scaledTime(value, sourceDuration, timelineDuration RationalTime) *big.Rat {
@@ -1135,6 +1143,14 @@ func reservedSemanticToken(value string) bool {
 			textV2.OutlineProfile, textV2.RasterProfile, textV2.PaintProfile, textV2.CoverageHashProfile,
 			textV2.SemanticHashProfile, textV2.LayoutInputHashProfile, textV2.RunInputProfile,
 			textV2.UnicodeValidationProfile, textV2.UnicodeValidationHashProfile,
+		} {
+			add(token)
+		}
+		textTransition := TextTransitionScope()
+		for _, token := range []string{
+			textTransition.Profile, textTransition.RequiredCapability,
+			textTransition.BaseTransitionProfile, textTransition.TextProfile,
+			textTransition.TextEvaluatorProfile, textTransition.TransitionEvaluator,
 		} {
 			add(token)
 		}
