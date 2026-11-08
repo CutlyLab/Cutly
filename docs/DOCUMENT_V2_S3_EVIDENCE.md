@@ -436,13 +436,18 @@ remain zero. The outer work test executed the N-1 boundary, not literal value 1.
 pre-read checks, not a promise that later content-dependent font geometry succeeds.
 
 Parent final-repair task `be2xwr3o0` passed full reconstruction normal/race, repository vet,
-`go mod tidy -diff` and diff checks. Full repository rerun `bdg21w66b` is pending after a separate
-FFmpeg cancellation repair. The earlier full-race failure was traced to converting command.Start's
+`go mod tidy -diff` and diff checks. Full repository rerun `bdg21w66b` passed `go test ./... -count=1`,
+`go test -race ./... -count=1`, `go vet ./...`, `go mod tidy -diff` and `git diff --check` after the
+separate FFmpeg cancellation repair. The earlier full-race failure was traced to converting command.Start's
 context cause to text with `%v`; changing that cause to `%w` preserves error classification without
 reclassifying real failures on late cancellation. A new deterministic test failed both cancellation
 cases before repair. Its initial terminal assertion incorrectly also demanded ErrCommand after the
 existing emitter intentionally normalized to ctx.Err(); that test assertion was corrected without
-changing emitter behavior. Final backend independent review and full rerun are pending.
+changing emitter behavior. Independent backend review found no remaining correctness findings;
+new deterministic tests passed 20 repetitions and cancellation/real-failure race tests passed ten.
+Reconstruction integration is saved at `f5564e4`, cancellation repair at `f0722bb`. Full gate results
+include preserved deferred archive work in this checkout; they are not clean release or S3 exit
+acceptance. No previously blocked codec/font review was retried or rerouted.
 
 The earlier interrupted codec repair review still gates S3 exit. None of these new implementation or
 review tasks substitutes for it. Temporal video, MP4/Evidence v2, scheduling/worker execution and the
