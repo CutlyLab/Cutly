@@ -26,14 +26,16 @@ type expectedResultSource struct {
 // Surface. It re-evaluates timeline scope, cross-binds nested receipts and independently recomputes
 // the final pixel hash. It does not prove that source pixels caused that Surface; offline provenance
 // requires trusted provider replay, an artifact chain or a trusted-execution signature.
-func (program *Program) ValidateResult(ctx context.Context, result Result) error {
+func (program *Program) ValidateResult(ctx context.Context, result Result) (err error) {
+	defer program.recoverDomainPanic(&err)
 	return program.validateResult(ctx, result, true)
 }
 
 // ValidateSerializedReceipt validates deterministic structure, frozen document/evaluator scope and
 // all provider receipt bindings, but cannot verify final pixels when Surface is absent. A
 // canonical-looking PixelHash in a serialized receipt is a claim, not proof of rendered content.
-func (program *Program) ValidateSerializedReceipt(ctx context.Context, result Result) error {
+func (program *Program) ValidateSerializedReceipt(ctx context.Context, result Result) (err error) {
+	defer program.recoverDomainPanic(&err)
 	return program.validateResult(ctx, result, false)
 }
 
@@ -48,9 +50,9 @@ func (program *Program) validateResult(ctx context.Context, result Result, requi
 	if program.config.Source.StaticTextV2 {
 		wantTextContract = textlayer.ContractVersion
 	}
-	if result.SchemaVersion != ResultSchemaVersion || result.Profile != profileForConfig(program.config) ||
+	if result.SchemaVersion != ResultSchemaVersion || result.Profile != program.profile() ||
 		result.Width != program.config.Width || result.Height != program.config.Height ||
-		result.DocumentHash != program.documentHash || result.BuildFingerprint != program.config.BuildFingerprint ||
+		result.DomainScopeHash != program.domainScopeHash || result.DocumentHash != program.documentHash || result.BuildFingerprint != program.config.BuildFingerprint ||
 		result.NativeSourceContractVersion != rastercompositor.NativeSourceContractVersion ||
 		result.ExpressionContractVersion != expressionlayer.ContractVersion ||
 		result.ExpressionHandleContractVersion != expressionlayer.TransitionHandleContractVersion ||

@@ -226,6 +226,52 @@ Downstream native domain compile
 entries, the host-owned reconstruction factory, explicit semantic/native identity bridge and a real
 same-Document PNG/vector/pinned-text/WAV subprocess restart proof remain to be implemented and audited.
 
+## Scoped native visual compilation (slice independently accepted)
+
+On 2026-11-08 the additive `visualcompositor.CompileDomain`,
+`referencevisual.CompileDomainV2` and resource-free `PreflightDomainV2` passed independent
+read-only review by `a3a86eeaed4f2d6fa`, with no verified P0/P1/P2. Preflight and compilation
+share normalized configuration, fixed capabilities, scope validation and aggregate admission.
+The original full Document hash and indexes survive authored audio; providers receive the
+unchanged Document. Initial support requires exactly one authored timeline, all enabled visual
+clips in the requested intersection, and no transitions. Temporal video is not implemented here.
+
+New explicitly versioned scope/config/source identities prevent same-Document cross-range replay,
+including transparent gaps. Legacy profiles, fixture bytes and referencevisualchunk admission remain
+unchanged. Tests exercise actual PNG/vector/pinned-font Text with authored audio, original indexes,
+owned getters, concurrent readers, pre-callback scope guards and cancellation/panic failure-zero.
+
+Independent commands passed:
+
+```sh
+go test ./render/visualcompositor ./render/referencevisual -count=1
+go test -race ./render/visualcompositor ./render/referencevisual -count=1
+go vet ./render/visualcompositor ./render/referencevisual
+git diff --check -- render/visualcompositor render/referencevisual
+go test ./conformance -run '^(TestDocumentV2Fixtures|TestDocumentV2VectorViewportFixtures|TestDocumentV2PinnedFontViewportTextFixtures|TestSchemasCompileAndValidateInstances)$' -count=1
+```
+
+Audited SHA-256: visual domain source `fe8aca653a484c4d6f6bd0e68f961cf02fcee50147d1dd3830f3819a728326d7`,
+referencevisual domain source `e6347dde8d32759a682aaf1324c08b67fba088939899201b0e20d9ac1fcf87c5`.
+The review used source analysis and existing tests, not a new independent adversarial overlay or
+exhaustive fuzzing. It does not accept audio integration, factory, codec or S3 as a whole.
+
+## Private resource snapshot prerequisite (slice independently accepted)
+
+The new `reconstructv2.ResourceSource` is trusted host configuration, not wire authority.
+Its private snapshot helper independently compares the expected binding before Open, reads bounded
+private bytes, closes returned readers even alongside Open errors, isolates pointer-valued claims,
+and returns zero on read/close/cancellation/panic failure. It must only be used after joint environment
+verification, scope/host-pin/aggregate admission; the same bytes must subsequently be inspected.
+It cannot interrupt synchronous blocked host callbacks or prove locator confinement by itself.
+
+Parent task `bhbzho2q1` and independent reviewer `a3a86eeaed4f2d6fa` passed package normal/race/vet
+and diff checks. No verified P0/P1/P2 was found in source.go/source_test.go. An attempted independent
+/tmp overlay write was blocked by a classifier service timeout and was not retried or rerouted;
+no such extra test coverage is claimed. Audited source SHA-256:
+`314bafacfde48a1a455b92d38bce248757ea40cdfa229e18f419edef53d09abe`.
+Additional scope/font/factory work is not included in this acceptance.
+
 ## Current integration gates
 
 After the resource ownership repair and evaluator implementation freeze, task `b26sb68lz` passed

@@ -65,7 +65,8 @@ type SurfaceFrameResult struct {
 	Result                visualcompositor.Result `json:"result"`
 }
 
-func (program *Program) RenderAt(ctx context.Context, timelineID documentv2.ID, at documentv2.RationalTime) (Result, error) {
+func (program *Program) RenderAt(ctx context.Context, timelineID documentv2.ID, at documentv2.RationalTime) (result Result, err error) {
+	defer program.recoverDomainPanic(&err, func() { result = Result{} })
 	visual, err := program.RenderSurfaceAt(ctx, timelineID, at)
 	if err != nil {
 		return Result{}, err
@@ -76,7 +77,8 @@ func (program *Program) RenderAt(ctx context.Context, timelineID documentv2.ID, 
 // RenderSurfaceAt renders and strictly validates one canonical visual surface without performing
 // the later RGBA8 conversion or PNG encoding stages. It is the embedding boundary for pre-codec
 // surface chunk providers. Failure and cancellation return a zero result.
-func (program *Program) RenderSurfaceAt(ctx context.Context, timelineID documentv2.ID, at documentv2.RationalTime) (visualcompositor.Result, error) {
+func (program *Program) RenderSurfaceAt(ctx context.Context, timelineID documentv2.ID, at documentv2.RationalTime) (result visualcompositor.Result, err error) {
+	defer program.recoverDomainPanic(&err, func() { result = visualcompositor.Result{} })
 	if err := program.validateRuntime(ctx); err != nil {
 		return visualcompositor.Result{}, err
 	}
@@ -96,7 +98,8 @@ func (program *Program) RenderSurfaceAt(ctx context.Context, timelineID document
 	return visual, nil
 }
 
-func (program *Program) RenderFrame(ctx context.Context, timelineID documentv2.ID, clock videoedit.FrameClock, compositionFrameIndex int64) (FrameResult, error) {
+func (program *Program) RenderFrame(ctx context.Context, timelineID documentv2.ID, clock videoedit.FrameClock, compositionFrameIndex int64) (frameResult FrameResult, err error) {
+	defer program.recoverDomainPanic(&err, func() { frameResult = FrameResult{} })
 	visualFrame, err := program.RenderSurfaceFrame(ctx, timelineID, clock, compositionFrameIndex)
 	if err != nil {
 		return FrameResult{}, err
@@ -114,7 +117,8 @@ func (program *Program) RenderFrame(ctx context.Context, timelineID documentv2.I
 // RenderSurfaceFrame resolves one composition-wide frame index, renders its canonical visual
 // surface and repeats the complete live provider/receipt/hash validation. It performs no output
 // color conversion or image encoding. Failure and cancellation return a zero result.
-func (program *Program) RenderSurfaceFrame(ctx context.Context, timelineID documentv2.ID, clock videoedit.FrameClock, compositionFrameIndex int64) (SurfaceFrameResult, error) {
+func (program *Program) RenderSurfaceFrame(ctx context.Context, timelineID documentv2.ID, clock videoedit.FrameClock, compositionFrameIndex int64) (result SurfaceFrameResult, err error) {
+	defer program.recoverDomainPanic(&err, func() { result = SurfaceFrameResult{} })
 	if err := program.validateRuntime(ctx); err != nil {
 		return SurfaceFrameResult{}, err
 	}
@@ -186,10 +190,21 @@ func (program *Program) runtimeInvariant() bool {
 			return false
 		}
 	}
+	if program.domainScope != nil {
+		binding := program.visual.ScopeBinding()
+		if !program.v2 || program.manifest.DomainScope == nil || !equalScopeBindings(&binding, program.manifest.DomainScope) || !equalDomainScopes(program.visual.Scope(), *program.domainScope) {
+			return false
+		}
+	} else if program.manifest.DomainScope != nil || program.visual.DomainScopeHash() != "" {
+		return false
+	}
 	return true
 }
 
 func (program *Program) profile() string {
+	if program != nil && program.domainScope != nil {
+		return DomainProfileV1
+	}
 	if program != nil && program.v2 {
 		return ProfileV2
 	}
@@ -243,7 +258,8 @@ func (program *Program) finishValidated(ctx context.Context, visual visualcompos
 
 // ValidateResult is the strict live boundary. It requires every runtime object, re-renders from
 // the Program's concrete providers, then independently repeats color conversion and PNG encoding.
-func (program *Program) ValidateResult(ctx context.Context, value Result) error {
+func (program *Program) ValidateResult(ctx context.Context, value Result) (err error) {
+	defer program.recoverDomainPanic(&err, nil)
 	if err := program.validateRuntime(ctx); err != nil {
 		return err
 	}
@@ -288,7 +304,8 @@ func (program *Program) ValidateResult(ctx context.Context, value Result) error 
 // ValidateSerializedReceipt validates frozen scope, profiles, geometry and hash-chain claims while
 // accepting omitted Surface/Frame/Artifact runtime objects. It intentionally does not claim that
 // serialized hashes prove pixel causality or provenance.
-func (program *Program) ValidateSerializedReceipt(ctx context.Context, value Result) error {
+func (program *Program) ValidateSerializedReceipt(ctx context.Context, value Result) (err error) {
+	defer program.recoverDomainPanic(&err, nil)
 	if err := program.validateRuntime(ctx); err != nil {
 		return err
 	}

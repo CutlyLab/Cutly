@@ -72,7 +72,9 @@ type frozenTransition struct {
 }
 
 type Program struct {
-	evaluator             *evaluator.Program
+	evaluator             visualEvaluator
+	domainScope           *evaluator.DomainScope
+	domainScopeHash       string
 	documentHash          string
 	config                Config
 	capabilities          videoedit.BackendCapabilities
@@ -144,6 +146,10 @@ func Capabilities(config Config) (videoedit.BackendCapabilities, error) {
 // Compile freezes the complete document and every dispatch binding. Any diagnostic with error
 // severity returns a nil Program; cancellation likewise never publishes partial state.
 func Compile(ctx context.Context, document documentv2.Document, config Config) (*Program, []documentv2.Diagnostic) {
+	return compile(ctx, document, config, nil)
+}
+
+func compile(ctx context.Context, document documentv2.Document, config Config, domain *evaluator.DomainScope) (*Program, []documentv2.Diagnostic) {
 	if ctx == nil {
 		return nil, []documentv2.Diagnostic{compileDiagnostic(DiagnosticCodeConfigInvalid, "/visual_compositor/context", ErrInvalidConfig)}
 	}
@@ -165,20 +171,41 @@ func Compile(ctx context.Context, document documentv2.Document, config Config) (
 		}
 		return nil, []documentv2.Diagnostic{compileDiagnostic(DiagnosticCodeDocumentLimit, "/"+strings.TrimPrefix(limitPath, "/"), limitErr)}
 	}
+	if domain != nil {
+		if err := validateDomainProviderClosure(ctx, document, *domain); err != nil {
+			return nil, []documentv2.Diagnostic{compileDiagnostic(DiagnosticCodeDomainInvalid, "/scope", err)}
+		}
+	}
 	if normalized.Source.StaticTextV2 {
-		if subsetPath, subsetErr := validateStaticTextSubset(ctx, document); subsetErr != nil {
+		if subsetPath, subsetErr := validateStaticTextSubsetMode(ctx, document, domain); subsetErr != nil {
 			if errors.Is(subsetErr, ErrCanceled) {
 				return nil, []documentv2.Diagnostic{compileDiagnostic(DiagnosticCodeCanceled, "/visual_compositor", subsetErr)}
 			}
 			return nil, []documentv2.Diagnostic{compileDiagnostic(DiagnosticCodeStaticText, "/"+strings.TrimPrefix(subsetPath, "/"), subsetErr)}
 		}
 	}
-	compiled, snapshot, diagnostics := evaluator.CompileSnapshot(
-		ctx, document, capabilities, evaluator.SnapshotLimits{
-			MaxCanonicalDocumentBytes: normalized.Limits.MaxCanonicalDocumentBytes,
-			MaxDocumentNodes:          uint64(normalized.Limits.MaxDocumentNodes),
-		},
-	)
+	var compiled visualEvaluator
+	var snapshot *evaluator.FrozenSnapshot
+	var diagnostics []documentv2.Diagnostic
+	limits := evaluator.SnapshotLimits{
+		MaxCanonicalDocumentBytes: normalized.Limits.MaxCanonicalDocumentBytes,
+		MaxDocumentNodes:          uint64(normalized.Limits.MaxDocumentNodes),
+	}
+	if domain == nil {
+		value, frozen, ds := evaluator.CompileSnapshot(ctx, document, capabilities, limits)
+		if value != nil {
+			compiled = value
+		}
+		snapshot, diagnostics = frozen, ds
+	} else {
+		value, frozen, ds := evaluator.CompileDomainSnapshot(ctx, document, *domain, capabilities, limits)
+		if value != nil {
+			compiled = value
+			owned := value.Scope()
+			domain = &owned
+		}
+		snapshot, diagnostics = frozen, ds
+	}
 	if compiled == nil || documentv2.HasErrorDiagnostics(diagnostics) {
 		if ctx.Err() != nil {
 			return nil, []documentv2.Diagnostic{compileDiagnostic(DiagnosticCodeCanceled, "/visual_compositor", errors.Join(ErrCanceled, ctx.Err()))}
@@ -188,6 +215,18 @@ func Compile(ctx context.Context, document documentv2.Document, config Config) (
 	if snapshot == nil || snapshot.DocumentHash() == "" || snapshot.DocumentHash() != compiled.DocumentHash() ||
 		snapshot.CanonicalBytes() > normalized.Limits.MaxCanonicalDocumentBytes {
 		return nil, append(diagnostics, compileDiagnostic(DiagnosticCodeInvariant, "/document_hash", ErrInvariantFailed))
+	}
+	selected := map[documentv2.ID]bool(nil)
+	if domain != nil {
+		selected = domainClipSet(*domain)
+	}
+	domainHash := ""
+	if domain != nil {
+		var err error
+		domainHash, err = hashDomainScope(*domain)
+		if err != nil {
+			return nil, append(diagnostics, compileDiagnostic(DiagnosticCodeDomainInvalid, "/scope", err))
+		}
 	}
 	documentHash := snapshot.DocumentHash()
 	frozenAssets := snapshot.Assets()
@@ -239,6 +278,9 @@ func Compile(ctx context.Context, document documentv2.Document, config Config) (
 		if timeline.Index != timelineIndex {
 			return nil, append(diagnostics, compileDiagnostic(DiagnosticCodeInvariant, fmt.Sprintf("/timelines/%d/index", timelineIndex), ErrInvariantFailed))
 		}
+		if domain != nil && timeline.ID != domain.Selection.TimelineID {
+			continue
+		}
 		timelines[timeline.ID] = timelineIndex
 		for trackIndex, track := range timeline.Tracks {
 			if trackIndex&255 == 0 {
@@ -257,6 +299,9 @@ func Compile(ctx context.Context, document documentv2.Document, config Config) (
 				}
 				if clip.Index != clipIndex {
 					return nil, append(diagnostics, compileDiagnostic(DiagnosticCodeInvariant, fmt.Sprintf("/timelines/%d/tracks/%d/clips/%d/index", timelineIndex, trackIndex, clipIndex), ErrInvariantFailed))
+				}
+				if domain != nil && !selected[clip.ID] {
+					continue
 				}
 				asset, exists := assets[clip.AssetID]
 				if !exists {
@@ -296,6 +341,9 @@ func Compile(ctx context.Context, document documentv2.Document, config Config) (
 	transitions := make(map[transitionScopeKey]frozenTransition)
 	needsExpressionHandle := false
 	for timelineIndex, timeline := range frozenTimelines {
+		if domain != nil {
+			continue
+		}
 		for transitionIndex, transition := range timeline.Transitions {
 			if transitionIndex&255 == 0 {
 				if err := contextError(ctx, "compile/transition_scopes"); err != nil {
@@ -328,7 +376,7 @@ func Compile(ctx context.Context, document documentv2.Document, config Config) (
 		return nil, append(diagnostics, compileDiagnostic(DiagnosticCodeCanceled, "/visual_compositor", err))
 	}
 	return &Program{
-		evaluator: compiled, documentHash: documentHash, config: normalized, capabilities: capabilities,
+		evaluator: compiled, domainScope: domain, domainScopeHash: domainHash, documentHash: documentHash, config: normalized, capabilities: capabilities,
 		assets: assets, clips: clips, timelines: timelines, transitions: transitions,
 		needsNative: needsNative, needsExpression: needsExpression,
 		needsExpressionHandle: needsExpressionHandle, needsText: needsText,
@@ -343,8 +391,16 @@ func compileDiagnostic(code, path string, err error) documentv2.Diagnostic {
 // refuses dynamic paint and Text transitions before advertising or freezing its own evaluator
 // program, so a permissive or mismatched provider can never broaden this profile.
 func validateStaticTextSubset(ctx context.Context, document documentv2.Document) (string, error) {
+	return validateStaticTextSubsetMode(ctx, document, nil)
+}
+
+func validateStaticTextSubsetMode(ctx context.Context, document documentv2.Document, domain *evaluator.DomainScope) (string, error) {
 	if err := contextError(ctx, "compile/static_text/preflight"); err != nil {
 		return "", err
+	}
+	selected := map[documentv2.ID]bool(nil)
+	if domain != nil {
+		selected = domainClipSet(*domain)
 	}
 	assets := make(map[documentv2.ID]documentv2.Asset, len(document.Assets))
 	for assetIndex, asset := range document.Assets {
@@ -361,6 +417,9 @@ func validateStaticTextSubset(ctx context.Context, document documentv2.Document)
 				return "", err
 			}
 		}
+		if domain != nil && timeline.ID != domain.Selection.TimelineID {
+			continue
+		}
 		clipKinds := make(map[documentv2.ID]documentv2.TrackKind)
 		for trackIndex, track := range timeline.Tracks {
 			if trackIndex&255 == 0 {
@@ -373,6 +432,9 @@ func validateStaticTextSubset(ctx context.Context, document documentv2.Document)
 					if err := contextError(ctx, "compile/static_text/clips"); err != nil {
 						return "", err
 					}
+				}
+				if domain != nil && !selected[clip.ID] {
+					continue
 				}
 				clipKinds[clip.ID] = track.Kind
 				if track.Kind != documentv2.TrackKindText || clip.Disabled {
@@ -410,6 +472,9 @@ func validateStaticTextSubset(ctx context.Context, document documentv2.Document)
 					}
 				}
 			}
+		}
+		if domain != nil {
+			continue
 		}
 		for transitionIndex, transition := range timeline.Transitions {
 			if transitionIndex&255 == 0 {
