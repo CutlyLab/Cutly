@@ -353,10 +353,14 @@ The native audio receipt hash is verified in its original representation before 
 scope fields to lowercase wire names; the projection has a separate hash. WAV/audio source list
 cross-binding relies on the independently accepted exact enabled-closure scope gate, not pruning.
 
-The reviewer authored additional late-cancellation/panic, same-document probe mismatch and stdlib
-hash-preimage checks under `/tmp/s3-bridge-independent-overlay.json`, but their first execution was
-blocked by an actively edited preflight unused import. No supplemental pass, independent vet or
-full-package gate is claimed at this checkpoint. Earlier blocked font/codec work was untouched.
+The reviewer's additional checks under `/tmp/s3-bridge-independent-overlay.json` initially could
+not compile because preflight was actively edited. After dependency freeze, both normal and race
+supplemental runs passed. They observed 985 bridge-build context checkpoints and sampled 32 positions
+for cancellation and panic, requiring strictly zero output; every observed canonicalBridge checkpoint
+was tested for nil-byte failure. Genuine same-document native audio with a different valid probe build
+fingerprint was rejected against the WAV provider. Independent stdlib SHA-256 preimage checks passed
+for native receipt, lowercase projection and omitted-self bridge hashes. Independent full-package/vet
+acceptance is not claimed by this bridge review. Earlier blocked font/codec work was untouched.
 Bridge is unsigned self-integrity evidence, not attestation, pixel/sample causality proof or durable
 authority. Factory/preflight and full S3 acceptance remain separate.
 
@@ -401,6 +405,44 @@ already uses the conservative source-style measure), and identified WAV retained
 document-known vector limits that also need pre-callback checks. The preflight owner is repairing
 these with no-callback regressions; independent closure is pending. No previous passing focused test
 is treated as evidence that these gaps were absent.
+
+After the first repaired preflight freeze, independent reviewer `a3a86eeaed4f2d6fa` ran the final
+mixed/restart/runtime tests in normal and race modes, plus package vet: all passed, with no verified
+P0/P1/P2 in that assigned integration slice. Final factory_test.go hash was
+`5cfd302c9dc8bc138d9cbff044d526071c886665f3c24c0862e467b93d7c0bbd` before and after execution.
+Both runs actually launched the fresh-process restart helper. Third-Open cancellation/unformattable
+panic, nil Bundle and same-Factory successful recovery with all resources rebound were executed.
+This closes the earlier final-test execution hold, not the separately audited preflight boundary.
+
+Parent task `btlu1i9d3` passed reconstruction-package Linux/amd64, Linux/386, Windows/amd64 and
+JS/Wasm compile-only checks. No target-runtime execution is implied. Full synchronized task
+`b4qizjhis` passed the normal suite and reconstruction-package race tests, but the full race suite
+failed `render/ffmpegbackend.TestM1CancellationDuringDecodedEvidenceIsTerminalAndBounded`: returned
+`ffmpeg backend: command failed: start decoded frames evidence: context deadline exceeded` did not
+satisfy the expected deadline error classification. Vet/tidy were not reached. This failure is under
+separate investigation, not dismissed as a flaky pass.
+
+Independent preflight recheck passed its focused normal/race/vet gates and confirmed the earlier
+repairs, but found a remaining P1 early-admission issue: document-known text scalar/per-line scalar
+limits and mandatory raster lower bounds could still fail only after resource callbacks. Follow-up
+repair includes both inner and outer work-unit lower bounds because outer work caps the child;
+inner canonical reservation must not be incorrectly imposed on the outer exact canonical cap.
+Final independent preflight closure by `a60f4bedcfc8e7caf` reports P0=0/P1=0/P2=0 on
+preflight.go `d713579ea7b510649e5a567d655dadb24c311bef5ab3a6b2d1b3d73279384b77` and
+preflight_test.go `bc5a309bc879186a2575f054fb2e54d0a409ca60b9bd83cbdd689859a252f718`.
+Focused constructor/preflight normal/race and package vet passed independently. Unicode/LF scalar
+boundaries and inner/outer raster N-1 rejection tests assert all three resource callback counters
+remain zero. The outer work test executed the N-1 boundary, not literal value 1. These are necessary
+pre-read checks, not a promise that later content-dependent font geometry succeeds.
+
+Parent final-repair task `be2xwr3o0` passed full reconstruction normal/race, repository vet,
+`go mod tidy -diff` and diff checks. Full repository rerun `bdg21w66b` is pending after a separate
+FFmpeg cancellation repair. The earlier full-race failure was traced to converting command.Start's
+context cause to text with `%v`; changing that cause to `%w` preserves error classification without
+reclassifying real failures on late cancellation. A new deterministic test failed both cancellation
+cases before repair. Its initial terminal assertion incorrectly also demanded ErrCommand after the
+existing emitter intentionally normalized to ctx.Err(); that test assertion was corrected without
+changing emitter behavior. Final backend independent review and full rerun are pending.
 
 The earlier interrupted codec repair review still gates S3 exit. None of these new implementation or
 review tasks substitutes for it. Temporal video, MP4/Evidence v2, scheduling/worker execution and the
