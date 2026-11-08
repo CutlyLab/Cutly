@@ -315,6 +315,34 @@ scope_test.go `47933e8fc2b3bfbb9b6927d343959b89b837b5497a0c167b645349e8a7a832ed`
 
 Accepted visual/source slice is committed at `ae7e2da`; accepted audio slice at `325f78a`.
 
+## Pinned-font reconstruction adapter (slice reviewed)
+
+The private `buildFontBinding` consumes an actual owned core inspection and independently authorized
+binding, then follows DecodeOutlineFont → ValidateOutlineGeometry → MaterializeOutlineSet →
+BuildLayoutGraph → BindShapeProvider. Each edge checks the preceding native receipt; the resulting
+text binding retains the original Document hash and font asset ID. No wire receipt substitutes for
+live native lineage, and no new encoded-byte parse bypasses the inspected object. Failure, panic and
+cancellation return a zero binding.
+
+All fixed initial font-build limits must be positive and no larger than the adapter defaults. Five
+phase working/retained maxima plus a second layout reservation account for graph replay during
+provider binding: 96 MiB working plus 96 MiB retained under the default profile. These are conservative
+logical admission charges, not measured RSS/GC ceilings. Core inspection and input snapshots require
+separate factory admission.
+
+Implementer `a60f4bedcfc8e7caf` reported focused normal/race, package vet and full package tests passed.
+Independent reviewer `a91a0421285b64f18` found no verified P0/P1/P2 after source/ownership/accounting
+inspection and ten normal FontAdapter test repetitions. Its combined search/hash/race command was
+refused by the worktree command-shape guard and was not retried or rerouted. Independent race, vet,
+full-package tests and fresh post-compaction hashes are therefore **not** claimed for this review.
+No empirical RSS or pathological-layout instrumentation is claimed. This review does not accept the
+factory's aggregate budget or S3 exit.
+
+Reviewed hashes supplied with the handoff:
+
+- `font.go`: `384de0802ed2f82e5391127c1a686829ea2874b357ba2e7a23a17fe7fde84fa2`
+- `font_test.go`: `02c511142c11b242ad8e98bf027b9dcbc912f97523abff15e32f11dfbd3dd566`
+
 ## Current integration gates
 
 After the resource ownership repair and evaluator implementation freeze, task `b26sb68lz` passed
