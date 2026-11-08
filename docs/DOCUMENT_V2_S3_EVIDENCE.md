@@ -272,6 +272,29 @@ no such extra test coverage is claimed. Audited source SHA-256:
 `314bafacfde48a1a455b92d38bce248757ea40cdfa229e18f419edef53d09abe`.
 Additional scope/font/factory work is not included in this acceptance.
 
+## Scoped native audio compilation (slice independently accepted)
+
+On 2026-11-08 `audiograph.CompileDomain` and its shared resource-free `PreflightDomain`
+passed independent read-only review by `a91a0421285b64f18` with no verified P0/P1/P2.
+The opaque DomainProgram retains the full original Document identity and indexes, requires exactly
+selected graph bindings, and binds owned scope/config/source/descriptor receipts separately from
+the unchanged DSP profile. Initial support rejects audio buses, selected rendering extensions,
+nonunit retime and selected-timeline transitions. The whole-document WAV source policy remains
+unchanged; the factory must reject unsupported full-document/range combinations before IO.
+
+An independent `math/big.Rat` interval oracle checked 840 origin/rate/first/count combinations with
+an instrumented block allocator. Rejected ranges made zero allocator and provider calls, including
+silent gaps and zero blocks. Zero blocks require a half-open in-range start; nonzero block exclusive
+end may equal requested end, but partial cells extending beyond it fail. Overlay normal three times
+and race once passed. Independent exact legacy/domain pan-automation parity passed at 16 times.
+Temporary reproduction: `/tmp/s3-audio-domain-audit-overlay.json`.
+
+Independent full audiograph normal/race/vet, integration normal tests for audiograph/wavsource/
+pcm16le/evaluator/conformance, wavsource/pcm16le race, domain tests ten times and diff checks passed.
+Tests ran on Darwin; no other runtime platform is claimed. Audited domain.go SHA-256:
+`653f80dc54b786f7ebe2e722e1fe7753e85c030f4debb86395dac0b03acb5101`.
+This accepts the audio slice only, not the reconstruction factory or S3 stage.
+
 ## Current integration gates
 
 After the resource ownership repair and evaluator implementation freeze, task `b26sb68lz` passed
