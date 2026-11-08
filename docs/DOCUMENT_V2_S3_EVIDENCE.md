@@ -295,6 +295,26 @@ Tests ran on Darwin; no other runtime platform is claimed. Audited domain.go SHA
 `653f80dc54b786f7ebe2e722e1fe7753e85c030f4debb86395dac0b03acb5101`.
 This accepts the audio slice only, not the reconstruction factory or S3 stage.
 
+## Reconstruction support scope (slice independently accepted)
+
+The private `selectScopes` gate runs only after joint owned Environment verification. It rejects
+multiple timelines, authored/planned transitions and buses, nonempty zero-tick domains, unsupported
+asset/track pairs, URI-only selected resources, omitted enabled clips (including out-of-range reuse
+of a selected asset), changed authored binding tuples and non-exact external/indirect-font closures.
+It retains original indexes/ranges and returns owned sorted visual/audio selections without IO.
+Native preflights still decide supported rendering properties; this gate is not S1 verification.
+
+Independent reviewer `a3a86eeaed4f2d6fa` closed with no verified P0/P1/P2, including a test-delta
+recheck using actual S1 Resolve and VerifyAgainstDocument for the indirect-font positive case.
+Focused normal/race tests and package vet passed. The initial parent fixture had overlapping clips
+(despite one being disabled); a later text fixture mixed Latin/Han under a Han script declaration.
+Both fixture errors were corrected before successful runs; neither was an implementation pass.
+No legacy fixture file was edited. This does not prove joint Environment/native factory execution.
+Audited SHA-256: scope.go `f711fbd009b24da83fdc72dc55aba3088376690be86789c033e58aa3f44e83a2`,
+scope_test.go `47933e8fc2b3bfbb9b6927d343959b89b837b5497a0c167b645349e8a7a832ed`.
+
+Accepted visual/source slice is committed at `ae7e2da`; accepted audio slice at `325f78a`.
+
 ## Current integration gates
 
 After the resource ownership repair and evaluator implementation freeze, task `b26sb68lz` passed
