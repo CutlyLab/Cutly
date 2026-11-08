@@ -343,6 +343,69 @@ Reviewed hashes supplied with the handoff:
 - `font.go`: `384de0802ed2f82e5391127c1a686829ea2874b357ba2e7a23a17fe7fde84fa2`
 - `font_test.go`: `02c511142c11b242ad8e98bf027b9dcbc912f97523abff15e32f11dfbd3dd566`
 
+## Semantic/native identity bridge (slice independently reviewed)
+
+Independent reviewer `a91a0421285b64f18` found no verified P0/P1/P2 in bridge.go/bridge_test.go.
+Frozen bridge tests passed independently ten normal and three race repetitions, including real
+nonempty WAV source evidence, gap versus disabled zero-tick domains, original/native identity
+separation, deep ownership, concurrent readers, scope/document mismatches and self-hash omission.
+The native audio receipt hash is verified in its original representation before explicitly projecting
+scope fields to lowercase wire names; the projection has a separate hash. WAV/audio source list
+cross-binding relies on the independently accepted exact enabled-closure scope gate, not pruning.
+
+The reviewer authored additional late-cancellation/panic, same-document probe mismatch and stdlib
+hash-preimage checks under `/tmp/s3-bridge-independent-overlay.json`, but their first execution was
+blocked by an actively edited preflight unused import. No supplemental pass, independent vet or
+full-package gate is claimed at this checkpoint. Earlier blocked font/codec work was untouched.
+Bridge is unsigned self-integrity evidence, not attestation, pixel/sample causality proof or durable
+authority. Factory/preflight and full S3 acceptance remain separate.
+
+Frozen hashes:
+
+- `bridge.go`: `3eee6deff69c5fe44248e68bba9fa44a7a92cc0de282edc2f9e777928e1040c1`
+- `bridge_test.go`: `f052598064f5875a05143dc72f5a39d8a285e1010e3b4b86c4478b2be63b1112`
+
+## Native reconstruction integration (implementation under independent review)
+
+The new host-owned Factory checks joint environment identity, supported whole enabled closure,
+current pins, explicit native configuration, source-local counts and aggregate logical budgets before
+resource callbacks. It then authorizes the persisted environment, independently snapshots and
+inspects bytes, builds real font lineage and native visual/WAV/audio programs, and cross-checks every
+actual source observation before publishing a Bundle. Bundle exposes persisted-clock frame and PCM
+operations and owned identity receipts, never native program/provider handles. A semantic/native
+Bridge keeps S2 selections separate from native descriptors, configurations and observed source
+manifests; its unsigned fingerprint is self-integrity, not durable authority or execution attestation.
+
+Independent source/guard review by `a3a86eeaed4f2d6fa` found no verified P0/P1/P2 in factory.go,
+render.go and render_test.go; scoped Bundle normal/race tests passed. This preliminary review did
+not accept preflight, bridge or mixed restart integration. Their separate reviews remain active.
+Parent Bundle tests also passed ten repetitions. Existing conformance fixture paths remain unchanged.
+
+The mixed fixture author reports a real same-Document PNG/vector/pinned-font/WAV reconstruction,
+nonzero PCM and fresh-process durable-store restart passing, with full reconstruction package
+normal/race/vet passing. Final fault-test hardening and independent verification are pending; these
+are implementer results, not S3 acceptance. Initial concurrent compilation failures (unfinished helper,
+fixture imports/index fields) and fixture failures (nonzero seed, unsorted host capability declarations)
+were corrected rather than weakening production validation. Parent full integration task `b9v86ksn3` passed the normal suite, then failed the race build on
+an actively edited preflight import (`strings` temporarily unused); vet/tidy were not reached.
+These results predate the final admission repairs and are not synchronized acceptance evidence.
+Four-target reconstruction task `b17yghma7` passed Linux/amd64 and Linux/386
+compile-only checks, then failed compiling an actively edited factory test (`good` temporarily
+unused) on the Windows step; wasm was not reached. A synchronized rerun is required.
+
+Independent preflight review identified additional early-admission gaps: compositor-only preflight
+missed nested text-native configuration minima, source document measurements differed from the
+evaluator snapshot measurement, and nil-binding audio preflight did not enforce Audio.MaxBindings.
+Further source review narrowed the document-measurement issue to WAV limits (the visual compositor
+already uses the conservative source-style measure), and identified WAV retained-size admission and
+document-known vector limits that also need pre-callback checks. The preflight owner is repairing
+these with no-callback regressions; independent closure is pending. No previous passing focused test
+is treated as evidence that these gaps were absent.
+
+The earlier interrupted codec repair review still gates S3 exit. None of these new implementation or
+review tasks substitutes for it. Temporal video, MP4/Evidence v2, scheduling/worker execution and the
+public SDK/Player lifecycle remain downstream work, not features delivered by this package.
+
 ## Current integration gates
 
 After the resource ownership repair and evaluator implementation freeze, task `b26sb68lz` passed
