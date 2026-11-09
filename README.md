@@ -8,11 +8,15 @@
 A Chrome-free video editing SDK built on versioned documents, exact time,
 typed edits, and verifiable renders.
 
-<!-- CUTLY_LAUNCH_FILM -->
-https://github.com/user-attachments/assets/dddd4cf1-ead7-4894-86bd-3c5ed1ac3346
-<!-- /CUTLY_LAUNCH_FILM -->
+[![Cutly native rendering demo: three scenes showing native image, vector, text, transition, and audio composition](videos/cutly-native-demo/cover.png)](videos/cutly-native-demo/cutly-native-demo.mp4)
 
-**[Download the 21-second Cutly launch film](videos/cutly-launch/renders/cutly-launch.mp4)**
+**[Play the 6-second native Cutly demo](videos/cutly-native-demo/cutly-native-demo.mp4)** —
+three image assets, vector composition, pinned-font text, keyframed opacity,
+two dissolves, an audio bus and limiter, H.264/AAC output, and Evidence v2.
+
+[Evidence](videos/cutly-native-demo/cutly-native-demo.mp4.evidence.json) ·
+[Render metadata](videos/cutly-native-demo/cutly-native-demo.metadata.json) ·
+[21-second launch film](videos/cutly-launch/renders/cutly-launch.mp4)
 
 [Quick Start](#quick-start) · [Architecture](#how-it-works) ·
 [SDKs](#sdks-and-tools) · [CLI](#cli-and-daemon) · [Status](#current-status) ·

@@ -158,6 +158,21 @@ func assemblyNativeV2(t *testing.T, samples int64) *assemblyFixtureNativeV2 {
 	}
 	return &assemblyFixtureNativeV2{b: b, r: r, v: v, data: data, o: o}
 }
+
+func TestChunkAssemblerCapabilitiesV2AdvertisesImplementedDissolve(t *testing.T) {
+	caps, err := ChunkAssemblerCapabilitiesV2(digestV2([]byte("sdk")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := videoedit.CapabilityID(documentv2.TransitionDissolveV1)
+	for _, feature := range caps.Features {
+		if feature == want {
+			return
+		}
+	}
+	t.Fatalf("missing implemented capability %q", want)
+}
+
 func (f *assemblyFixtureNativeV2) source() ChunkSourceV2 {
 	return sourceFuncV2(func(ctx context.Context, d evidence.ChunkDescriptorV2) (io.ReadCloser, error) {
 		return io.NopCloser(bytes.NewReader(f.data[d.CacheKey])), nil

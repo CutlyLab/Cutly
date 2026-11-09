@@ -1,0 +1,4712 @@
+{
+  "document": {
+    "schema_version": 2,
+    "id": "cutly-readme-demo",
+    "revision": 1,
+    "assets": [
+      {
+        "id": "bg-1",
+        "kind": "image",
+        "uri": "cas://bg-1",
+        "content_hash": "sha256:4038aa49fa6771d6db8738093f0d13c2e153cf6b75e956ac3a55f545165392eb"
+      },
+      {
+        "id": "bg-2",
+        "kind": "image",
+        "uri": "cas://bg-2",
+        "content_hash": "sha256:6436db1080c6fa487d19723d710500d8cf215e9c1635f16e4eec051e1cc94fc8"
+      },
+      {
+        "id": "bg-3",
+        "kind": "image",
+        "uri": "cas://bg-3",
+        "content_hash": "sha256:d4533eebe16cc7855ff4812315dadeb3efdee7cbe99192e7eba7f62b97c4e153"
+      },
+      {
+        "id": "font",
+        "kind": "font",
+        "uri": "cas://font",
+        "content_hash": "sha256:948b2830a583dbc158bb97e6c7d47732e16cb3ae1264547dc7c92ac3eee481ec"
+      },
+      {
+        "id": "music",
+        "kind": "audio",
+        "uri": "cas://music",
+        "content_hash": "sha256:55b7df65f1d398a7228c90076947cadf3609faec8e32389321ec7340f552cda0",
+        "duration": {
+          "value": 6,
+          "rate": 1
+        }
+      },
+      {
+        "id": "card",
+        "kind": "vector",
+        "vector": {
+          "profile": "cutly.vector.path-viewport-px.v2",
+          "view_box": {
+            "x": {
+              "numerator": 0,
+              "denominator": 1
+            },
+            "y": {
+              "numerator": 0,
+              "denominator": 1
+            },
+            "width": {
+              "numerator": 560,
+              "denominator": 1
+            },
+            "height": {
+              "numerator": 132,
+              "denominator": 1
+            }
+          },
+          "viewport": {
+            "width_pixels": 560,
+            "height_pixels": 132
+          },
+          "paths": [
+            {
+              "id": "panel",
+              "commands": [
+                {
+                  "op": "move_to",
+                  "points": [
+                    {
+                      "x": {
+                        "numerator": 0,
+                        "denominator": 1
+                      },
+                      "y": {
+                        "numerator": 0,
+                        "denominator": 1
+                      }
+                    }
+                  ]
+                },
+                {
+                  "op": "line_to",
+                  "points": [
+                    {
+                      "x": {
+                        "numerator": 560,
+                        "denominator": 1
+                      },
+                      "y": {
+                        "numerator": 0,
+                        "denominator": 1
+                      }
+                    }
+                  ]
+                },
+                {
+                  "op": "line_to",
+                  "points": [
+                    {
+                      "x": {
+                        "numerator": 560,
+                        "denominator": 1
+                      },
+                      "y": {
+                        "numerator": 132,
+                        "denominator": 1
+                      }
+                    }
+                  ]
+                },
+                {
+                  "op": "line_to",
+                  "points": [
+                    {
+                      "x": {
+                        "numerator": 0,
+                        "denominator": 1
+                      },
+                      "y": {
+                        "numerator": 132,
+                        "denominator": 1
+                      }
+                    }
+                  ]
+                },
+                {
+                  "op": "close"
+                }
+              ],
+              "fill_rule": "nonzero",
+              "fill": {
+                "r": 1500,
+                "g": 3000,
+                "b": 6000,
+                "a": 26000
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "title-1",
+        "kind": "text",
+        "text": {
+          "profile": "cutly.text.pinned-font-viewport-px.v2",
+          "text": "CUTLY",
+          "font_asset_id": "font",
+          "font_size": {
+            "numerator": 84,
+            "denominator": 1
+          },
+          "line_height": {
+            "numerator": 100,
+            "denominator": 1
+          },
+          "viewport": {
+            "width_pixels": 540,
+            "height_pixels": 112
+          },
+          "fill": {
+            "r": 65535,
+            "g": 65535,
+            "b": 65535,
+            "a": 65535
+          },
+          "language": "en",
+          "script": "Latn",
+          "direction": "ltr",
+          "alignment": "start"
+        }
+      },
+      {
+        "id": "title-2",
+        "kind": "text",
+        "text": {
+          "profile": "cutly.text.pinned-font-viewport-px.v2",
+          "text": "COMPOSE. TRANSITION. MIX.",
+          "font_asset_id": "font",
+          "font_size": {
+            "numerator": 32,
+            "denominator": 1
+          },
+          "line_height": {
+            "numerator": 54,
+            "denominator": 1
+          },
+          "viewport": {
+            "width_pixels": 540,
+            "height_pixels": 112
+          },
+          "fill": {
+            "r": 26000,
+            "g": 65535,
+            "b": 59000,
+            "a": 65535
+          },
+          "language": "en",
+          "script": "Latn",
+          "direction": "ltr",
+          "alignment": "start"
+        }
+      },
+      {
+        "id": "title-3",
+        "kind": "text",
+        "text": {
+          "profile": "cutly.text.pinned-font-viewport-px.v2",
+          "text": "VERIFIABLE VIDEO SDK",
+          "font_asset_id": "font",
+          "font_size": {
+            "numerator": 38,
+            "denominator": 1
+          },
+          "line_height": {
+            "numerator": 54,
+            "denominator": 1
+          },
+          "viewport": {
+            "width_pixels": 540,
+            "height_pixels": 112
+          },
+          "fill": {
+            "r": 65535,
+            "g": 50000,
+            "b": 15000,
+            "a": 65535
+          },
+          "language": "en",
+          "script": "Latn",
+          "direction": "ltr",
+          "alignment": "start"
+        }
+      }
+    ],
+    "timelines": [
+      {
+        "id": "main",
+        "name": "README demo",
+        "tracks": [
+          {
+            "id": "backgrounds",
+            "kind": "video",
+            "clips": [
+              {
+                "id": "bg-clip-1",
+                "asset_id": "bg-1",
+                "timeline_range": {
+                  "start": {
+                    "value": 0,
+                    "rate": 1
+                  },
+                  "duration": {
+                    "value": 2,
+                    "rate": 1
+                  }
+                },
+                "source_range": {
+                  "start": {
+                    "value": 0,
+                    "rate": 1
+                  },
+                  "duration": {
+                    "value": 2,
+                    "rate": 1
+                  }
+                }
+              },
+              {
+                "id": "bg-clip-2",
+                "asset_id": "bg-2",
+                "timeline_range": {
+                  "start": {
+                    "value": 2,
+                    "rate": 1
+                  },
+                  "duration": {
+                    "value": 2,
+                    "rate": 1
+                  }
+                },
+                "source_range": {
+                  "start": {
+                    "value": 2,
+                    "rate": 1
+                  },
+                  "duration": {
+                    "value": 2,
+                    "rate": 1
+                  }
+                }
+              },
+              {
+                "id": "bg-clip-3",
+                "asset_id": "bg-3",
+                "timeline_range": {
+                  "start": {
+                    "value": 4,
+                    "rate": 1
+                  },
+                  "duration": {
+                    "value": 2,
+                    "rate": 1
+                  }
+                },
+                "source_range": {
+                  "start": {
+                    "value": 4,
+                    "rate": 1
+                  },
+                  "duration": {
+                    "value": 2,
+                    "rate": 1
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "id": "card-layer",
+            "kind": "vector",
+            "clips": [
+              {
+                "id": "card-clip",
+                "asset_id": "card",
+                "timeline_range": {
+                  "start": {
+                    "value": 0,
+                    "rate": 1
+                  },
+                  "duration": {
+                    "value": 6,
+                    "rate": 1
+                  }
+                },
+                "source_range": {
+                  "start": {
+                    "value": 0,
+                    "rate": 1
+                  },
+                  "duration": {
+                    "value": 6,
+                    "rate": 1
+                  }
+                },
+                "property_set": {
+                  "transform": {
+                    "position": {
+                      "x": {
+                        "numerator": 40,
+                        "denominator": 1
+                      },
+                      "y": {
+                        "numerator": 116,
+                        "denominator": 1
+                      }
+                    },
+                    "scale": {
+                      "x": {
+                        "numerator": 1,
+                        "denominator": 1
+                      },
+                      "y": {
+                        "numerator": 1,
+                        "denominator": 1
+                      }
+                    },
+                    "rotation_degrees": {
+                      "numerator": 0,
+                      "denominator": 1
+                    },
+                    "anchor": {
+                      "x": {
+                        "numerator": 0,
+                        "denominator": 1
+                      },
+                      "y": {
+                        "numerator": 0,
+                        "denominator": 1
+                      }
+                    }
+                  },
+                  "opacity": {
+                    "value": {
+                      "numerator": 1,
+                      "denominator": 1
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "id": "titles",
+            "kind": "text",
+            "clips": [
+              {
+                "id": "title-clip-1",
+                "asset_id": "title-1",
+                "timeline_range": {
+                  "start": {
+                    "value": 0,
+                    "rate": 1
+                  },
+                  "duration": {
+                    "value": 2,
+                    "rate": 1
+                  }
+                },
+                "source_range": {
+                  "start": {
+                    "value": 0,
+                    "rate": 1
+                  },
+                  "duration": {
+                    "value": 2,
+                    "rate": 1
+                  }
+                },
+                "property_set": {
+                  "transform": {
+                    "position": {
+                      "x": {
+                        "numerator": 54,
+                        "denominator": 1
+                      },
+                      "y": {
+                        "numerator": 132,
+                        "denominator": 1
+                      }
+                    },
+                    "scale": {
+                      "x": {
+                        "numerator": 1,
+                        "denominator": 1
+                      },
+                      "y": {
+                        "numerator": 1,
+                        "denominator": 1
+                      }
+                    },
+                    "rotation_degrees": {
+                      "numerator": 0,
+                      "denominator": 1
+                    },
+                    "anchor": {
+                      "x": {
+                        "numerator": 0,
+                        "denominator": 1
+                      },
+                      "y": {
+                        "numerator": 0,
+                        "denominator": 1
+                      }
+                    }
+                  },
+                  "opacity": {
+                    "value": {
+                      "numerator": 1,
+                      "denominator": 1
+                    }
+                  }
+                },
+                "keyframe_lanes": [
+                  {
+                    "id": "title-clip-1-opacity",
+                    "target": "opacity.value",
+                    "value_type": "scalar",
+                    "keyframes": [
+                      {
+                        "offset": {
+                          "value": 0,
+                          "rate": 1
+                        },
+                        "value": {
+                          "scalar": {
+                            "numerator": 0,
+                            "denominator": 1
+                          }
+                        },
+                        "interpolation": "linear"
+                      },
+                      {
+                        "offset": {
+                          "value": 1,
+                          "rate": 4
+                        },
+                        "value": {
+                          "scalar": {
+                            "numerator": 1,
+                            "denominator": 1
+                          }
+                        },
+                        "interpolation": "linear"
+                      },
+                      {
+                        "offset": {
+                          "value": 7,
+                          "rate": 4
+                        },
+                        "value": {
+                          "scalar": {
+                            "numerator": 1,
+                            "denominator": 1
+                          }
+                        },
+                        "interpolation": "linear"
+                      },
+                      {
+                        "offset": {
+                          "value": 2,
+                          "rate": 1
+                        },
+                        "value": {
+                          "scalar": {
+                            "numerator": 0,
+                            "denominator": 1
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "title-clip-2",
+                "asset_id": "title-2",
+                "timeline_range": {
+                  "start": {
+                    "value": 2,
+                    "rate": 1
+                  },
+                  "duration": {
+                    "value": 2,
+                    "rate": 1
+                  }
+                },
+                "source_range": {
+                  "start": {
+                    "value": 2,
+                    "rate": 1
+                  },
+                  "duration": {
+                    "value": 2,
+                    "rate": 1
+                  }
+                },
+                "property_set": {
+                  "transform": {
+                    "position": {
+                      "x": {
+                        "numerator": 54,
+                        "denominator": 1
+                      },
+                      "y": {
+                        "numerator": 132,
+                        "denominator": 1
+                      }
+                    },
+                    "scale": {
+                      "x": {
+                        "numerator": 1,
+                        "denominator": 1
+                      },
+                      "y": {
+                        "numerator": 1,
+                        "denominator": 1
+                      }
+                    },
+                    "rotation_degrees": {
+                      "numerator": 0,
+                      "denominator": 1
+                    },
+                    "anchor": {
+                      "x": {
+                        "numerator": 0,
+                        "denominator": 1
+                      },
+                      "y": {
+                        "numerator": 0,
+                        "denominator": 1
+                      }
+                    }
+                  },
+                  "opacity": {
+                    "value": {
+                      "numerator": 1,
+                      "denominator": 1
+                    }
+                  }
+                },
+                "keyframe_lanes": [
+                  {
+                    "id": "title-clip-2-opacity",
+                    "target": "opacity.value",
+                    "value_type": "scalar",
+                    "keyframes": [
+                      {
+                        "offset": {
+                          "value": 0,
+                          "rate": 1
+                        },
+                        "value": {
+                          "scalar": {
+                            "numerator": 0,
+                            "denominator": 1
+                          }
+                        },
+                        "interpolation": "linear"
+                      },
+                      {
+                        "offset": {
+                          "value": 1,
+                          "rate": 4
+                        },
+                        "value": {
+                          "scalar": {
+                            "numerator": 1,
+                            "denominator": 1
+                          }
+                        },
+                        "interpolation": "linear"
+                      },
+                      {
+                        "offset": {
+                          "value": 7,
+                          "rate": 4
+                        },
+                        "value": {
+                          "scalar": {
+                            "numerator": 1,
+                            "denominator": 1
+                          }
+                        },
+                        "interpolation": "linear"
+                      },
+                      {
+                        "offset": {
+                          "value": 2,
+                          "rate": 1
+                        },
+                        "value": {
+                          "scalar": {
+                            "numerator": 0,
+                            "denominator": 1
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "title-clip-3",
+                "asset_id": "title-3",
+                "timeline_range": {
+                  "start": {
+                    "value": 4,
+                    "rate": 1
+                  },
+                  "duration": {
+                    "value": 2,
+                    "rate": 1
+                  }
+                },
+                "source_range": {
+                  "start": {
+                    "value": 4,
+                    "rate": 1
+                  },
+                  "duration": {
+                    "value": 2,
+                    "rate": 1
+                  }
+                },
+                "property_set": {
+                  "transform": {
+                    "position": {
+                      "x": {
+                        "numerator": 54,
+                        "denominator": 1
+                      },
+                      "y": {
+                        "numerator": 132,
+                        "denominator": 1
+                      }
+                    },
+                    "scale": {
+                      "x": {
+                        "numerator": 1,
+                        "denominator": 1
+                      },
+                      "y": {
+                        "numerator": 1,
+                        "denominator": 1
+                      }
+                    },
+                    "rotation_degrees": {
+                      "numerator": 0,
+                      "denominator": 1
+                    },
+                    "anchor": {
+                      "x": {
+                        "numerator": 0,
+                        "denominator": 1
+                      },
+                      "y": {
+                        "numerator": 0,
+                        "denominator": 1
+                      }
+                    }
+                  },
+                  "opacity": {
+                    "value": {
+                      "numerator": 1,
+                      "denominator": 1
+                    }
+                  }
+                },
+                "keyframe_lanes": [
+                  {
+                    "id": "title-clip-3-opacity",
+                    "target": "opacity.value",
+                    "value_type": "scalar",
+                    "keyframes": [
+                      {
+                        "offset": {
+                          "value": 0,
+                          "rate": 1
+                        },
+                        "value": {
+                          "scalar": {
+                            "numerator": 0,
+                            "denominator": 1
+                          }
+                        },
+                        "interpolation": "linear"
+                      },
+                      {
+                        "offset": {
+                          "value": 1,
+                          "rate": 4
+                        },
+                        "value": {
+                          "scalar": {
+                            "numerator": 1,
+                            "denominator": 1
+                          }
+                        },
+                        "interpolation": "linear"
+                      },
+                      {
+                        "offset": {
+                          "value": 7,
+                          "rate": 4
+                        },
+                        "value": {
+                          "scalar": {
+                            "numerator": 1,
+                            "denominator": 1
+                          }
+                        },
+                        "interpolation": "linear"
+                      },
+                      {
+                        "offset": {
+                          "value": 2,
+                          "rate": 1
+                        },
+                        "value": {
+                          "scalar": {
+                            "numerator": 0,
+                            "denominator": 1
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "soundtrack",
+            "kind": "audio",
+            "clips": [
+              {
+                "id": "music-clip",
+                "asset_id": "music",
+                "timeline_range": {
+                  "start": {
+                    "value": 0,
+                    "rate": 1
+                  },
+                  "duration": {
+                    "value": 6,
+                    "rate": 1
+                  }
+                },
+                "source_range": {
+                  "start": {
+                    "value": 0,
+                    "rate": 1
+                  },
+                  "duration": {
+                    "value": 6,
+                    "rate": 1
+                  }
+                }
+              }
+            ],
+            "audio_bus_id": "music-bus"
+          }
+        ],
+        "transitions": [
+          {
+            "id": "dissolve-1",
+            "profile": "cutly.transition.dissolve.v1",
+            "outgoing_clip_id": "bg-clip-1",
+            "incoming_clip_id": "bg-clip-2",
+            "pre_duration": {
+              "value": 1,
+              "rate": 4
+            },
+            "post_duration": {
+              "value": 1,
+              "rate": 4
+            }
+          },
+          {
+            "id": "dissolve-2",
+            "profile": "cutly.transition.dissolve.v1",
+            "outgoing_clip_id": "bg-clip-2",
+            "incoming_clip_id": "bg-clip-3",
+            "pre_duration": {
+              "value": 1,
+              "rate": 4
+            },
+            "post_duration": {
+              "value": 1,
+              "rate": 4
+            }
+          }
+        ]
+      }
+    ],
+    "audio_buses": [
+      {
+        "id": "music-bus",
+        "kind": "group",
+        "parent_bus_id": "master",
+        "properties": {
+          "gain_linear": {
+            "numerator": 3,
+            "denominator": 4
+          },
+          "pan": {
+            "numerator": 0,
+            "denominator": 1
+          }
+        }
+      },
+      {
+        "id": "master",
+        "kind": "master",
+        "properties": {
+          "gain_linear": {
+            "numerator": 1,
+            "denominator": 1
+          },
+          "pan": {
+            "numerator": 0,
+            "denominator": 1
+          },
+          "sample_peak_limiter": {
+            "ceiling_linear": {
+              "numerator": 9,
+              "denominator": 10
+            }
+          }
+        }
+      }
+    ]
+  },
+  "plan": {
+    "schema_version": 1,
+    "profile": "cutly.semantic.document-v2-render-plan.v1",
+    "canonical_json_profile": "cutly.json.canonical-integer.v1",
+    "document_id": "cutly-readme-demo",
+    "revision": 1,
+    "document_hash": "sha256:b06edb6818d332468395b6a8402cf5858f0ea993382c374d0b40c51942aeb6d8",
+    "timeline_id": "main",
+    "requested_range": {
+      "start": {
+        "value": 0,
+        "rate": 1
+      },
+      "duration": {
+        "value": 6,
+        "rate": 1
+      }
+    },
+    "target": {
+      "timeline_id": "main",
+      "width": 640,
+      "height": 360,
+      "frame_clock": {
+        "origin": {
+          "value": 0,
+          "rate": 1
+        },
+        "frames_per_second": {
+          "value": 24,
+          "rate": 1
+        }
+      },
+      "sample_clock": {
+        "origin": {
+          "value": 0,
+          "rate": 1
+        },
+        "samples_per_second": 48000
+      },
+      "channels": 2,
+      "pixel_format": "rgba16",
+      "color_space": "linear-srgb"
+    },
+    "frame_range": {
+      "first": 0,
+      "count": 144
+    },
+    "sample_range": {
+      "first": 0,
+      "count": 288000
+    },
+    "required_capabilities": {
+      "track_kinds": [
+        "audio",
+        "text",
+        "vector",
+        "video"
+      ],
+      "asset_kinds": [
+        "audio",
+        "font",
+        "image",
+        "text",
+        "vector"
+      ],
+      "features": [
+        "cutly.audio.gain.v1",
+        "cutly.audio.limiter.sample-peak-instant.v1",
+        "cutly.audio.pan.v1",
+        "cutly.audio.route.v1",
+        "cutly.interpolation.linear.v1",
+        "cutly.keyframes.v1",
+        "cutly.opacity.v1",
+        "cutly.text.pinned-font-viewport-px.v2",
+        "cutly.transform.v1",
+        "cutly.transition.dissolve.v1",
+        "cutly.vector.path-viewport-px.v2"
+      ]
+    },
+    "visual": [
+      {
+        "binding": {
+          "track_id": "backgrounds",
+          "clip_id": "bg-clip-1",
+          "asset_id": "bg-1",
+          "track_kind": "video",
+          "asset_kind": "image",
+          "track_index": 0,
+          "clip_index": 0,
+          "timeline_range": {
+            "start": {
+              "value": 0,
+              "rate": 1
+            },
+            "duration": {
+              "value": 2,
+              "rate": 1
+            }
+          },
+          "source_range": {
+            "start": {
+              "value": 0,
+              "rate": 1
+            },
+            "duration": {
+              "value": 2,
+              "rate": 1
+            }
+          },
+          "font_asset_id": "",
+          "audio_bus_id": ""
+        },
+        "visible_timeline_range": {
+          "start": {
+            "value": 0,
+            "rate": 1
+          },
+          "duration": {
+            "value": 2,
+            "rate": 1
+          }
+        },
+        "visible_source_range": {
+          "start": {
+            "value": 0,
+            "rate": 1
+          },
+          "duration": {
+            "value": 2,
+            "rate": 1
+          }
+        }
+      },
+      {
+        "binding": {
+          "track_id": "backgrounds",
+          "clip_id": "bg-clip-2",
+          "asset_id": "bg-2",
+          "track_kind": "video",
+          "asset_kind": "image",
+          "track_index": 0,
+          "clip_index": 1,
+          "timeline_range": {
+            "start": {
+              "value": 2,
+              "rate": 1
+            },
+            "duration": {
+              "value": 2,
+              "rate": 1
+            }
+          },
+          "source_range": {
+            "start": {
+              "value": 2,
+              "rate": 1
+            },
+            "duration": {
+              "value": 2,
+              "rate": 1
+            }
+          },
+          "font_asset_id": "",
+          "audio_bus_id": ""
+        },
+        "visible_timeline_range": {
+          "start": {
+            "value": 2,
+            "rate": 1
+          },
+          "duration": {
+            "value": 2,
+            "rate": 1
+          }
+        },
+        "visible_source_range": {
+          "start": {
+            "value": 2,
+            "rate": 1
+          },
+          "duration": {
+            "value": 2,
+            "rate": 1
+          }
+        }
+      },
+      {
+        "binding": {
+          "track_id": "backgrounds",
+          "clip_id": "bg-clip-3",
+          "asset_id": "bg-3",
+          "track_kind": "video",
+          "asset_kind": "image",
+          "track_index": 0,
+          "clip_index": 2,
+          "timeline_range": {
+            "start": {
+              "value": 4,
+              "rate": 1
+            },
+            "duration": {
+              "value": 2,
+              "rate": 1
+            }
+          },
+          "source_range": {
+            "start": {
+              "value": 4,
+              "rate": 1
+            },
+            "duration": {
+              "value": 2,
+              "rate": 1
+            }
+          },
+          "font_asset_id": "",
+          "audio_bus_id": ""
+        },
+        "visible_timeline_range": {
+          "start": {
+            "value": 4,
+            "rate": 1
+          },
+          "duration": {
+            "value": 2,
+            "rate": 1
+          }
+        },
+        "visible_source_range": {
+          "start": {
+            "value": 4,
+            "rate": 1
+          },
+          "duration": {
+            "value": 2,
+            "rate": 1
+          }
+        }
+      },
+      {
+        "binding": {
+          "track_id": "card-layer",
+          "clip_id": "card-clip",
+          "asset_id": "card",
+          "track_kind": "vector",
+          "asset_kind": "vector",
+          "track_index": 1,
+          "clip_index": 0,
+          "timeline_range": {
+            "start": {
+              "value": 0,
+              "rate": 1
+            },
+            "duration": {
+              "value": 6,
+              "rate": 1
+            }
+          },
+          "source_range": {
+            "start": {
+              "value": 0,
+              "rate": 1
+            },
+            "duration": {
+              "value": 6,
+              "rate": 1
+            }
+          },
+          "font_asset_id": "",
+          "audio_bus_id": ""
+        },
+        "visible_timeline_range": {
+          "start": {
+            "value": 0,
+            "rate": 1
+          },
+          "duration": {
+            "value": 6,
+            "rate": 1
+          }
+        },
+        "visible_source_range": {
+          "start": {
+            "value": 0,
+            "rate": 1
+          },
+          "duration": {
+            "value": 6,
+            "rate": 1
+          }
+        }
+      },
+      {
+        "binding": {
+          "track_id": "titles",
+          "clip_id": "title-clip-1",
+          "asset_id": "title-1",
+          "track_kind": "text",
+          "asset_kind": "text",
+          "track_index": 2,
+          "clip_index": 0,
+          "timeline_range": {
+            "start": {
+              "value": 0,
+              "rate": 1
+            },
+            "duration": {
+              "value": 2,
+              "rate": 1
+            }
+          },
+          "source_range": {
+            "start": {
+              "value": 0,
+              "rate": 1
+            },
+            "duration": {
+              "value": 2,
+              "rate": 1
+            }
+          },
+          "font_asset_id": "font",
+          "audio_bus_id": ""
+        },
+        "visible_timeline_range": {
+          "start": {
+            "value": 0,
+            "rate": 1
+          },
+          "duration": {
+            "value": 2,
+            "rate": 1
+          }
+        },
+        "visible_source_range": {
+          "start": {
+            "value": 0,
+            "rate": 1
+          },
+          "duration": {
+            "value": 2,
+            "rate": 1
+          }
+        }
+      },
+      {
+        "binding": {
+          "track_id": "titles",
+          "clip_id": "title-clip-2",
+          "asset_id": "title-2",
+          "track_kind": "text",
+          "asset_kind": "text",
+          "track_index": 2,
+          "clip_index": 1,
+          "timeline_range": {
+            "start": {
+              "value": 2,
+              "rate": 1
+            },
+            "duration": {
+              "value": 2,
+              "rate": 1
+            }
+          },
+          "source_range": {
+            "start": {
+              "value": 2,
+              "rate": 1
+            },
+            "duration": {
+              "value": 2,
+              "rate": 1
+            }
+          },
+          "font_asset_id": "font",
+          "audio_bus_id": ""
+        },
+        "visible_timeline_range": {
+          "start": {
+            "value": 2,
+            "rate": 1
+          },
+          "duration": {
+            "value": 2,
+            "rate": 1
+          }
+        },
+        "visible_source_range": {
+          "start": {
+            "value": 2,
+            "rate": 1
+          },
+          "duration": {
+            "value": 2,
+            "rate": 1
+          }
+        }
+      },
+      {
+        "binding": {
+          "track_id": "titles",
+          "clip_id": "title-clip-3",
+          "asset_id": "title-3",
+          "track_kind": "text",
+          "asset_kind": "text",
+          "track_index": 2,
+          "clip_index": 2,
+          "timeline_range": {
+            "start": {
+              "value": 4,
+              "rate": 1
+            },
+            "duration": {
+              "value": 2,
+              "rate": 1
+            }
+          },
+          "source_range": {
+            "start": {
+              "value": 4,
+              "rate": 1
+            },
+            "duration": {
+              "value": 2,
+              "rate": 1
+            }
+          },
+          "font_asset_id": "font",
+          "audio_bus_id": ""
+        },
+        "visible_timeline_range": {
+          "start": {
+            "value": 4,
+            "rate": 1
+          },
+          "duration": {
+            "value": 2,
+            "rate": 1
+          }
+        },
+        "visible_source_range": {
+          "start": {
+            "value": 4,
+            "rate": 1
+          },
+          "duration": {
+            "value": 2,
+            "rate": 1
+          }
+        }
+      }
+    ],
+    "audio": [
+      {
+        "binding": {
+          "track_id": "soundtrack",
+          "clip_id": "music-clip",
+          "asset_id": "music",
+          "track_kind": "audio",
+          "asset_kind": "audio",
+          "track_index": 3,
+          "clip_index": 0,
+          "timeline_range": {
+            "start": {
+              "value": 0,
+              "rate": 1
+            },
+            "duration": {
+              "value": 6,
+              "rate": 1
+            }
+          },
+          "source_range": {
+            "start": {
+              "value": 0,
+              "rate": 1
+            },
+            "duration": {
+              "value": 6,
+              "rate": 1
+            }
+          },
+          "font_asset_id": "",
+          "audio_bus_id": "music-bus"
+        },
+        "visible_timeline_range": {
+          "start": {
+            "value": 0,
+            "rate": 1
+          },
+          "duration": {
+            "value": 6,
+            "rate": 1
+          }
+        },
+        "visible_source_range": {
+          "start": {
+            "value": 0,
+            "rate": 1
+          },
+          "duration": {
+            "value": 6,
+            "rate": 1
+          }
+        }
+      }
+    ],
+    "transitions": [
+      {
+        "transition_id": "dissolve-1",
+        "transition_index": 0,
+        "profile": "cutly.transition.dissolve.v1",
+        "cut": {
+          "value": 2,
+          "rate": 1
+        },
+        "pre_duration": {
+          "value": 1,
+          "rate": 4
+        },
+        "post_duration": {
+          "value": 1,
+          "rate": 4
+        },
+        "timeline_range": {
+          "start": {
+            "value": 7,
+            "rate": 4
+          },
+          "duration": {
+            "value": 1,
+            "rate": 2
+          }
+        },
+        "active_timeline_range": {
+          "start": {
+            "value": 7,
+            "rate": 4
+          },
+          "duration": {
+            "value": 1,
+            "rate": 2
+          }
+        },
+        "outgoing": {
+          "binding": {
+            "track_id": "backgrounds",
+            "clip_id": "bg-clip-1",
+            "asset_id": "bg-1",
+            "track_kind": "video",
+            "asset_kind": "image",
+            "track_index": 0,
+            "clip_index": 0,
+            "timeline_range": {
+              "start": {
+                "value": 0,
+                "rate": 1
+              },
+              "duration": {
+                "value": 2,
+                "rate": 1
+              }
+            },
+            "source_range": {
+              "start": {
+                "value": 0,
+                "rate": 1
+              },
+              "duration": {
+                "value": 2,
+                "rate": 1
+              }
+            },
+            "font_asset_id": "",
+            "audio_bus_id": ""
+          },
+          "sampled_timeline_range": {
+            "start": {
+              "value": 7,
+              "rate": 4
+            },
+            "duration": {
+              "value": 1,
+              "rate": 2
+            }
+          },
+          "sampled_source_range": {
+            "start": {
+              "value": 7,
+              "rate": 4
+            },
+            "duration": {
+              "value": 1,
+              "rate": 2
+            }
+          },
+          "handles": []
+        },
+        "incoming": {
+          "binding": {
+            "track_id": "backgrounds",
+            "clip_id": "bg-clip-2",
+            "asset_id": "bg-2",
+            "track_kind": "video",
+            "asset_kind": "image",
+            "track_index": 0,
+            "clip_index": 1,
+            "timeline_range": {
+              "start": {
+                "value": 2,
+                "rate": 1
+              },
+              "duration": {
+                "value": 2,
+                "rate": 1
+              }
+            },
+            "source_range": {
+              "start": {
+                "value": 2,
+                "rate": 1
+              },
+              "duration": {
+                "value": 2,
+                "rate": 1
+              }
+            },
+            "font_asset_id": "",
+            "audio_bus_id": ""
+          },
+          "sampled_timeline_range": {
+            "start": {
+              "value": 7,
+              "rate": 4
+            },
+            "duration": {
+              "value": 1,
+              "rate": 2
+            }
+          },
+          "sampled_source_range": {
+            "start": {
+              "value": 7,
+              "rate": 4
+            },
+            "duration": {
+              "value": 1,
+              "rate": 2
+            }
+          },
+          "handles": []
+        }
+      },
+      {
+        "transition_id": "dissolve-2",
+        "transition_index": 1,
+        "profile": "cutly.transition.dissolve.v1",
+        "cut": {
+          "value": 4,
+          "rate": 1
+        },
+        "pre_duration": {
+          "value": 1,
+          "rate": 4
+        },
+        "post_duration": {
+          "value": 1,
+          "rate": 4
+        },
+        "timeline_range": {
+          "start": {
+            "value": 15,
+            "rate": 4
+          },
+          "duration": {
+            "value": 1,
+            "rate": 2
+          }
+        },
+        "active_timeline_range": {
+          "start": {
+            "value": 15,
+            "rate": 4
+          },
+          "duration": {
+            "value": 1,
+            "rate": 2
+          }
+        },
+        "outgoing": {
+          "binding": {
+            "track_id": "backgrounds",
+            "clip_id": "bg-clip-2",
+            "asset_id": "bg-2",
+            "track_kind": "video",
+            "asset_kind": "image",
+            "track_index": 0,
+            "clip_index": 1,
+            "timeline_range": {
+              "start": {
+                "value": 2,
+                "rate": 1
+              },
+              "duration": {
+                "value": 2,
+                "rate": 1
+              }
+            },
+            "source_range": {
+              "start": {
+                "value": 2,
+                "rate": 1
+              },
+              "duration": {
+                "value": 2,
+                "rate": 1
+              }
+            },
+            "font_asset_id": "",
+            "audio_bus_id": ""
+          },
+          "sampled_timeline_range": {
+            "start": {
+              "value": 15,
+              "rate": 4
+            },
+            "duration": {
+              "value": 1,
+              "rate": 2
+            }
+          },
+          "sampled_source_range": {
+            "start": {
+              "value": 15,
+              "rate": 4
+            },
+            "duration": {
+              "value": 1,
+              "rate": 2
+            }
+          },
+          "handles": []
+        },
+        "incoming": {
+          "binding": {
+            "track_id": "backgrounds",
+            "clip_id": "bg-clip-3",
+            "asset_id": "bg-3",
+            "track_kind": "video",
+            "asset_kind": "image",
+            "track_index": 0,
+            "clip_index": 2,
+            "timeline_range": {
+              "start": {
+                "value": 4,
+                "rate": 1
+              },
+              "duration": {
+                "value": 2,
+                "rate": 1
+              }
+            },
+            "source_range": {
+              "start": {
+                "value": 4,
+                "rate": 1
+              },
+              "duration": {
+                "value": 2,
+                "rate": 1
+              }
+            },
+            "font_asset_id": "",
+            "audio_bus_id": ""
+          },
+          "sampled_timeline_range": {
+            "start": {
+              "value": 15,
+              "rate": 4
+            },
+            "duration": {
+              "value": 1,
+              "rate": 2
+            }
+          },
+          "sampled_source_range": {
+            "start": {
+              "value": 15,
+              "rate": 4
+            },
+            "duration": {
+              "value": 1,
+              "rate": 2
+            }
+          },
+          "handles": []
+        }
+      }
+    ],
+    "audio_bus_ids": [
+      "master",
+      "music-bus"
+    ],
+    "resources": [
+      {
+        "asset_id": "bg-1",
+        "kind": "image",
+        "content_hash": "sha256:4038aa49fa6771d6db8738093f0d13c2e153cf6b75e956ac3a55f545165392eb"
+      },
+      {
+        "asset_id": "bg-2",
+        "kind": "image",
+        "content_hash": "sha256:6436db1080c6fa487d19723d710500d8cf215e9c1635f16e4eec051e1cc94fc8"
+      },
+      {
+        "asset_id": "bg-3",
+        "kind": "image",
+        "content_hash": "sha256:d4533eebe16cc7855ff4812315dadeb3efdee7cbe99192e7eba7f62b97c4e153"
+      },
+      {
+        "asset_id": "font",
+        "kind": "font",
+        "content_hash": "sha256:948b2830a583dbc158bb97e6c7d47732e16cb3ae1264547dc7c92ac3eee481ec"
+      },
+      {
+        "asset_id": "music",
+        "kind": "audio",
+        "content_hash": "sha256:55b7df65f1d398a7228c90076947cadf3609faec8e32389321ec7340f552cda0"
+      }
+    ],
+    "fingerprint": "sha256:eb14bda040155145d05bc04a7ca3ff21f6fd9c41dac32cfaa800f14a8fe9bb45"
+  },
+  "manifest": {
+    "schema_version": 2,
+    "profile": "cutly.execution-manifest.document-v2.v2",
+    "canonical_json_profile": "cutly.json.canonical-integer.v1",
+    "plan_fingerprint": "sha256:eb14bda040155145d05bc04a7ca3ff21f6fd9c41dac32cfaa800f14a8fe9bb45",
+    "semantic_profile": "cutly.semantic.document-v2-render-plan.v1",
+    "document_hash": "sha256:b06edb6818d332468395b6a8402cf5858f0ea993382c374d0b40c51942aeb6d8",
+    "compiler_build": "sha256:5f15a38afebce6896f7320a6c4a7ca5b3ac59e9c303089ae7e91b686f5ab8d80",
+    "evaluator_build": "sha256:5f15a38afebce6896f7320a6c4a7ca5b3ac59e9c303089ae7e91b686f5ab8d80",
+    "provider_build": "sha256:cd4ad4a711930bc894d9d58d07f0f8055d1638b4fcfaecd63dbcaab3d878cc51",
+    "resources": [
+      {
+        "asset_id": "bg-1",
+        "kind": "image",
+        "content_hash": "sha256:4038aa49fa6771d6db8738093f0d13c2e153cf6b75e956ac3a55f545165392eb",
+        "size_bytes": 87103,
+        "locator_scheme": "cas",
+        "locator": "cas://sha256/4038aa49fa6771d6db8738093f0d13c2e153cf6b75e956ac3a55f545165392eb",
+        "materialization_profile": "cutly.materialized.document-v2.inspected-image.v2",
+        "inspection_fingerprint": "sha256:fa57ce3db50e25de959f458a88e08959bf91b1e20974e52718e26433f8675b32"
+      },
+      {
+        "asset_id": "bg-2",
+        "kind": "image",
+        "content_hash": "sha256:6436db1080c6fa487d19723d710500d8cf215e9c1635f16e4eec051e1cc94fc8",
+        "size_bytes": 110850,
+        "locator_scheme": "cas",
+        "locator": "cas://sha256/6436db1080c6fa487d19723d710500d8cf215e9c1635f16e4eec051e1cc94fc8",
+        "materialization_profile": "cutly.materialized.document-v2.inspected-image.v2",
+        "inspection_fingerprint": "sha256:2e28c3c8d78256899e2816a8a4341904f3f11dc273819c4b03b7f4609aefadb7"
+      },
+      {
+        "asset_id": "bg-3",
+        "kind": "image",
+        "content_hash": "sha256:d4533eebe16cc7855ff4812315dadeb3efdee7cbe99192e7eba7f62b97c4e153",
+        "size_bytes": 112394,
+        "locator_scheme": "cas",
+        "locator": "cas://sha256/d4533eebe16cc7855ff4812315dadeb3efdee7cbe99192e7eba7f62b97c4e153",
+        "materialization_profile": "cutly.materialized.document-v2.inspected-image.v2",
+        "inspection_fingerprint": "sha256:143dee928963b3684bf579e7390dfc2f426738deec16620161172c23bd82182e"
+      },
+      {
+        "asset_id": "font",
+        "kind": "font",
+        "content_hash": "sha256:948b2830a583dbc158bb97e6c7d47732e16cb3ae1264547dc7c92ac3eee481ec",
+        "size_bytes": 2380,
+        "locator_scheme": "cas",
+        "locator": "cas://sha256/948b2830a583dbc158bb97e6c7d47732e16cb3ae1264547dc7c92ac3eee481ec",
+        "materialization_profile": "cutly.materialized.document-v2.inspected-font.v2",
+        "inspection_fingerprint": "sha256:08ce2a1ace27b15c037d97a04e1d5735eb958b5508be8f0e70204083083e09d7"
+      },
+      {
+        "asset_id": "music",
+        "kind": "audio",
+        "content_hash": "sha256:55b7df65f1d398a7228c90076947cadf3609faec8e32389321ec7340f552cda0",
+        "size_bytes": 1152044,
+        "locator_scheme": "cas",
+        "locator": "cas://sha256/55b7df65f1d398a7228c90076947cadf3609faec8e32389321ec7340f552cda0",
+        "materialization_profile": "cutly.materialized.document-v2.probed-av.v2",
+        "probe_fingerprint": "sha256:04b5e44dbbb874f99c18b4c3edcf816a37d7f9d7f6be95072216e192d2e468d2"
+      }
+    ],
+    "backend": {
+      "backend_id": "cutly.ffmpeg-chunk-assembler.document-v2.v2",
+      "build_fingerprint": "sha256:87826b81e6f330939404cf945e564b6e31e4786a2e5d1f47426a617f5ba3bfe2",
+      "track_kinds": [
+        "audio",
+        "text",
+        "vector",
+        "video"
+      ],
+      "asset_kinds": [
+        "audio",
+        "font",
+        "image",
+        "text",
+        "vector",
+        "video"
+      ],
+      "features": [
+        "audio.linear_retime.v1",
+        "audio.time_stretch_preserve_pitch.v1",
+        "cutly.audio.channel-matrix.stereo.v1",
+        "cutly.audio.gain.v1",
+        "cutly.audio.limiter.sample-peak-instant.v1",
+        "cutly.audio.pan.v1",
+        "cutly.audio.route.v1",
+        "cutly.crop.v1",
+        "cutly.interpolation.cubic-bezier.v1",
+        "cutly.interpolation.hold.v1",
+        "cutly.interpolation.linear.v1",
+        "cutly.keyframes.v1",
+        "cutly.opacity.v1",
+        "cutly.text.pinned-font-viewport-px.v2",
+        "cutly.text.v1",
+        "cutly.transform.v1",
+        "cutly.transition-scope.text-pinned-font-viewport-px.v1",
+        "cutly.transition-scope.vector-path-viewport-px.v1",
+        "cutly.transition.dissolve.v1",
+        "cutly.vector.path-viewport-px.v2",
+        "cutly.vector.path.v1",
+        "video.linear_retime.v1"
+      ],
+      "max_width": 8192,
+      "max_height": 8192
+    },
+    "media_runtime": {
+      "ffmpeg_build": "sha256:e1957f8f7002584eb60dcde0caf11b64ace8d3ee6de8044fa3a99d98e7f35b1a",
+      "decoder_profile": "cutly.decode.ffmpeg-zscale-rgba64.v1",
+      "encoder_profile": "cutly.ffmpeg.rgba8-pcm16.h264-aac-mp4.document-v2.v2",
+      "color_profile": "cutly.color.linear-bt709-premultiplied-rgba16-to-rgba8-srgb-straight.v1"
+    },
+    "output": {
+      "reference_profile": "cutly.output.document-v2.v2",
+      "format": "mp4",
+      "width": 640,
+      "height": 360,
+      "pixel_format": "rgba16",
+      "color_space": "linear-srgb",
+      "video_codec": "h264",
+      "audio_codec": "aac",
+      "frame_clock": {
+        "origin": {
+          "value": 0,
+          "rate": 1
+        },
+        "frames_per_second": {
+          "value": 24,
+          "rate": 1
+        }
+      },
+      "sample_clock": {
+        "origin": {
+          "value": 0,
+          "rate": 1
+        },
+        "samples_per_second": 48000
+      },
+      "sample_rate": 48000,
+      "channels": 2,
+      "intermediate": {
+        "video_surface_profile": "cutly.surface.linear-bt709-premultiplied-rgba16.v1",
+        "audio_block_profile": "cutly.decoded-audio.pcm-s16le.interleaved.v1"
+      },
+      "decoded_video_profile": "cutly.decoded-video.rgba8.interleaved.top-down.tight.v1",
+      "decoded_audio_profile": "cutly.decoded-audio.pcm-s16le.interleaved.v1"
+    },
+    "visual": {
+      "enabled": true,
+      "profile": "cutly.program.document-v2.plan-visual.v2",
+      "descriptor": {
+        "schema_version": 2,
+        "profile": "cutly.program.document-v2.plan-visual.v2",
+        "domain": "visual",
+        "configuration_profile": "cutly.program-config.document-v2.visual.v2",
+        "source_manifest_profile": "cutly.program-source-manifest.document-v2.v2",
+        "output_profile": "cutly.surface.linear-bt709-premultiplied-rgba16.v1",
+        "contribution": "ordered-plan-visual-and-transition-participants"
+      },
+      "descriptor_fingerprint": "sha256:75fdc3966997238194ba29b8b60a768e86020924aa8e7b258deb3a2f8561d91c",
+      "configuration": {
+        "frame_clock": {
+          "frames_per_second": {
+            "rate": 1,
+            "value": 24
+          },
+          "origin": {
+            "rate": 1,
+            "value": 0
+          }
+        },
+        "frame_range": {
+          "count": 144,
+          "first": 0
+        },
+        "height": 360,
+        "profile": "cutly.program-config.document-v2.visual.v2",
+        "schema_version": 2,
+        "surface_profile": "cutly.surface.linear-bt709-premultiplied-rgba16.v1",
+        "width": 640
+      },
+      "configuration_fingerprint": "sha256:f4783bf9ddba5f104ce451f5acda65de7f07da953ee521f74c3d43dadc463673",
+      "source_manifest": {
+        "schema_version": 2,
+        "profile": "cutly.program-source-manifest.document-v2.v2",
+        "canonical_json_profile": "cutly.json.canonical-integer.v1",
+        "document_hash": "sha256:b06edb6818d332468395b6a8402cf5858f0ea993382c374d0b40c51942aeb6d8",
+        "plan_fingerprint": "sha256:eb14bda040155145d05bc04a7ca3ff21f6fd9c41dac32cfaa800f14a8fe9bb45",
+        "domain": "visual",
+        "program_profile": "cutly.program.document-v2.plan-visual.v2",
+        "descriptor_fingerprint": "sha256:75fdc3966997238194ba29b8b60a768e86020924aa8e7b258deb3a2f8561d91c",
+        "configuration_fingerprint": "sha256:f4783bf9ddba5f104ce451f5acda65de7f07da953ee521f74c3d43dadc463673",
+        "requested_range": {
+          "start": {
+            "value": 0,
+            "rate": 1
+          },
+          "duration": {
+            "value": 6,
+            "rate": 1
+          }
+        },
+        "tick_range": {
+          "first": 0,
+          "count": 144
+        },
+        "clips": [
+          {
+            "binding": {
+              "track_id": "backgrounds",
+              "clip_id": "bg-clip-1",
+              "asset_id": "bg-1",
+              "track_kind": "video",
+              "asset_kind": "image",
+              "track_index": 0,
+              "clip_index": 0,
+              "timeline_range": {
+                "start": {
+                  "value": 0,
+                  "rate": 1
+                },
+                "duration": {
+                  "value": 2,
+                  "rate": 1
+                }
+              },
+              "source_range": {
+                "start": {
+                  "value": 0,
+                  "rate": 1
+                },
+                "duration": {
+                  "value": 2,
+                  "rate": 1
+                }
+              },
+              "font_asset_id": "",
+              "audio_bus_id": ""
+            },
+            "visible_timeline_range": {
+              "start": {
+                "value": 0,
+                "rate": 1
+              },
+              "duration": {
+                "value": 2,
+                "rate": 1
+              }
+            },
+            "visible_source_range": {
+              "start": {
+                "value": 0,
+                "rate": 1
+              },
+              "duration": {
+                "value": 2,
+                "rate": 1
+              }
+            }
+          },
+          {
+            "binding": {
+              "track_id": "backgrounds",
+              "clip_id": "bg-clip-2",
+              "asset_id": "bg-2",
+              "track_kind": "video",
+              "asset_kind": "image",
+              "track_index": 0,
+              "clip_index": 1,
+              "timeline_range": {
+                "start": {
+                  "value": 2,
+                  "rate": 1
+                },
+                "duration": {
+                  "value": 2,
+                  "rate": 1
+                }
+              },
+              "source_range": {
+                "start": {
+                  "value": 2,
+                  "rate": 1
+                },
+                "duration": {
+                  "value": 2,
+                  "rate": 1
+                }
+              },
+              "font_asset_id": "",
+              "audio_bus_id": ""
+            },
+            "visible_timeline_range": {
+              "start": {
+                "value": 2,
+                "rate": 1
+              },
+              "duration": {
+                "value": 2,
+                "rate": 1
+              }
+            },
+            "visible_source_range": {
+              "start": {
+                "value": 2,
+                "rate": 1
+              },
+              "duration": {
+                "value": 2,
+                "rate": 1
+              }
+            }
+          },
+          {
+            "binding": {
+              "track_id": "backgrounds",
+              "clip_id": "bg-clip-3",
+              "asset_id": "bg-3",
+              "track_kind": "video",
+              "asset_kind": "image",
+              "track_index": 0,
+              "clip_index": 2,
+              "timeline_range": {
+                "start": {
+                  "value": 4,
+                  "rate": 1
+                },
+                "duration": {
+                  "value": 2,
+                  "rate": 1
+                }
+              },
+              "source_range": {
+                "start": {
+                  "value": 4,
+                  "rate": 1
+                },
+                "duration": {
+                  "value": 2,
+                  "rate": 1
+                }
+              },
+              "font_asset_id": "",
+              "audio_bus_id": ""
+            },
+            "visible_timeline_range": {
+              "start": {
+                "value": 4,
+                "rate": 1
+              },
+              "duration": {
+                "value": 2,
+                "rate": 1
+              }
+            },
+            "visible_source_range": {
+              "start": {
+                "value": 4,
+                "rate": 1
+              },
+              "duration": {
+                "value": 2,
+                "rate": 1
+              }
+            }
+          },
+          {
+            "binding": {
+              "track_id": "card-layer",
+              "clip_id": "card-clip",
+              "asset_id": "card",
+              "track_kind": "vector",
+              "asset_kind": "vector",
+              "track_index": 1,
+              "clip_index": 0,
+              "timeline_range": {
+                "start": {
+                  "value": 0,
+                  "rate": 1
+                },
+                "duration": {
+                  "value": 6,
+                  "rate": 1
+                }
+              },
+              "source_range": {
+                "start": {
+                  "value": 0,
+                  "rate": 1
+                },
+                "duration": {
+                  "value": 6,
+                  "rate": 1
+                }
+              },
+              "font_asset_id": "",
+              "audio_bus_id": ""
+            },
+            "visible_timeline_range": {
+              "start": {
+                "value": 0,
+                "rate": 1
+              },
+              "duration": {
+                "value": 6,
+                "rate": 1
+              }
+            },
+            "visible_source_range": {
+              "start": {
+                "value": 0,
+                "rate": 1
+              },
+              "duration": {
+                "value": 6,
+                "rate": 1
+              }
+            }
+          },
+          {
+            "binding": {
+              "track_id": "titles",
+              "clip_id": "title-clip-1",
+              "asset_id": "title-1",
+              "track_kind": "text",
+              "asset_kind": "text",
+              "track_index": 2,
+              "clip_index": 0,
+              "timeline_range": {
+                "start": {
+                  "value": 0,
+                  "rate": 1
+                },
+                "duration": {
+                  "value": 2,
+                  "rate": 1
+                }
+              },
+              "source_range": {
+                "start": {
+                  "value": 0,
+                  "rate": 1
+                },
+                "duration": {
+                  "value": 2,
+                  "rate": 1
+                }
+              },
+              "font_asset_id": "font",
+              "audio_bus_id": ""
+            },
+            "visible_timeline_range": {
+              "start": {
+                "value": 0,
+                "rate": 1
+              },
+              "duration": {
+                "value": 2,
+                "rate": 1
+              }
+            },
+            "visible_source_range": {
+              "start": {
+                "value": 0,
+                "rate": 1
+              },
+              "duration": {
+                "value": 2,
+                "rate": 1
+              }
+            }
+          },
+          {
+            "binding": {
+              "track_id": "titles",
+              "clip_id": "title-clip-2",
+              "asset_id": "title-2",
+              "track_kind": "text",
+              "asset_kind": "text",
+              "track_index": 2,
+              "clip_index": 1,
+              "timeline_range": {
+                "start": {
+                  "value": 2,
+                  "rate": 1
+                },
+                "duration": {
+                  "value": 2,
+                  "rate": 1
+                }
+              },
+              "source_range": {
+                "start": {
+                  "value": 2,
+                  "rate": 1
+                },
+                "duration": {
+                  "value": 2,
+                  "rate": 1
+                }
+              },
+              "font_asset_id": "font",
+              "audio_bus_id": ""
+            },
+            "visible_timeline_range": {
+              "start": {
+                "value": 2,
+                "rate": 1
+              },
+              "duration": {
+                "value": 2,
+                "rate": 1
+              }
+            },
+            "visible_source_range": {
+              "start": {
+                "value": 2,
+                "rate": 1
+              },
+              "duration": {
+                "value": 2,
+                "rate": 1
+              }
+            }
+          },
+          {
+            "binding": {
+              "track_id": "titles",
+              "clip_id": "title-clip-3",
+              "asset_id": "title-3",
+              "track_kind": "text",
+              "asset_kind": "text",
+              "track_index": 2,
+              "clip_index": 2,
+              "timeline_range": {
+                "start": {
+                  "value": 4,
+                  "rate": 1
+                },
+                "duration": {
+                  "value": 2,
+                  "rate": 1
+                }
+              },
+              "source_range": {
+                "start": {
+                  "value": 4,
+                  "rate": 1
+                },
+                "duration": {
+                  "value": 2,
+                  "rate": 1
+                }
+              },
+              "font_asset_id": "font",
+              "audio_bus_id": ""
+            },
+            "visible_timeline_range": {
+              "start": {
+                "value": 4,
+                "rate": 1
+              },
+              "duration": {
+                "value": 2,
+                "rate": 1
+              }
+            },
+            "visible_source_range": {
+              "start": {
+                "value": 4,
+                "rate": 1
+              },
+              "duration": {
+                "value": 2,
+                "rate": 1
+              }
+            }
+          }
+        ],
+        "transitions": [
+          {
+            "transition_id": "dissolve-1",
+            "transition_index": 0,
+            "profile": "cutly.transition.dissolve.v1",
+            "cut": {
+              "value": 2,
+              "rate": 1
+            },
+            "pre_duration": {
+              "value": 1,
+              "rate": 4
+            },
+            "post_duration": {
+              "value": 1,
+              "rate": 4
+            },
+            "timeline_range": {
+              "start": {
+                "value": 7,
+                "rate": 4
+              },
+              "duration": {
+                "value": 1,
+                "rate": 2
+              }
+            },
+            "active_timeline_range": {
+              "start": {
+                "value": 7,
+                "rate": 4
+              },
+              "duration": {
+                "value": 1,
+                "rate": 2
+              }
+            },
+            "outgoing": {
+              "binding": {
+                "track_id": "backgrounds",
+                "clip_id": "bg-clip-1",
+                "asset_id": "bg-1",
+                "track_kind": "video",
+                "asset_kind": "image",
+                "track_index": 0,
+                "clip_index": 0,
+                "timeline_range": {
+                  "start": {
+                    "value": 0,
+                    "rate": 1
+                  },
+                  "duration": {
+                    "value": 2,
+                    "rate": 1
+                  }
+                },
+                "source_range": {
+                  "start": {
+                    "value": 0,
+                    "rate": 1
+                  },
+                  "duration": {
+                    "value": 2,
+                    "rate": 1
+                  }
+                },
+                "font_asset_id": "",
+                "audio_bus_id": ""
+              },
+              "sampled_timeline_range": {
+                "start": {
+                  "value": 7,
+                  "rate": 4
+                },
+                "duration": {
+                  "value": 1,
+                  "rate": 2
+                }
+              },
+              "sampled_source_range": {
+                "start": {
+                  "value": 7,
+                  "rate": 4
+                },
+                "duration": {
+                  "value": 1,
+                  "rate": 2
+                }
+              },
+              "handles": []
+            },
+            "incoming": {
+              "binding": {
+                "track_id": "backgrounds",
+                "clip_id": "bg-clip-2",
+                "asset_id": "bg-2",
+                "track_kind": "video",
+                "asset_kind": "image",
+                "track_index": 0,
+                "clip_index": 1,
+                "timeline_range": {
+                  "start": {
+                    "value": 2,
+                    "rate": 1
+                  },
+                  "duration": {
+                    "value": 2,
+                    "rate": 1
+                  }
+                },
+                "source_range": {
+                  "start": {
+                    "value": 2,
+                    "rate": 1
+                  },
+                  "duration": {
+                    "value": 2,
+                    "rate": 1
+                  }
+                },
+                "font_asset_id": "",
+                "audio_bus_id": ""
+              },
+              "sampled_timeline_range": {
+                "start": {
+                  "value": 7,
+                  "rate": 4
+                },
+                "duration": {
+                  "value": 1,
+                  "rate": 2
+                }
+              },
+              "sampled_source_range": {
+                "start": {
+                  "value": 7,
+                  "rate": 4
+                },
+                "duration": {
+                  "value": 1,
+                  "rate": 2
+                }
+              },
+              "handles": []
+            }
+          },
+          {
+            "transition_id": "dissolve-2",
+            "transition_index": 1,
+            "profile": "cutly.transition.dissolve.v1",
+            "cut": {
+              "value": 4,
+              "rate": 1
+            },
+            "pre_duration": {
+              "value": 1,
+              "rate": 4
+            },
+            "post_duration": {
+              "value": 1,
+              "rate": 4
+            },
+            "timeline_range": {
+              "start": {
+                "value": 15,
+                "rate": 4
+              },
+              "duration": {
+                "value": 1,
+                "rate": 2
+              }
+            },
+            "active_timeline_range": {
+              "start": {
+                "value": 15,
+                "rate": 4
+              },
+              "duration": {
+                "value": 1,
+                "rate": 2
+              }
+            },
+            "outgoing": {
+              "binding": {
+                "track_id": "backgrounds",
+                "clip_id": "bg-clip-2",
+                "asset_id": "bg-2",
+                "track_kind": "video",
+                "asset_kind": "image",
+                "track_index": 0,
+                "clip_index": 1,
+                "timeline_range": {
+                  "start": {
+                    "value": 2,
+                    "rate": 1
+                  },
+                  "duration": {
+                    "value": 2,
+                    "rate": 1
+                  }
+                },
+                "source_range": {
+                  "start": {
+                    "value": 2,
+                    "rate": 1
+                  },
+                  "duration": {
+                    "value": 2,
+                    "rate": 1
+                  }
+                },
+                "font_asset_id": "",
+                "audio_bus_id": ""
+              },
+              "sampled_timeline_range": {
+                "start": {
+                  "value": 15,
+                  "rate": 4
+                },
+                "duration": {
+                  "value": 1,
+                  "rate": 2
+                }
+              },
+              "sampled_source_range": {
+                "start": {
+                  "value": 15,
+                  "rate": 4
+                },
+                "duration": {
+                  "value": 1,
+                  "rate": 2
+                }
+              },
+              "handles": []
+            },
+            "incoming": {
+              "binding": {
+                "track_id": "backgrounds",
+                "clip_id": "bg-clip-3",
+                "asset_id": "bg-3",
+                "track_kind": "video",
+                "asset_kind": "image",
+                "track_index": 0,
+                "clip_index": 2,
+                "timeline_range": {
+                  "start": {
+                    "value": 4,
+                    "rate": 1
+                  },
+                  "duration": {
+                    "value": 2,
+                    "rate": 1
+                  }
+                },
+                "source_range": {
+                  "start": {
+                    "value": 4,
+                    "rate": 1
+                  },
+                  "duration": {
+                    "value": 2,
+                    "rate": 1
+                  }
+                },
+                "font_asset_id": "",
+                "audio_bus_id": ""
+              },
+              "sampled_timeline_range": {
+                "start": {
+                  "value": 15,
+                  "rate": 4
+                },
+                "duration": {
+                  "value": 1,
+                  "rate": 2
+                }
+              },
+              "sampled_source_range": {
+                "start": {
+                  "value": 15,
+                  "rate": 4
+                },
+                "duration": {
+                  "value": 1,
+                  "rate": 2
+                }
+              },
+              "handles": []
+            }
+          }
+        ],
+        "audio_bus_ids": [],
+        "resources": [
+          {
+            "asset_id": "bg-1",
+            "kind": "image",
+            "content_hash": "sha256:4038aa49fa6771d6db8738093f0d13c2e153cf6b75e956ac3a55f545165392eb",
+            "size_bytes": 87103,
+            "locator_scheme": "cas",
+            "locator": "cas://sha256/4038aa49fa6771d6db8738093f0d13c2e153cf6b75e956ac3a55f545165392eb",
+            "materialization_profile": "cutly.materialized.document-v2.inspected-image.v2",
+            "inspection_fingerprint": "sha256:fa57ce3db50e25de959f458a88e08959bf91b1e20974e52718e26433f8675b32"
+          },
+          {
+            "asset_id": "bg-2",
+            "kind": "image",
+            "content_hash": "sha256:6436db1080c6fa487d19723d710500d8cf215e9c1635f16e4eec051e1cc94fc8",
+            "size_bytes": 110850,
+            "locator_scheme": "cas",
+            "locator": "cas://sha256/6436db1080c6fa487d19723d710500d8cf215e9c1635f16e4eec051e1cc94fc8",
+            "materialization_profile": "cutly.materialized.document-v2.inspected-image.v2",
+            "inspection_fingerprint": "sha256:2e28c3c8d78256899e2816a8a4341904f3f11dc273819c4b03b7f4609aefadb7"
+          },
+          {
+            "asset_id": "bg-3",
+            "kind": "image",
+            "content_hash": "sha256:d4533eebe16cc7855ff4812315dadeb3efdee7cbe99192e7eba7f62b97c4e153",
+            "size_bytes": 112394,
+            "locator_scheme": "cas",
+            "locator": "cas://sha256/d4533eebe16cc7855ff4812315dadeb3efdee7cbe99192e7eba7f62b97c4e153",
+            "materialization_profile": "cutly.materialized.document-v2.inspected-image.v2",
+            "inspection_fingerprint": "sha256:143dee928963b3684bf579e7390dfc2f426738deec16620161172c23bd82182e"
+          },
+          {
+            "asset_id": "font",
+            "kind": "font",
+            "content_hash": "sha256:948b2830a583dbc158bb97e6c7d47732e16cb3ae1264547dc7c92ac3eee481ec",
+            "size_bytes": 2380,
+            "locator_scheme": "cas",
+            "locator": "cas://sha256/948b2830a583dbc158bb97e6c7d47732e16cb3ae1264547dc7c92ac3eee481ec",
+            "materialization_profile": "cutly.materialized.document-v2.inspected-font.v2",
+            "inspection_fingerprint": "sha256:08ce2a1ace27b15c037d97a04e1d5735eb958b5508be8f0e70204083083e09d7"
+          }
+        ]
+      },
+      "source_manifest_fingerprint": "sha256:3274bf7a9edba025537340dbe2636a5e2a7d207a20bfeeee6b178bf30481eabb"
+    },
+    "audio": {
+      "enabled": true,
+      "profile": "cutly.program.document-v2.plan-audio.v2",
+      "descriptor": {
+        "schema_version": 2,
+        "profile": "cutly.program.document-v2.plan-audio.v2",
+        "domain": "audio",
+        "configuration_profile": "cutly.program-config.document-v2.audio.v2",
+        "source_manifest_profile": "cutly.program-source-manifest.document-v2.v2",
+        "output_profile": "cutly.decoded-audio.pcm-s16le.interleaved.v1",
+        "contribution": "ordered-plan-audio-and-bus-closure"
+      },
+      "descriptor_fingerprint": "sha256:6a68e3de965da92d9b708ec353a2cc068b8df7a50d4c85e3ceb4b0acb1e87e5e",
+      "configuration": {
+        "block_profile": "cutly.decoded-audio.pcm-s16le.interleaved.v1",
+        "channels": 2,
+        "profile": "cutly.program-config.document-v2.audio.v2",
+        "sample_clock": {
+          "origin": {
+            "rate": 1,
+            "value": 0
+          },
+          "samples_per_second": 48000
+        },
+        "sample_range": {
+          "count": 288000,
+          "first": 0
+        },
+        "schema_version": 2
+      },
+      "configuration_fingerprint": "sha256:0e37e14a6a038c07310c544a6468d2e2bb9638dea638ce2cbf9a211394bd6e62",
+      "source_manifest": {
+        "schema_version": 2,
+        "profile": "cutly.program-source-manifest.document-v2.v2",
+        "canonical_json_profile": "cutly.json.canonical-integer.v1",
+        "document_hash": "sha256:b06edb6818d332468395b6a8402cf5858f0ea993382c374d0b40c51942aeb6d8",
+        "plan_fingerprint": "sha256:eb14bda040155145d05bc04a7ca3ff21f6fd9c41dac32cfaa800f14a8fe9bb45",
+        "domain": "audio",
+        "program_profile": "cutly.program.document-v2.plan-audio.v2",
+        "descriptor_fingerprint": "sha256:6a68e3de965da92d9b708ec353a2cc068b8df7a50d4c85e3ceb4b0acb1e87e5e",
+        "configuration_fingerprint": "sha256:0e37e14a6a038c07310c544a6468d2e2bb9638dea638ce2cbf9a211394bd6e62",
+        "requested_range": {
+          "start": {
+            "value": 0,
+            "rate": 1
+          },
+          "duration": {
+            "value": 6,
+            "rate": 1
+          }
+        },
+        "tick_range": {
+          "first": 0,
+          "count": 288000
+        },
+        "clips": [
+          {
+            "binding": {
+              "track_id": "soundtrack",
+              "clip_id": "music-clip",
+              "asset_id": "music",
+              "track_kind": "audio",
+              "asset_kind": "audio",
+              "track_index": 3,
+              "clip_index": 0,
+              "timeline_range": {
+                "start": {
+                  "value": 0,
+                  "rate": 1
+                },
+                "duration": {
+                  "value": 6,
+                  "rate": 1
+                }
+              },
+              "source_range": {
+                "start": {
+                  "value": 0,
+                  "rate": 1
+                },
+                "duration": {
+                  "value": 6,
+                  "rate": 1
+                }
+              },
+              "font_asset_id": "",
+              "audio_bus_id": "music-bus"
+            },
+            "visible_timeline_range": {
+              "start": {
+                "value": 0,
+                "rate": 1
+              },
+              "duration": {
+                "value": 6,
+                "rate": 1
+              }
+            },
+            "visible_source_range": {
+              "start": {
+                "value": 0,
+                "rate": 1
+              },
+              "duration": {
+                "value": 6,
+                "rate": 1
+              }
+            }
+          }
+        ],
+        "transitions": [],
+        "audio_bus_ids": [
+          "master",
+          "music-bus"
+        ],
+        "resources": [
+          {
+            "asset_id": "music",
+            "kind": "audio",
+            "content_hash": "sha256:55b7df65f1d398a7228c90076947cadf3609faec8e32389321ec7340f552cda0",
+            "size_bytes": 1152044,
+            "locator_scheme": "cas",
+            "locator": "cas://sha256/55b7df65f1d398a7228c90076947cadf3609faec8e32389321ec7340f552cda0",
+            "materialization_profile": "cutly.materialized.document-v2.probed-av.v2",
+            "probe_fingerprint": "sha256:04b5e44dbbb874f99c18b4c3edcf816a37d7f9d7f6be95072216e192d2e468d2"
+          }
+        ]
+      },
+      "source_manifest_fingerprint": "sha256:d559e598b757d0bc6ae595c2559725b7319159c88d07787b036bd73751b4277f"
+    },
+    "deterministic_seed": 0,
+    "fingerprint": "sha256:4cbce38548fdc7fa4e62620966fb38adbfeee2ffcc7ba64674881933fb31ed12"
+  },
+  "bridge": {
+    "schema_version": 2,
+    "profile": "cutly.reconstruct.document-v2.semantic-native-mixed-bridge.v2",
+    "environment_key": {
+      "document_hash": "sha256:b06edb6818d332468395b6a8402cf5858f0ea993382c374d0b40c51942aeb6d8",
+      "plan_fingerprint": "sha256:eb14bda040155145d05bc04a7ca3ff21f6fd9c41dac32cfaa800f14a8fe9bb45",
+      "execution_manifest_fingerprint": "sha256:4cbce38548fdc7fa4e62620966fb38adbfeee2ffcc7ba64674881933fb31ed12"
+    },
+    "host_config_hash": "sha256:3b8a6312fdd68e86e13cfa537f673936ba80ebadc8bfcafb7396c22c45e34eef",
+    "backend": {
+      "backend_id": "cutly.ffmpeg-chunk-assembler.document-v2.v2",
+      "build_fingerprint": "sha256:87826b81e6f330939404cf945e564b6e31e4786a2e5d1f47426a617f5ba3bfe2",
+      "track_kinds": [
+        "audio",
+        "text",
+        "vector",
+        "video"
+      ],
+      "asset_kinds": [
+        "audio",
+        "font",
+        "image",
+        "text",
+        "vector",
+        "video"
+      ],
+      "features": [
+        "audio.linear_retime.v1",
+        "audio.time_stretch_preserve_pitch.v1",
+        "cutly.audio.channel-matrix.stereo.v1",
+        "cutly.audio.gain.v1",
+        "cutly.audio.limiter.sample-peak-instant.v1",
+        "cutly.audio.pan.v1",
+        "cutly.audio.route.v1",
+        "cutly.crop.v1",
+        "cutly.interpolation.cubic-bezier.v1",
+        "cutly.interpolation.hold.v1",
+        "cutly.interpolation.linear.v1",
+        "cutly.keyframes.v1",
+        "cutly.opacity.v1",
+        "cutly.text.pinned-font-viewport-px.v2",
+        "cutly.text.v1",
+        "cutly.transform.v1",
+        "cutly.transition-scope.text-pinned-font-viewport-px.v1",
+        "cutly.transition-scope.vector-path-viewport-px.v1",
+        "cutly.transition.dissolve.v1",
+        "cutly.vector.path-viewport-px.v2",
+        "cutly.vector.path.v1",
+        "video.linear_retime.v1"
+      ],
+      "max_width": 8192,
+      "max_height": 8192
+    },
+    "media_runtime": {
+      "ffmpeg_build": "sha256:e1957f8f7002584eb60dcde0caf11b64ace8d3ee6de8044fa3a99d98e7f35b1a",
+      "decoder_profile": "cutly.decode.ffmpeg-zscale-rgba64.v1",
+      "encoder_profile": "cutly.ffmpeg.rgba8-pcm16.h264-aac-mp4.document-v2.v2",
+      "color_profile": "cutly.color.linear-bt709-premultiplied-rgba16-to-rgba8-srgb-straight.v1"
+    },
+    "output": {
+      "reference_profile": "cutly.output.document-v2.v2",
+      "format": "mp4",
+      "width": 640,
+      "height": 360,
+      "pixel_format": "rgba16",
+      "color_space": "linear-srgb",
+      "video_codec": "h264",
+      "audio_codec": "aac",
+      "frame_clock": {
+        "origin": {
+          "value": 0,
+          "rate": 1
+        },
+        "frames_per_second": {
+          "value": 24,
+          "rate": 1
+        }
+      },
+      "sample_clock": {
+        "origin": {
+          "value": 0,
+          "rate": 1
+        },
+        "samples_per_second": 48000
+      },
+      "sample_rate": 48000,
+      "channels": 2,
+      "intermediate": {
+        "video_surface_profile": "cutly.surface.linear-bt709-premultiplied-rgba16.v1",
+        "audio_block_profile": "cutly.decoded-audio.pcm-s16le.interleaved.v1"
+      },
+      "decoded_video_profile": "cutly.decoded-video.rgba8.interleaved.top-down.tight.v1",
+      "decoded_audio_profile": "cutly.decoded-audio.pcm-s16le.interleaved.v1"
+    },
+    "semantic_visual": {
+      "enabled": true,
+      "profile": "cutly.program.document-v2.plan-visual.v2",
+      "descriptor": {
+        "schema_version": 2,
+        "profile": "cutly.program.document-v2.plan-visual.v2",
+        "domain": "visual",
+        "configuration_profile": "cutly.program-config.document-v2.visual.v2",
+        "source_manifest_profile": "cutly.program-source-manifest.document-v2.v2",
+        "output_profile": "cutly.surface.linear-bt709-premultiplied-rgba16.v1",
+        "contribution": "ordered-plan-visual-and-transition-participants"
+      },
+      "descriptor_fingerprint": "sha256:75fdc3966997238194ba29b8b60a768e86020924aa8e7b258deb3a2f8561d91c",
+      "configuration": {
+        "frame_clock": {
+          "frames_per_second": {
+            "rate": 1,
+            "value": 24
+          },
+          "origin": {
+            "rate": 1,
+            "value": 0
+          }
+        },
+        "frame_range": {
+          "count": 144,
+          "first": 0
+        },
+        "height": 360,
+        "profile": "cutly.program-config.document-v2.visual.v2",
+        "schema_version": 2,
+        "surface_profile": "cutly.surface.linear-bt709-premultiplied-rgba16.v1",
+        "width": 640
+      },
+      "configuration_fingerprint": "sha256:f4783bf9ddba5f104ce451f5acda65de7f07da953ee521f74c3d43dadc463673",
+      "source_manifest": {
+        "schema_version": 2,
+        "profile": "cutly.program-source-manifest.document-v2.v2",
+        "canonical_json_profile": "cutly.json.canonical-integer.v1",
+        "document_hash": "sha256:b06edb6818d332468395b6a8402cf5858f0ea993382c374d0b40c51942aeb6d8",
+        "plan_fingerprint": "sha256:eb14bda040155145d05bc04a7ca3ff21f6fd9c41dac32cfaa800f14a8fe9bb45",
+        "domain": "visual",
+        "program_profile": "cutly.program.document-v2.plan-visual.v2",
+        "descriptor_fingerprint": "sha256:75fdc3966997238194ba29b8b60a768e86020924aa8e7b258deb3a2f8561d91c",
+        "configuration_fingerprint": "sha256:f4783bf9ddba5f104ce451f5acda65de7f07da953ee521f74c3d43dadc463673",
+        "requested_range": {
+          "start": {
+            "value": 0,
+            "rate": 1
+          },
+          "duration": {
+            "value": 6,
+            "rate": 1
+          }
+        },
+        "tick_range": {
+          "first": 0,
+          "count": 144
+        },
+        "clips": [
+          {
+            "binding": {
+              "track_id": "backgrounds",
+              "clip_id": "bg-clip-1",
+              "asset_id": "bg-1",
+              "track_kind": "video",
+              "asset_kind": "image",
+              "track_index": 0,
+              "clip_index": 0,
+              "timeline_range": {
+                "start": {
+                  "value": 0,
+                  "rate": 1
+                },
+                "duration": {
+                  "value": 2,
+                  "rate": 1
+                }
+              },
+              "source_range": {
+                "start": {
+                  "value": 0,
+                  "rate": 1
+                },
+                "duration": {
+                  "value": 2,
+                  "rate": 1
+                }
+              },
+              "font_asset_id": "",
+              "audio_bus_id": ""
+            },
+            "visible_timeline_range": {
+              "start": {
+                "value": 0,
+                "rate": 1
+              },
+              "duration": {
+                "value": 2,
+                "rate": 1
+              }
+            },
+            "visible_source_range": {
+              "start": {
+                "value": 0,
+                "rate": 1
+              },
+              "duration": {
+                "value": 2,
+                "rate": 1
+              }
+            }
+          },
+          {
+            "binding": {
+              "track_id": "backgrounds",
+              "clip_id": "bg-clip-2",
+              "asset_id": "bg-2",
+              "track_kind": "video",
+              "asset_kind": "image",
+              "track_index": 0,
+              "clip_index": 1,
+              "timeline_range": {
+                "start": {
+                  "value": 2,
+                  "rate": 1
+                },
+                "duration": {
+                  "value": 2,
+                  "rate": 1
+                }
+              },
+              "source_range": {
+                "start": {
+                  "value": 2,
+                  "rate": 1
+                },
+                "duration": {
+                  "value": 2,
+                  "rate": 1
+                }
+              },
+              "font_asset_id": "",
+              "audio_bus_id": ""
+            },
+            "visible_timeline_range": {
+              "start": {
+                "value": 2,
+                "rate": 1
+              },
+              "duration": {
+                "value": 2,
+                "rate": 1
+              }
+            },
+            "visible_source_range": {
+              "start": {
+                "value": 2,
+                "rate": 1
+              },
+              "duration": {
+                "value": 2,
+                "rate": 1
+              }
+            }
+          },
+          {
+            "binding": {
+              "track_id": "backgrounds",
+              "clip_id": "bg-clip-3",
+              "asset_id": "bg-3",
+              "track_kind": "video",
+              "asset_kind": "image",
+              "track_index": 0,
+              "clip_index": 2,
+              "timeline_range": {
+                "start": {
+                  "value": 4,
+                  "rate": 1
+                },
+                "duration": {
+                  "value": 2,
+                  "rate": 1
+                }
+              },
+              "source_range": {
+                "start": {
+                  "value": 4,
+                  "rate": 1
+                },
+                "duration": {
+                  "value": 2,
+                  "rate": 1
+                }
+              },
+              "font_asset_id": "",
+              "audio_bus_id": ""
+            },
+            "visible_timeline_range": {
+              "start": {
+                "value": 4,
+                "rate": 1
+              },
+              "duration": {
+                "value": 2,
+                "rate": 1
+              }
+            },
+            "visible_source_range": {
+              "start": {
+                "value": 4,
+                "rate": 1
+              },
+              "duration": {
+                "value": 2,
+                "rate": 1
+              }
+            }
+          },
+          {
+            "binding": {
+              "track_id": "card-layer",
+              "clip_id": "card-clip",
+              "asset_id": "card",
+              "track_kind": "vector",
+              "asset_kind": "vector",
+              "track_index": 1,
+              "clip_index": 0,
+              "timeline_range": {
+                "start": {
+                  "value": 0,
+                  "rate": 1
+                },
+                "duration": {
+                  "value": 6,
+                  "rate": 1
+                }
+              },
+              "source_range": {
+                "start": {
+                  "value": 0,
+                  "rate": 1
+                },
+                "duration": {
+                  "value": 6,
+                  "rate": 1
+                }
+              },
+              "font_asset_id": "",
+              "audio_bus_id": ""
+            },
+            "visible_timeline_range": {
+              "start": {
+                "value": 0,
+                "rate": 1
+              },
+              "duration": {
+                "value": 6,
+                "rate": 1
+              }
+            },
+            "visible_source_range": {
+              "start": {
+                "value": 0,
+                "rate": 1
+              },
+              "duration": {
+                "value": 6,
+                "rate": 1
+              }
+            }
+          },
+          {
+            "binding": {
+              "track_id": "titles",
+              "clip_id": "title-clip-1",
+              "asset_id": "title-1",
+              "track_kind": "text",
+              "asset_kind": "text",
+              "track_index": 2,
+              "clip_index": 0,
+              "timeline_range": {
+                "start": {
+                  "value": 0,
+                  "rate": 1
+                },
+                "duration": {
+                  "value": 2,
+                  "rate": 1
+                }
+              },
+              "source_range": {
+                "start": {
+                  "value": 0,
+                  "rate": 1
+                },
+                "duration": {
+                  "value": 2,
+                  "rate": 1
+                }
+              },
+              "font_asset_id": "font",
+              "audio_bus_id": ""
+            },
+            "visible_timeline_range": {
+              "start": {
+                "value": 0,
+                "rate": 1
+              },
+              "duration": {
+                "value": 2,
+                "rate": 1
+              }
+            },
+            "visible_source_range": {
+              "start": {
+                "value": 0,
+                "rate": 1
+              },
+              "duration": {
+                "value": 2,
+                "rate": 1
+              }
+            }
+          },
+          {
+            "binding": {
+              "track_id": "titles",
+              "clip_id": "title-clip-2",
+              "asset_id": "title-2",
+              "track_kind": "text",
+              "asset_kind": "text",
+              "track_index": 2,
+              "clip_index": 1,
+              "timeline_range": {
+                "start": {
+                  "value": 2,
+                  "rate": 1
+                },
+                "duration": {
+                  "value": 2,
+                  "rate": 1
+                }
+              },
+              "source_range": {
+                "start": {
+                  "value": 2,
+                  "rate": 1
+                },
+                "duration": {
+                  "value": 2,
+                  "rate": 1
+                }
+              },
+              "font_asset_id": "font",
+              "audio_bus_id": ""
+            },
+            "visible_timeline_range": {
+              "start": {
+                "value": 2,
+                "rate": 1
+              },
+              "duration": {
+                "value": 2,
+                "rate": 1
+              }
+            },
+            "visible_source_range": {
+              "start": {
+                "value": 2,
+                "rate": 1
+              },
+              "duration": {
+                "value": 2,
+                "rate": 1
+              }
+            }
+          },
+          {
+            "binding": {
+              "track_id": "titles",
+              "clip_id": "title-clip-3",
+              "asset_id": "title-3",
+              "track_kind": "text",
+              "asset_kind": "text",
+              "track_index": 2,
+              "clip_index": 2,
+              "timeline_range": {
+                "start": {
+                  "value": 4,
+                  "rate": 1
+                },
+                "duration": {
+                  "value": 2,
+                  "rate": 1
+                }
+              },
+              "source_range": {
+                "start": {
+                  "value": 4,
+                  "rate": 1
+                },
+                "duration": {
+                  "value": 2,
+                  "rate": 1
+                }
+              },
+              "font_asset_id": "font",
+              "audio_bus_id": ""
+            },
+            "visible_timeline_range": {
+              "start": {
+                "value": 4,
+                "rate": 1
+              },
+              "duration": {
+                "value": 2,
+                "rate": 1
+              }
+            },
+            "visible_source_range": {
+              "start": {
+                "value": 4,
+                "rate": 1
+              },
+              "duration": {
+                "value": 2,
+                "rate": 1
+              }
+            }
+          }
+        ],
+        "transitions": [
+          {
+            "transition_id": "dissolve-1",
+            "transition_index": 0,
+            "profile": "cutly.transition.dissolve.v1",
+            "cut": {
+              "value": 2,
+              "rate": 1
+            },
+            "pre_duration": {
+              "value": 1,
+              "rate": 4
+            },
+            "post_duration": {
+              "value": 1,
+              "rate": 4
+            },
+            "timeline_range": {
+              "start": {
+                "value": 7,
+                "rate": 4
+              },
+              "duration": {
+                "value": 1,
+                "rate": 2
+              }
+            },
+            "active_timeline_range": {
+              "start": {
+                "value": 7,
+                "rate": 4
+              },
+              "duration": {
+                "value": 1,
+                "rate": 2
+              }
+            },
+            "outgoing": {
+              "binding": {
+                "track_id": "backgrounds",
+                "clip_id": "bg-clip-1",
+                "asset_id": "bg-1",
+                "track_kind": "video",
+                "asset_kind": "image",
+                "track_index": 0,
+                "clip_index": 0,
+                "timeline_range": {
+                  "start": {
+                    "value": 0,
+                    "rate": 1
+                  },
+                  "duration": {
+                    "value": 2,
+                    "rate": 1
+                  }
+                },
+                "source_range": {
+                  "start": {
+                    "value": 0,
+                    "rate": 1
+                  },
+                  "duration": {
+                    "value": 2,
+                    "rate": 1
+                  }
+                },
+                "font_asset_id": "",
+                "audio_bus_id": ""
+              },
+              "sampled_timeline_range": {
+                "start": {
+                  "value": 7,
+                  "rate": 4
+                },
+                "duration": {
+                  "value": 1,
+                  "rate": 2
+                }
+              },
+              "sampled_source_range": {
+                "start": {
+                  "value": 7,
+                  "rate": 4
+                },
+                "duration": {
+                  "value": 1,
+                  "rate": 2
+                }
+              },
+              "handles": []
+            },
+            "incoming": {
+              "binding": {
+                "track_id": "backgrounds",
+                "clip_id": "bg-clip-2",
+                "asset_id": "bg-2",
+                "track_kind": "video",
+                "asset_kind": "image",
+                "track_index": 0,
+                "clip_index": 1,
+                "timeline_range": {
+                  "start": {
+                    "value": 2,
+                    "rate": 1
+                  },
+                  "duration": {
+                    "value": 2,
+                    "rate": 1
+                  }
+                },
+                "source_range": {
+                  "start": {
+                    "value": 2,
+                    "rate": 1
+                  },
+                  "duration": {
+                    "value": 2,
+                    "rate": 1
+                  }
+                },
+                "font_asset_id": "",
+                "audio_bus_id": ""
+              },
+              "sampled_timeline_range": {
+                "start": {
+                  "value": 7,
+                  "rate": 4
+                },
+                "duration": {
+                  "value": 1,
+                  "rate": 2
+                }
+              },
+              "sampled_source_range": {
+                "start": {
+                  "value": 7,
+                  "rate": 4
+                },
+                "duration": {
+                  "value": 1,
+                  "rate": 2
+                }
+              },
+              "handles": []
+            }
+          },
+          {
+            "transition_id": "dissolve-2",
+            "transition_index": 1,
+            "profile": "cutly.transition.dissolve.v1",
+            "cut": {
+              "value": 4,
+              "rate": 1
+            },
+            "pre_duration": {
+              "value": 1,
+              "rate": 4
+            },
+            "post_duration": {
+              "value": 1,
+              "rate": 4
+            },
+            "timeline_range": {
+              "start": {
+                "value": 15,
+                "rate": 4
+              },
+              "duration": {
+                "value": 1,
+                "rate": 2
+              }
+            },
+            "active_timeline_range": {
+              "start": {
+                "value": 15,
+                "rate": 4
+              },
+              "duration": {
+                "value": 1,
+                "rate": 2
+              }
+            },
+            "outgoing": {
+              "binding": {
+                "track_id": "backgrounds",
+                "clip_id": "bg-clip-2",
+                "asset_id": "bg-2",
+                "track_kind": "video",
+                "asset_kind": "image",
+                "track_index": 0,
+                "clip_index": 1,
+                "timeline_range": {
+                  "start": {
+                    "value": 2,
+                    "rate": 1
+                  },
+                  "duration": {
+                    "value": 2,
+                    "rate": 1
+                  }
+                },
+                "source_range": {
+                  "start": {
+                    "value": 2,
+                    "rate": 1
+                  },
+                  "duration": {
+                    "value": 2,
+                    "rate": 1
+                  }
+                },
+                "font_asset_id": "",
+                "audio_bus_id": ""
+              },
+              "sampled_timeline_range": {
+                "start": {
+                  "value": 15,
+                  "rate": 4
+                },
+                "duration": {
+                  "value": 1,
+                  "rate": 2
+                }
+              },
+              "sampled_source_range": {
+                "start": {
+                  "value": 15,
+                  "rate": 4
+                },
+                "duration": {
+                  "value": 1,
+                  "rate": 2
+                }
+              },
+              "handles": []
+            },
+            "incoming": {
+              "binding": {
+                "track_id": "backgrounds",
+                "clip_id": "bg-clip-3",
+                "asset_id": "bg-3",
+                "track_kind": "video",
+                "asset_kind": "image",
+                "track_index": 0,
+                "clip_index": 2,
+                "timeline_range": {
+                  "start": {
+                    "value": 4,
+                    "rate": 1
+                  },
+                  "duration": {
+                    "value": 2,
+                    "rate": 1
+                  }
+                },
+                "source_range": {
+                  "start": {
+                    "value": 4,
+                    "rate": 1
+                  },
+                  "duration": {
+                    "value": 2,
+                    "rate": 1
+                  }
+                },
+                "font_asset_id": "",
+                "audio_bus_id": ""
+              },
+              "sampled_timeline_range": {
+                "start": {
+                  "value": 15,
+                  "rate": 4
+                },
+                "duration": {
+                  "value": 1,
+                  "rate": 2
+                }
+              },
+              "sampled_source_range": {
+                "start": {
+                  "value": 15,
+                  "rate": 4
+                },
+                "duration": {
+                  "value": 1,
+                  "rate": 2
+                }
+              },
+              "handles": []
+            }
+          }
+        ],
+        "audio_bus_ids": [],
+        "resources": [
+          {
+            "asset_id": "bg-1",
+            "kind": "image",
+            "content_hash": "sha256:4038aa49fa6771d6db8738093f0d13c2e153cf6b75e956ac3a55f545165392eb",
+            "size_bytes": 87103,
+            "locator_scheme": "cas",
+            "locator": "cas://sha256/4038aa49fa6771d6db8738093f0d13c2e153cf6b75e956ac3a55f545165392eb",
+            "materialization_profile": "cutly.materialized.document-v2.inspected-image.v2",
+            "inspection_fingerprint": "sha256:fa57ce3db50e25de959f458a88e08959bf91b1e20974e52718e26433f8675b32"
+          },
+          {
+            "asset_id": "bg-2",
+            "kind": "image",
+            "content_hash": "sha256:6436db1080c6fa487d19723d710500d8cf215e9c1635f16e4eec051e1cc94fc8",
+            "size_bytes": 110850,
+            "locator_scheme": "cas",
+            "locator": "cas://sha256/6436db1080c6fa487d19723d710500d8cf215e9c1635f16e4eec051e1cc94fc8",
+            "materialization_profile": "cutly.materialized.document-v2.inspected-image.v2",
+            "inspection_fingerprint": "sha256:2e28c3c8d78256899e2816a8a4341904f3f11dc273819c4b03b7f4609aefadb7"
+          },
+          {
+            "asset_id": "bg-3",
+            "kind": "image",
+            "content_hash": "sha256:d4533eebe16cc7855ff4812315dadeb3efdee7cbe99192e7eba7f62b97c4e153",
+            "size_bytes": 112394,
+            "locator_scheme": "cas",
+            "locator": "cas://sha256/d4533eebe16cc7855ff4812315dadeb3efdee7cbe99192e7eba7f62b97c4e153",
+            "materialization_profile": "cutly.materialized.document-v2.inspected-image.v2",
+            "inspection_fingerprint": "sha256:143dee928963b3684bf579e7390dfc2f426738deec16620161172c23bd82182e"
+          },
+          {
+            "asset_id": "font",
+            "kind": "font",
+            "content_hash": "sha256:948b2830a583dbc158bb97e6c7d47732e16cb3ae1264547dc7c92ac3eee481ec",
+            "size_bytes": 2380,
+            "locator_scheme": "cas",
+            "locator": "cas://sha256/948b2830a583dbc158bb97e6c7d47732e16cb3ae1264547dc7c92ac3eee481ec",
+            "materialization_profile": "cutly.materialized.document-v2.inspected-font.v2",
+            "inspection_fingerprint": "sha256:08ce2a1ace27b15c037d97a04e1d5735eb958b5508be8f0e70204083083e09d7"
+          }
+        ]
+      },
+      "source_manifest_fingerprint": "sha256:3274bf7a9edba025537340dbe2636a5e2a7d207a20bfeeee6b178bf30481eabb"
+    },
+    "semantic_audio": {
+      "enabled": true,
+      "profile": "cutly.program.document-v2.plan-audio.v2",
+      "descriptor": {
+        "schema_version": 2,
+        "profile": "cutly.program.document-v2.plan-audio.v2",
+        "domain": "audio",
+        "configuration_profile": "cutly.program-config.document-v2.audio.v2",
+        "source_manifest_profile": "cutly.program-source-manifest.document-v2.v2",
+        "output_profile": "cutly.decoded-audio.pcm-s16le.interleaved.v1",
+        "contribution": "ordered-plan-audio-and-bus-closure"
+      },
+      "descriptor_fingerprint": "sha256:6a68e3de965da92d9b708ec353a2cc068b8df7a50d4c85e3ceb4b0acb1e87e5e",
+      "configuration": {
+        "block_profile": "cutly.decoded-audio.pcm-s16le.interleaved.v1",
+        "channels": 2,
+        "profile": "cutly.program-config.document-v2.audio.v2",
+        "sample_clock": {
+          "origin": {
+            "rate": 1,
+            "value": 0
+          },
+          "samples_per_second": 48000
+        },
+        "sample_range": {
+          "count": 288000,
+          "first": 0
+        },
+        "schema_version": 2
+      },
+      "configuration_fingerprint": "sha256:0e37e14a6a038c07310c544a6468d2e2bb9638dea638ce2cbf9a211394bd6e62",
+      "source_manifest": {
+        "schema_version": 2,
+        "profile": "cutly.program-source-manifest.document-v2.v2",
+        "canonical_json_profile": "cutly.json.canonical-integer.v1",
+        "document_hash": "sha256:b06edb6818d332468395b6a8402cf5858f0ea993382c374d0b40c51942aeb6d8",
+        "plan_fingerprint": "sha256:eb14bda040155145d05bc04a7ca3ff21f6fd9c41dac32cfaa800f14a8fe9bb45",
+        "domain": "audio",
+        "program_profile": "cutly.program.document-v2.plan-audio.v2",
+        "descriptor_fingerprint": "sha256:6a68e3de965da92d9b708ec353a2cc068b8df7a50d4c85e3ceb4b0acb1e87e5e",
+        "configuration_fingerprint": "sha256:0e37e14a6a038c07310c544a6468d2e2bb9638dea638ce2cbf9a211394bd6e62",
+        "requested_range": {
+          "start": {
+            "value": 0,
+            "rate": 1
+          },
+          "duration": {
+            "value": 6,
+            "rate": 1
+          }
+        },
+        "tick_range": {
+          "first": 0,
+          "count": 288000
+        },
+        "clips": [
+          {
+            "binding": {
+              "track_id": "soundtrack",
+              "clip_id": "music-clip",
+              "asset_id": "music",
+              "track_kind": "audio",
+              "asset_kind": "audio",
+              "track_index": 3,
+              "clip_index": 0,
+              "timeline_range": {
+                "start": {
+                  "value": 0,
+                  "rate": 1
+                },
+                "duration": {
+                  "value": 6,
+                  "rate": 1
+                }
+              },
+              "source_range": {
+                "start": {
+                  "value": 0,
+                  "rate": 1
+                },
+                "duration": {
+                  "value": 6,
+                  "rate": 1
+                }
+              },
+              "font_asset_id": "",
+              "audio_bus_id": "music-bus"
+            },
+            "visible_timeline_range": {
+              "start": {
+                "value": 0,
+                "rate": 1
+              },
+              "duration": {
+                "value": 6,
+                "rate": 1
+              }
+            },
+            "visible_source_range": {
+              "start": {
+                "value": 0,
+                "rate": 1
+              },
+              "duration": {
+                "value": 6,
+                "rate": 1
+              }
+            }
+          }
+        ],
+        "transitions": [],
+        "audio_bus_ids": [
+          "master",
+          "music-bus"
+        ],
+        "resources": [
+          {
+            "asset_id": "music",
+            "kind": "audio",
+            "content_hash": "sha256:55b7df65f1d398a7228c90076947cadf3609faec8e32389321ec7340f552cda0",
+            "size_bytes": 1152044,
+            "locator_scheme": "cas",
+            "locator": "cas://sha256/55b7df65f1d398a7228c90076947cadf3609faec8e32389321ec7340f552cda0",
+            "materialization_profile": "cutly.materialized.document-v2.probed-av.v2",
+            "probe_fingerprint": "sha256:04b5e44dbbb874f99c18b4c3edcf816a37d7f9d7f6be95072216e192d2e468d2"
+          }
+        ]
+      },
+      "source_manifest_fingerprint": "sha256:d559e598b757d0bc6ae595c2559725b7319159c88d07787b036bd73751b4277f"
+    },
+    "visual_config": {
+      "static": {
+        "width": 640,
+        "height": 360,
+        "native_limits": {
+          "max_bindings": 256,
+          "max_clip_scopes": 65536,
+          "max_document_nodes": 262144,
+          "max_tracks_per_timeline": 4096,
+          "max_retained_bytes": 536870912,
+          "max_total_encoded_bytes": 536870912,
+          "max_canonical_document_bytes": 134217728,
+          "png": {
+            "max_width": 8192,
+            "max_height": 8192,
+            "max_encoded_bytes": 134217728,
+            "max_working_bytes": 536870912
+          }
+        },
+        "expression_limits": {
+          "max_clip_scopes": 65536,
+          "max_expression_assets": 256,
+          "max_document_nodes": 262144,
+          "max_tracks_per_timeline": 4096,
+          "max_total_paths": 65536,
+          "max_total_commands": 1048576,
+          "max_total_edges": 1048576,
+          "max_retained_bytes": 536870912,
+          "max_canonical_document_bytes": 134217728,
+          "vector": {
+            "max_width": 4096,
+            "max_height": 4096,
+            "max_pixels": 16777216,
+            "max_paths": 1024,
+            "max_commands": 65536,
+            "max_edges": 65536,
+            "max_exact_bits": 512,
+            "max_canonical_source_bytes": 33554432,
+            "max_working_bytes": 536870912,
+            "max_retained_bytes": 268435456,
+            "max_work_units": 4294967296
+          }
+        },
+        "text_config": {
+          "limits": {
+            "max_bindings": 256,
+            "max_clip_scopes": 65536,
+            "max_text_assets": 256,
+            "max_font_assets": 256,
+            "max_document_nodes": 262144,
+            "max_tracks_per_timeline": 4096,
+            "max_canonical_document_bytes": 134217728,
+            "max_total_static_surface_bytes": 536870912,
+            "max_compile_working_bytes": 2147483648,
+            "frozen_text": {
+              "max_text_bytes": 1048576,
+              "max_canonical_source_bytes": 8388608,
+              "max_text_semantic_canonical_bytes": 16777216,
+              "max_layout_input_canonical_bytes": 16777216,
+              "max_canonical_binary_bytes": 67108864,
+              "max_work_units": 134217728,
+              "max_working_bytes": 134217728,
+              "max_retained_bytes": 16777216
+            },
+            "assembly": {
+              "shape": {
+                "max_text_bytes": 65536,
+                "max_lines": 1024,
+                "max_scalars_per_line": 32768,
+                "max_scalars": 262144,
+                "max_glyphs_per_line": 32768,
+                "max_glyphs": 262144,
+                "max_canonical_bytes": 134217728,
+                "max_work_units": 4294967296,
+                "max_working_bytes": 536870912,
+                "max_retained_bytes": 268435456
+              },
+              "layout_source": {
+                "max_glyphs": 65535,
+                "max_contours": 4194304,
+                "max_commands": 25165824,
+                "max_command_point_occurrences": 37748736,
+                "max_commands_per_glyph": 262144,
+                "max_canonical_binary_bytes": 1048576,
+                "max_work_units": 1152921504606846976,
+                "max_working_bytes": 4294967296,
+                "max_retained_bytes": 2147483648
+              },
+              "layout": {
+                "max_width": 4096,
+                "max_height": 4096,
+                "max_pixels": 16777216,
+                "max_text_bytes": 65536,
+                "max_lines": 1024,
+                "max_glyphs_per_line": 32768,
+                "max_glyphs": 262144,
+                "max_unique_glyphs": 65536,
+                "max_commands_per_glyph": 65536,
+                "max_commands": 2097152,
+                "max_contours": 1048576,
+                "max_exact_bits": 512,
+                "max_canonical_binary_bytes": 268435456,
+                "max_working_bytes": 536870912,
+                "max_retained_bytes": 536870912,
+                "max_work_units": 4294967296
+              },
+              "max_lines": 1024,
+              "max_glyphs": 262144,
+              "max_unique_glyphs": 65536,
+              "max_commands": 2097152,
+              "max_command_point_occurrences": 4194304,
+              "max_canonical_binary_bytes": 1073741824,
+              "max_work_units": 1152921504606846976,
+              "max_working_bytes": 4294967296,
+              "max_retained_bytes": 2147483648
+            },
+            "raster": {
+              "raster": {
+                "max_width": 4096,
+                "max_height": 4096,
+                "max_pixels": 16777216,
+                "max_placements": 262144,
+                "max_unique_glyphs": 65536,
+                "max_commands": 2097152,
+                "max_segments": 4194304,
+                "max_exact_bits": 512,
+                "max_canonical_binary_bytes": 268435456,
+                "max_working_bytes": 536870912,
+                "max_retained_bytes": 536870912,
+                "max_work_units": 4294967296
+              },
+              "max_canonical_binary_bytes": 1073741824,
+              "max_work_units": 1152921504606846976,
+              "max_working_bytes": 4294967296,
+              "max_retained_bytes": 2147483648
+            }
+          }
+        },
+        "compositor_limits": {
+          "target": {
+            "MaxWidth": 16384,
+            "MaxHeight": 16384,
+            "MaxBytes": 536870912
+          },
+          "raster": {
+            "max_width": 4096,
+            "max_height": 4096,
+            "max_output_pixels": 4194304,
+            "max_working_bytes": 134217728,
+            "max_exact_bits": 512
+          },
+          "max_layers": 1024,
+          "max_source_requests": 2048,
+          "max_document_nodes": 262144,
+          "max_tracks_per_timeline": 4096,
+          "max_source_bytes": 536870912,
+          "max_target_working_bytes": 402653184,
+          "max_canonical_document_bytes": 67108864
+        },
+        "output_limits": {
+          "max_width": 8192,
+          "max_height": 8192,
+          "max_output_bytes": 268435456
+        },
+        "png_limits": {
+          "max_width": 8192,
+          "max_height": 8192,
+          "max_raw_rgba_bytes": 268435456,
+          "max_artifact_bytes": 335544320,
+          "max_working_bytes": 335577088
+        },
+        "pipeline_limits": {
+          "max_retained_source_bytes": 2147483648,
+          "max_compile_working_bytes": 4294967296,
+          "max_runtime_working_bytes": 3221225472
+        }
+      },
+      "video_limits": {
+        "max_bindings": 1024,
+        "max_clip_scopes": 65536,
+        "max_canonical_document_bytes": 67108864
+      },
+      "max_video_frame_surface_bytes": 67108864
+    },
+    "visual_manifest": {
+      "schema_version": 3,
+      "profile": "cutly.reference-visual.domain-source-manifest.v3",
+      "document_hash": "sha256:b06edb6818d332468395b6a8402cf5858f0ea993382c374d0b40c51942aeb6d8",
+      "domain_scope": {
+        "profile": "cutly.hash.visual-domain-scope-canonical-json.v1",
+        "fingerprint": "sha256:1735c5d765c5017e452fccca355f9a434ac2dafcb60d04f870c250037d64355b",
+        "scope": {
+          "domain": "visual",
+          "selection": {
+            "timeline_id": "main",
+            "clip_ids": [
+              "bg-clip-1",
+              "bg-clip-2",
+              "bg-clip-3",
+              "card-clip",
+              "title-clip-1",
+              "title-clip-2",
+              "title-clip-3"
+            ],
+            "transition_ids": [
+              "dissolve-1",
+              "dissolve-2"
+            ]
+          },
+          "requested_range": {
+            "start": {
+              "value": 0,
+              "rate": 1
+            },
+            "duration": {
+              "value": 6,
+              "rate": 1
+            }
+          }
+        }
+      },
+      "static": {
+        "schema_version": 1,
+        "profile": "cutly.reference-visual.source-manifest.v2",
+        "document_hash": "sha256:b06edb6818d332468395b6a8402cf5858f0ea993382c374d0b40c51942aeb6d8",
+        "native_png": {
+          "schema_version": 1,
+          "profile": "cutly.source.verified-native-static-png.v1",
+          "document_hash": "sha256:b06edb6818d332468395b6a8402cf5858f0ea993382c374d0b40c51942aeb6d8",
+          "source_contract_version": 1,
+          "source_profile": "cutly.source.normalized-native-surface-frame.v1",
+          "surface_profile": "cutly.surface.linear-bt709-premultiplied-rgba16.v1",
+          "assets": [
+            {
+              "asset_id": "bg-1",
+              "asset_index": 0,
+              "encoded_content_hash": "sha256:4038aa49fa6771d6db8738093f0d13c2e153cf6b75e956ac3a55f545165392eb",
+              "pixel_hash": "sha256:c05b19fe19863b45b532d8c905022544e6da848383061494e243842eb52c7ea4",
+              "width": 640,
+              "height": 360,
+              "srgb_rendering_intent": 0,
+              "decode_profile": "cutly.decode.png-rgba8-explicit-srgb.v1",
+              "selection_profile": "cutly.selection.static-image-any-valid-source-time.v1",
+              "color_profile": "cutly.color.rgba8-srgb-straight-to-linear-bt709-premultiplied-rgba16.v1",
+              "normalization_profile": "cutly.normalization.png-native-top-down-square-pixel-no-exif.v1",
+              "content_hash_profile": "cutly.hash.sha256.encoded-png-bytes.v1",
+              "source_profile": "cutly.source.normalized-native-surface-frame.v1",
+              "surface_profile": "cutly.surface.linear-bt709-premultiplied-rgba16.v1"
+            },
+            {
+              "asset_id": "bg-2",
+              "asset_index": 1,
+              "encoded_content_hash": "sha256:6436db1080c6fa487d19723d710500d8cf215e9c1635f16e4eec051e1cc94fc8",
+              "pixel_hash": "sha256:eca8d689ea19076faf480f5126bc233a32211635843a5ce52d6d1d7a4ffbda61",
+              "width": 640,
+              "height": 360,
+              "srgb_rendering_intent": 0,
+              "decode_profile": "cutly.decode.png-rgba8-explicit-srgb.v1",
+              "selection_profile": "cutly.selection.static-image-any-valid-source-time.v1",
+              "color_profile": "cutly.color.rgba8-srgb-straight-to-linear-bt709-premultiplied-rgba16.v1",
+              "normalization_profile": "cutly.normalization.png-native-top-down-square-pixel-no-exif.v1",
+              "content_hash_profile": "cutly.hash.sha256.encoded-png-bytes.v1",
+              "source_profile": "cutly.source.normalized-native-surface-frame.v1",
+              "surface_profile": "cutly.surface.linear-bt709-premultiplied-rgba16.v1"
+            },
+            {
+              "asset_id": "bg-3",
+              "asset_index": 2,
+              "encoded_content_hash": "sha256:d4533eebe16cc7855ff4812315dadeb3efdee7cbe99192e7eba7f62b97c4e153",
+              "pixel_hash": "sha256:e4eb05ff3757925f0595d553b46c134c0dbc07f1d49163461b8da8824b3833b2",
+              "width": 640,
+              "height": 360,
+              "srgb_rendering_intent": 0,
+              "decode_profile": "cutly.decode.png-rgba8-explicit-srgb.v1",
+              "selection_profile": "cutly.selection.static-image-any-valid-source-time.v1",
+              "color_profile": "cutly.color.rgba8-srgb-straight-to-linear-bt709-premultiplied-rgba16.v1",
+              "normalization_profile": "cutly.normalization.png-native-top-down-square-pixel-no-exif.v1",
+              "content_hash_profile": "cutly.hash.sha256.encoded-png-bytes.v1",
+              "source_profile": "cutly.source.normalized-native-surface-frame.v1",
+              "surface_profile": "cutly.surface.linear-bt709-premultiplied-rgba16.v1"
+            }
+          ]
+        },
+        "expression": {
+          "schema_version": 1,
+          "profile": "cutly.provider.expression-layer.vector-viewport-px.v1",
+          "contract_version": 1,
+          "document_hash": "sha256:b06edb6818d332468395b6a8402cf5858f0ea993382c374d0b40c51942aeb6d8",
+          "source_profile": "cutly.source.expression-layer-intrinsic-surface.v1",
+          "selection_profile": "cutly.selection.static-expression-visible-time.v1",
+          "asset_semantic_hash_profile": "cutly.hash.vector-source-canonical-json.v1",
+          "expression_profile": "cutly.vector.path-viewport-px.v2",
+          "evaluator_profile": "cutly.evaluator.vector-path-viewport-px.v2",
+          "raster_profile": "cutly.raster.vector-path-viewport-px-supersample8x8.v1",
+          "paint_profile": "cutly.color.rgba16-srgb-straight-paint-to-linear-bt709-premultiplied-rgba16.v1",
+          "kernel_profile": "cutly.compositor.cpu-kernel.v1",
+          "surface_profile": "cutly.surface.linear-bt709-premultiplied-rgba16.v1",
+          "pixel_hash_profile": "cutly.hash.sha256.surface-rgba16be-pixels.v1",
+          "assets": [
+            {
+              "asset_id": "card",
+              "asset_index": 5,
+              "asset_kind": "vector",
+              "asset_semantic_hash_profile": "cutly.hash.vector-source-canonical-json.v1",
+              "asset_semantic_hash": "sha256:4573586253745aa2b085114e9958e3c786d51892bac11ccd69dd31fbe134cd6b",
+              "raster_viewport": {
+                "width_pixels": 560,
+                "height_pixels": 132
+              },
+              "expression_profile": "cutly.vector.path-viewport-px.v2",
+              "evaluator_profile": "cutly.evaluator.vector-path-viewport-px.v2",
+              "source_profile": "cutly.source.expression-layer-intrinsic-surface.v1",
+              "selection_profile": "cutly.selection.static-expression-visible-time.v1",
+              "raster_profile": "cutly.raster.vector-path-viewport-px-supersample8x8.v1",
+              "paint_profile": "cutly.color.rgba16-srgb-straight-paint-to-linear-bt709-premultiplied-rgba16.v1",
+              "kernel_profile": "cutly.compositor.cpu-kernel.v1",
+              "surface_profile": "cutly.surface.linear-bt709-premultiplied-rgba16.v1",
+              "path_count": 1,
+              "command_count": 5,
+              "conceptual_edge_count": 4,
+              "effective_edge_count": 2,
+              "surface_bytes": 591360,
+              "surface_identity": {
+                "width_pixels": 560,
+                "height_pixels": 132,
+                "pixel_hash_profile": "cutly.hash.sha256.surface-rgba16be-pixels.v1",
+                "pixel_hash": "sha256:c19e3a108621a2023668980840e3bbf2782f091b13ccf3da66d16b36bab3f43b",
+                "surface_profile": "cutly.surface.linear-bt709-premultiplied-rgba16.v1"
+              },
+              "raster_receipt": {
+                "schema_version": 1,
+                "profile": "cutly.raster.vector-path-viewport-px-supersample8x8.receipt.v1",
+                "raster_profile": "cutly.raster.vector-path-viewport-px-supersample8x8.v1",
+                "source_profile": "cutly.vector.path-viewport-px.v2",
+                "source_hash_profile": "cutly.hash.vector-source-canonical-json.v1",
+                "source_semantic_hash": "sha256:4573586253745aa2b085114e9958e3c786d51892bac11ccd69dd31fbe134cd6b",
+                "paint_profile": "cutly.color.rgba16-srgb-straight-paint-to-linear-bt709-premultiplied-rgba16.v1",
+                "kernel_profile": "cutly.compositor.cpu-kernel.v1",
+                "surface_profile": "cutly.surface.linear-bt709-premultiplied-rgba16.v1",
+                "width_pixels": 560,
+                "height_pixels": 132,
+                "pixel_hash": "sha256:c19e3a108621a2023668980840e3bbf2782f091b13ccf3da66d16b36bab3f43b",
+                "path_count": 1,
+                "command_count": 5,
+                "conceptual_edge_count": 4,
+                "effective_edge_count": 2,
+                "sample_count": 4730880,
+                "work_units": 4895625,
+                "canonical_source_bytes": 805,
+                "working_bytes": 693530,
+                "retained_bytes": 591360
+              }
+            }
+          ]
+        },
+        "expression_handle_profile": "cutly.provider.expression-layer.vector-transition-handle.v2",
+        "expression_handle_contract_version": 2,
+        "vector_transition_scope_profile": "cutly.transition-scope.vector-path-viewport-px.v1",
+        "native_retained_surface_bytes": 5529600,
+        "expression_retained_surface_bytes": 591360,
+        "text": {
+          "schema_version": 1,
+          "profile": "cutly.provider.text-layer.pinned-font-static-surface.v1",
+          "contract_version": 1,
+          "document_hash": "sha256:b06edb6818d332468395b6a8402cf5858f0ea993382c374d0b40c51942aeb6d8",
+          "source_profile": "cutly.source.text-layer-intrinsic-surface.v1",
+          "selection_profile": "cutly.selection.static-text-visible-time.v1",
+          "text_profile": "cutly.text.pinned-font-viewport-px.v2",
+          "evaluator_profile": "cutly.evaluator.text-pinned-font-viewport-px.v2",
+          "raster_profile": "cutly.raster.text-glyf-unhinted-supersample8x8.v1",
+          "paint_profile": "cutly.color.rgba16-srgb-straight-paint-to-linear-bt709-premultiplied-rgba16.v1",
+          "surface_profile": "cutly.surface.linear-bt709-premultiplied-rgba16.v1",
+          "pixel_hash_profile": "cutly.hash.sha256.surface-rgba16be-pixels.v1",
+          "retained_surface_bytes": 1451520,
+          "assets": [
+            {
+              "asset_id": "title-1",
+              "asset_index": 6,
+              "asset_kind": "text",
+              "frozen_text_binding_hash_profile": "cutly.hash.sha256.evaluator-frozen-text-source-binding-be.v1",
+              "frozen_text_binding_hash": "sha256:57bce4c04602bec1fc4292984278e0c4962fd8c27be8335fc4e20c85341ae787",
+              "text_semantic_hash_profile": "cutly.hash.sha256.text-source-font-profiles.v1",
+              "text_semantic_hash": "sha256:e906456ca52bb9299cf1444757f38d60b1ff18916394c9a810807ec45339df91",
+              "layout_input_hash_profile": "cutly.hash.sha256.text-layout-input-source.v1",
+              "layout_input_hash": "sha256:89af143b633180c5db167ba3868107b5b61900ce3b3621309b5637f1c04c3ec7",
+              "font_asset_id": "font",
+              "font_asset_index": 3,
+              "font_content_hash_profile": "cutly.hash.sha256.font-sfnt-complete-bytes.v1",
+              "font_content_hash": "sha256:948b2830a583dbc158bb97e6c7d47732e16cb3ae1264547dc7c92ac3eee481ec",
+              "raster_viewport": {
+                "width_pixels": 540,
+                "height_pixels": 112
+              },
+              "surface_bytes": 483840,
+              "assembly": {
+                "schema_version": 1,
+                "profile": "cutly.render.text-assembly.static-glyf.receipt.v1",
+                "descriptor_hash_profile": "cutly.hash.sha256.text-assembly-descriptor-json.v1",
+                "descriptor_hash": "sha256:adfd200508853e4af1861fbd2faa0ec8e31b96e8c60632da2bfaa49f3707ff43",
+                "assembly_hash_profile": "cutly.hash.sha256.text-assembly-binding-be.v1",
+                "assembly_hash": "sha256:46721fc2d5fb37b06d68928f8260728c3e8832cc8afdb2f7aec67911a09340f3",
+                "frozen_text_profile": "cutly.evaluator.frozen-text-source.v1",
+                "frozen_text_binding_hash_profile": "cutly.hash.sha256.evaluator-frozen-text-source-binding-be.v1",
+                "frozen_text_binding_hash": "sha256:57bce4c04602bec1fc4292984278e0c4962fd8c27be8335fc4e20c85341ae787",
+                "document_hash_profile": "cutly.hash.sha256.document-v2-canonical-json.v1",
+                "document_hash": "sha256:b06edb6818d332468395b6a8402cf5858f0ea993382c374d0b40c51942aeb6d8",
+                "text_asset_id": "title-1",
+                "text_asset_index": 6,
+                "font_asset_id": "font",
+                "font_asset_index": 3,
+                "font_content_hash_profile": "cutly.hash.sha256.font-sfnt-complete-bytes.v1",
+                "font_content_hash": "sha256:948b2830a583dbc158bb97e6c7d47732e16cb3ae1264547dc7c92ac3eee481ec",
+                "text_semantic_hash_profile": "cutly.hash.sha256.text-source-font-profiles.v1",
+                "text_semantic_hash": "sha256:e906456ca52bb9299cf1444757f38d60b1ff18916394c9a810807ec45339df91",
+                "layout_input_hash_profile": "cutly.hash.sha256.text-layout-input-source.v1",
+                "layout_input_hash": "sha256:89af143b633180c5db167ba3868107b5b61900ce3b3621309b5637f1c04c3ec7",
+                "shape_provider_profile": "cutly.shape.go-text-harfbuzz-static-glyf.v1",
+                "shape_provider_hash_profile": "cutly.hash.sha256.text-shape-provider-binding-be.v1",
+                "shape_provider_hash": "sha256:7116505b11ce81a7a66d5040eb37ac0e4347952975c7227e174168efb8b527be",
+                "dependency_fingerprint_profile": "cutly.hash.sha256.text-shape-dependency-lock-json.v1",
+                "dependency_fingerprint": "sha256:e2f3967156b6030da45e94771b910a79ac9ebe3618f320217ca35a4825de0ee2",
+                "layout_graph_hash_profile": "cutly.hash.sha256.font-opentype-layout-graph-be.v1",
+                "layout_graph_hash": "sha256:30c3c3c076c2687864a324834b0f5ddc11fd39ac529b91b910f421c965e3d770",
+                "source_outline_set_hash_profile": "cutly.hash.sha256.font-static-glyf-outline-set-q26_6-be.v1",
+                "source_outline_set_hash": "sha256:62d3f0cdb6a9b899e961db265b3026d1fe2fa4fafc2d8b2370008849480506fa",
+                "layout_source_hash_profile": "cutly.hash.sha256.font-static-glyf-layout-source-binding-be.v1",
+                "layout_source_hash": "sha256:70ecb8af2dc2f000a5a91562d599070bbde1bdb114b570ce4febc343b98e4210",
+                "shape_input_hash_profile": "cutly.hash.sha256.text-shape-input-be.v1",
+                "shape_input_hash": "sha256:a47520bb005881493cbbe5009034b59f6de2c43e34bcabdf290a6e98fe3baf7e",
+                "shape_output_profile": "cutly.text-shaped-stream.logical-pen-q26_6.v1",
+                "shape_output_hash_profile": "cutly.hash.sha256.text-shaped-glyph-stream-be.v1",
+                "shape_output_hash": "sha256:24a5ef9fcf15409e6964f3c3e026731bd4d3d77075c86926a9b99f998f50b767",
+                "layout_receipt_profile": "cutly.layout.text-unwrapped-top-baseline-logical-align.receipt.v1",
+                "glyph_stream_hash_profile": "cutly.hash.sha256.text-normalized-shaped-glyph-stream-be.v1",
+                "glyph_stream_hash": "sha256:d724434ab8e7bd50abcb91c8f9e6577c6c8dffcd3aae452d9f04c01ce1ef17a0",
+                "scaled_outline_hash_profile": "cutly.hash.sha256.text-scaled-outline-set-be.v1",
+                "scaled_outline_hash": "sha256:9771509df6081388b8812dcee7980b0e1efc74212fe741b809191034bd905afc",
+                "placement_hash_profile": "cutly.hash.sha256.text-glyph-placement-stream-be.v1",
+                "placement_hash": "sha256:98c705a1210b4a9d8577bb8de7fbf1a727b2ed2ed3a71c79fa1cc2b80f989c7e",
+                "layout_hash_profile": "cutly.hash.sha256.text-layout-binding-be.v1",
+                "layout_hash": "sha256:700fa09d48438c5ede9e3753d68d2a469095079b7f247dcd82e84a91d131d75e",
+                "shaping_provenance_status": "cutly.text-shaping-provenance.provider-authenticated-by-assembly.v1",
+                "paint_provenance_status": "cutly.text-paint-provenance.frozen-source-static-fill.v1",
+                "capability_status": "provider-authenticated-static-text-layout-ready-for-private-raster",
+                "width_pixels": 540,
+                "height_pixels": 112,
+                "font_size_numerator": 84,
+                "font_size_denominator": 1,
+                "fill_r": 65535,
+                "fill_g": 65535,
+                "fill_b": 65535,
+                "fill_a": 65535,
+                "line_count": 1,
+                "glyph_count": 5,
+                "unique_glyph_count": 5,
+                "contour_count": 5,
+                "command_count": 58,
+                "command_point_occurrences": 75,
+                "canonical_binary_bytes": 12080,
+                "work_units": 251752,
+                "working_bytes": 408164,
+                "retained_bytes": 237914
+              },
+              "raster": {
+                "schema_version": 1,
+                "profile": "cutly.render.text-assembly.static-raster.receipt.v1",
+                "descriptor_hash_profile": "cutly.hash.sha256.text-assembly-descriptor-json.v1",
+                "descriptor_hash": "sha256:adfd200508853e4af1861fbd2faa0ec8e31b96e8c60632da2bfaa49f3707ff43",
+                "binding_hash_profile": "cutly.hash.sha256.text-assembly-static-raster-binding-be.v1",
+                "binding_hash": "sha256:9b4fc6f746ea7732a4e69abebe951fe87ecca92c05fcc015dc7bc34ddb9670ca",
+                "assembly_hash_profile": "cutly.hash.sha256.text-assembly-binding-be.v1",
+                "assembly_hash": "sha256:46721fc2d5fb37b06d68928f8260728c3e8832cc8afdb2f7aec67911a09340f3",
+                "inner_receipt_profile": "cutly.raster.text-glyf-unhinted-supersample8x8.receipt.v1",
+                "inner_raster_profile": "cutly.raster.text-glyf-unhinted-supersample8x8.v1",
+                "inner_binding_hash_profile": "cutly.hash.sha256.text-raster-binding-be.v1",
+                "inner_binding_hash": "sha256:d0ea78d373e53c460bfeaeb19b6fadb3add1d928273291073744b0ac7cfa6467",
+                "inner_shaping_status": "cutly.text-shaping-provenance.caller-layout-unverified.v1",
+                "shaping_provenance_status": "cutly.text-shaping-provenance.provider-authenticated-by-assembly.v1",
+                "paint_provenance_status": "cutly.text-paint-provenance.frozen-source-static-fill.v1",
+                "coverage_hash_profile": "cutly.hash.sha256.text-coverage-u8.v1",
+                "coverage_hash": "sha256:53ee2a73781226bc20ea0ab571cb2e85c6f9c84660df037a865984096cb3b9e8",
+                "pixel_hash_profile": "cutly.hash.sha256.surface-rgba16be-pixels.v1",
+                "pixel_hash": "sha256:5110fb6225ebb9d49a1c280190c3c9bffe67770bcd92ac1020707f7e5f9b398e",
+                "width_pixels": 540,
+                "height_pixels": 112,
+                "canonical_binary_bytes": 547874,
+                "work_units": 32163405,
+                "working_bytes": 659432,
+                "retained_bytes": 497169
+              },
+              "surface_identity": {
+                "width_pixels": 540,
+                "height_pixels": 112,
+                "pixel_hash_profile": "cutly.hash.sha256.surface-rgba16be-pixels.v1",
+                "pixel_hash": "sha256:5110fb6225ebb9d49a1c280190c3c9bffe67770bcd92ac1020707f7e5f9b398e",
+                "surface_profile": "cutly.surface.linear-bt709-premultiplied-rgba16.v1"
+              }
+            },
+            {
+              "asset_id": "title-2",
+              "asset_index": 7,
+              "asset_kind": "text",
+              "frozen_text_binding_hash_profile": "cutly.hash.sha256.evaluator-frozen-text-source-binding-be.v1",
+              "frozen_text_binding_hash": "sha256:df8e19880dff5b1d7b9fb74d4b23bef0b33f66f0c040991179dea74c2a687ff1",
+              "text_semantic_hash_profile": "cutly.hash.sha256.text-source-font-profiles.v1",
+              "text_semantic_hash": "sha256:c686e3636ec777174d8115ce3410dd1982da3bc889b01b891e6cfaa938a0147c",
+              "layout_input_hash_profile": "cutly.hash.sha256.text-layout-input-source.v1",
+              "layout_input_hash": "sha256:e3440b25e030bf9269a808930b4fee5996dc7a3e909a56429bbb21b721376366",
+              "font_asset_id": "font",
+              "font_asset_index": 3,
+              "font_content_hash_profile": "cutly.hash.sha256.font-sfnt-complete-bytes.v1",
+              "font_content_hash": "sha256:948b2830a583dbc158bb97e6c7d47732e16cb3ae1264547dc7c92ac3eee481ec",
+              "raster_viewport": {
+                "width_pixels": 540,
+                "height_pixels": 112
+              },
+              "surface_bytes": 483840,
+              "assembly": {
+                "schema_version": 1,
+                "profile": "cutly.render.text-assembly.static-glyf.receipt.v1",
+                "descriptor_hash_profile": "cutly.hash.sha256.text-assembly-descriptor-json.v1",
+                "descriptor_hash": "sha256:adfd200508853e4af1861fbd2faa0ec8e31b96e8c60632da2bfaa49f3707ff43",
+                "assembly_hash_profile": "cutly.hash.sha256.text-assembly-binding-be.v1",
+                "assembly_hash": "sha256:bce1dbc52a48aa89d1359a13ccc7b83eac5ea64601f9ca0035e274815671445d",
+                "frozen_text_profile": "cutly.evaluator.frozen-text-source.v1",
+                "frozen_text_binding_hash_profile": "cutly.hash.sha256.evaluator-frozen-text-source-binding-be.v1",
+                "frozen_text_binding_hash": "sha256:df8e19880dff5b1d7b9fb74d4b23bef0b33f66f0c040991179dea74c2a687ff1",
+                "document_hash_profile": "cutly.hash.sha256.document-v2-canonical-json.v1",
+                "document_hash": "sha256:b06edb6818d332468395b6a8402cf5858f0ea993382c374d0b40c51942aeb6d8",
+                "text_asset_id": "title-2",
+                "text_asset_index": 7,
+                "font_asset_id": "font",
+                "font_asset_index": 3,
+                "font_content_hash_profile": "cutly.hash.sha256.font-sfnt-complete-bytes.v1",
+                "font_content_hash": "sha256:948b2830a583dbc158bb97e6c7d47732e16cb3ae1264547dc7c92ac3eee481ec",
+                "text_semantic_hash_profile": "cutly.hash.sha256.text-source-font-profiles.v1",
+                "text_semantic_hash": "sha256:c686e3636ec777174d8115ce3410dd1982da3bc889b01b891e6cfaa938a0147c",
+                "layout_input_hash_profile": "cutly.hash.sha256.text-layout-input-source.v1",
+                "layout_input_hash": "sha256:e3440b25e030bf9269a808930b4fee5996dc7a3e909a56429bbb21b721376366",
+                "shape_provider_profile": "cutly.shape.go-text-harfbuzz-static-glyf.v1",
+                "shape_provider_hash_profile": "cutly.hash.sha256.text-shape-provider-binding-be.v1",
+                "shape_provider_hash": "sha256:7116505b11ce81a7a66d5040eb37ac0e4347952975c7227e174168efb8b527be",
+                "dependency_fingerprint_profile": "cutly.hash.sha256.text-shape-dependency-lock-json.v1",
+                "dependency_fingerprint": "sha256:e2f3967156b6030da45e94771b910a79ac9ebe3618f320217ca35a4825de0ee2",
+                "layout_graph_hash_profile": "cutly.hash.sha256.font-opentype-layout-graph-be.v1",
+                "layout_graph_hash": "sha256:30c3c3c076c2687864a324834b0f5ddc11fd39ac529b91b910f421c965e3d770",
+                "source_outline_set_hash_profile": "cutly.hash.sha256.font-static-glyf-outline-set-q26_6-be.v1",
+                "source_outline_set_hash": "sha256:62d3f0cdb6a9b899e961db265b3026d1fe2fa4fafc2d8b2370008849480506fa",
+                "layout_source_hash_profile": "cutly.hash.sha256.font-static-glyf-layout-source-binding-be.v1",
+                "layout_source_hash": "sha256:70ecb8af2dc2f000a5a91562d599070bbde1bdb114b570ce4febc343b98e4210",
+                "shape_input_hash_profile": "cutly.hash.sha256.text-shape-input-be.v1",
+                "shape_input_hash": "sha256:ac6a216bead1eafdccfbad2fda43e46c826bba590ab8d4057e04868145a6f884",
+                "shape_output_profile": "cutly.text-shaped-stream.logical-pen-q26_6.v1",
+                "shape_output_hash_profile": "cutly.hash.sha256.text-shaped-glyph-stream-be.v1",
+                "shape_output_hash": "sha256:f9db1f74decb27fde608c083e6b41556ad66abece1b0b9037af34b170170f286",
+                "layout_receipt_profile": "cutly.layout.text-unwrapped-top-baseline-logical-align.receipt.v1",
+                "glyph_stream_hash_profile": "cutly.hash.sha256.text-normalized-shaped-glyph-stream-be.v1",
+                "glyph_stream_hash": "sha256:3dee19fc09001e1348d805c074641be098d06de20d7eef07b6b3cf24ce45e86a",
+                "scaled_outline_hash_profile": "cutly.hash.sha256.text-scaled-outline-set-be.v1",
+                "scaled_outline_hash": "sha256:f611994b93fec6ca9d37f31244b0a24549242c99a3fa4bf43ab8b5328faea9ee",
+                "placement_hash_profile": "cutly.hash.sha256.text-glyph-placement-stream-be.v1",
+                "placement_hash": "sha256:d00bc959f3939720ebfa5763ff00fb000e4f26928ecb969862e84dca3af78fd8",
+                "layout_hash_profile": "cutly.hash.sha256.text-layout-binding-be.v1",
+                "layout_hash": "sha256:5f574c550404a9a4dab855fafe2f0fb94aa487835873af45454b39dcf20f7e1e",
+                "shaping_provenance_status": "cutly.text-shaping-provenance.provider-authenticated-by-assembly.v1",
+                "paint_provenance_status": "cutly.text-paint-provenance.frozen-source-static-fill.v1",
+                "capability_status": "provider-authenticated-static-text-layout-ready-for-private-raster",
+                "width_pixels": 540,
+                "height_pixels": 112,
+                "font_size_numerator": 32,
+                "font_size_denominator": 1,
+                "fill_r": 26000,
+                "fill_g": 65535,
+                "fill_b": 59000,
+                "fill_a": 65535,
+                "line_count": 1,
+                "glyph_count": 25,
+                "unique_glyph_count": 14,
+                "contour_count": 17,
+                "command_count": 184,
+                "command_point_occurrences": 224,
+                "canonical_binary_bytes": 18326,
+                "work_units": 271581,
+                "working_bytes": 431235,
+                "retained_bytes": 245250
+              },
+              "raster": {
+                "schema_version": 1,
+                "profile": "cutly.render.text-assembly.static-raster.receipt.v1",
+                "descriptor_hash_profile": "cutly.hash.sha256.text-assembly-descriptor-json.v1",
+                "descriptor_hash": "sha256:adfd200508853e4af1861fbd2faa0ec8e31b96e8c60632da2bfaa49f3707ff43",
+                "binding_hash_profile": "cutly.hash.sha256.text-assembly-static-raster-binding-be.v1",
+                "binding_hash": "sha256:d44b7a32ee64346382205862a67b9e1ae82e6f9e9d9f7296772fc8019f789562",
+                "assembly_hash_profile": "cutly.hash.sha256.text-assembly-binding-be.v1",
+                "assembly_hash": "sha256:bce1dbc52a48aa89d1359a13ccc7b83eac5ea64601f9ca0035e274815671445d",
+                "inner_receipt_profile": "cutly.raster.text-glyf-unhinted-supersample8x8.receipt.v1",
+                "inner_raster_profile": "cutly.raster.text-glyf-unhinted-supersample8x8.v1",
+                "inner_binding_hash_profile": "cutly.hash.sha256.text-raster-binding-be.v1",
+                "inner_binding_hash": "sha256:5e93033c154695ad36eddf6650976339433974c77f06395ffe282a778f61b4cb",
+                "inner_shaping_status": "cutly.text-shaping-provenance.caller-layout-unverified.v1",
+                "shaping_provenance_status": "cutly.text-shaping-provenance.provider-authenticated-by-assembly.v1",
+                "paint_provenance_status": "cutly.text-paint-provenance.frozen-source-static-fill.v1",
+                "coverage_hash_profile": "cutly.hash.sha256.text-coverage-u8.v1",
+                "coverage_hash": "sha256:6346519fa7338619fa6a4a073f5ffe35c45799f87bb07eb65b90ba6a840dc643",
+                "pixel_hash_profile": "cutly.hash.sha256.surface-rgba16be-pixels.v1",
+                "pixel_hash": "sha256:1c50be04d7db2eabd7e429398dfd6c586e11dbd4c57cd3d06164d920dd58c01d",
+                "width_pixels": 540,
+                "height_pixels": 112,
+                "canonical_binary_bytes": 547874,
+                "work_units": 142289277,
+                "working_bytes": 690824,
+                "retained_bytes": 497169
+              },
+              "surface_identity": {
+                "width_pixels": 540,
+                "height_pixels": 112,
+                "pixel_hash_profile": "cutly.hash.sha256.surface-rgba16be-pixels.v1",
+                "pixel_hash": "sha256:1c50be04d7db2eabd7e429398dfd6c586e11dbd4c57cd3d06164d920dd58c01d",
+                "surface_profile": "cutly.surface.linear-bt709-premultiplied-rgba16.v1"
+              }
+            },
+            {
+              "asset_id": "title-3",
+              "asset_index": 8,
+              "asset_kind": "text",
+              "frozen_text_binding_hash_profile": "cutly.hash.sha256.evaluator-frozen-text-source-binding-be.v1",
+              "frozen_text_binding_hash": "sha256:f98de706f9617bef68ff99850ba0cf9283d0fb314eff38128e5f86d60a5e0862",
+              "text_semantic_hash_profile": "cutly.hash.sha256.text-source-font-profiles.v1",
+              "text_semantic_hash": "sha256:6d86879a79ddab1555dfbfcb57772a98c9a4b8d162f4b99114e050402da31d36",
+              "layout_input_hash_profile": "cutly.hash.sha256.text-layout-input-source.v1",
+              "layout_input_hash": "sha256:879b2d9306a760f74eda917b86c71b5c3c5a83da174c111ababca0a60b22ef9e",
+              "font_asset_id": "font",
+              "font_asset_index": 3,
+              "font_content_hash_profile": "cutly.hash.sha256.font-sfnt-complete-bytes.v1",
+              "font_content_hash": "sha256:948b2830a583dbc158bb97e6c7d47732e16cb3ae1264547dc7c92ac3eee481ec",
+              "raster_viewport": {
+                "width_pixels": 540,
+                "height_pixels": 112
+              },
+              "surface_bytes": 483840,
+              "assembly": {
+                "schema_version": 1,
+                "profile": "cutly.render.text-assembly.static-glyf.receipt.v1",
+                "descriptor_hash_profile": "cutly.hash.sha256.text-assembly-descriptor-json.v1",
+                "descriptor_hash": "sha256:adfd200508853e4af1861fbd2faa0ec8e31b96e8c60632da2bfaa49f3707ff43",
+                "assembly_hash_profile": "cutly.hash.sha256.text-assembly-binding-be.v1",
+                "assembly_hash": "sha256:aca9081bf4331c771a9840b9a650211e9c4e9daaad0ffb38a48e072ad28f01d0",
+                "frozen_text_profile": "cutly.evaluator.frozen-text-source.v1",
+                "frozen_text_binding_hash_profile": "cutly.hash.sha256.evaluator-frozen-text-source-binding-be.v1",
+                "frozen_text_binding_hash": "sha256:f98de706f9617bef68ff99850ba0cf9283d0fb314eff38128e5f86d60a5e0862",
+                "document_hash_profile": "cutly.hash.sha256.document-v2-canonical-json.v1",
+                "document_hash": "sha256:b06edb6818d332468395b6a8402cf5858f0ea993382c374d0b40c51942aeb6d8",
+                "text_asset_id": "title-3",
+                "text_asset_index": 8,
+                "font_asset_id": "font",
+                "font_asset_index": 3,
+                "font_content_hash_profile": "cutly.hash.sha256.font-sfnt-complete-bytes.v1",
+                "font_content_hash": "sha256:948b2830a583dbc158bb97e6c7d47732e16cb3ae1264547dc7c92ac3eee481ec",
+                "text_semantic_hash_profile": "cutly.hash.sha256.text-source-font-profiles.v1",
+                "text_semantic_hash": "sha256:6d86879a79ddab1555dfbfcb57772a98c9a4b8d162f4b99114e050402da31d36",
+                "layout_input_hash_profile": "cutly.hash.sha256.text-layout-input-source.v1",
+                "layout_input_hash": "sha256:879b2d9306a760f74eda917b86c71b5c3c5a83da174c111ababca0a60b22ef9e",
+                "shape_provider_profile": "cutly.shape.go-text-harfbuzz-static-glyf.v1",
+                "shape_provider_hash_profile": "cutly.hash.sha256.text-shape-provider-binding-be.v1",
+                "shape_provider_hash": "sha256:7116505b11ce81a7a66d5040eb37ac0e4347952975c7227e174168efb8b527be",
+                "dependency_fingerprint_profile": "cutly.hash.sha256.text-shape-dependency-lock-json.v1",
+                "dependency_fingerprint": "sha256:e2f3967156b6030da45e94771b910a79ac9ebe3618f320217ca35a4825de0ee2",
+                "layout_graph_hash_profile": "cutly.hash.sha256.font-opentype-layout-graph-be.v1",
+                "layout_graph_hash": "sha256:30c3c3c076c2687864a324834b0f5ddc11fd39ac529b91b910f421c965e3d770",
+                "source_outline_set_hash_profile": "cutly.hash.sha256.font-static-glyf-outline-set-q26_6-be.v1",
+                "source_outline_set_hash": "sha256:62d3f0cdb6a9b899e961db265b3026d1fe2fa4fafc2d8b2370008849480506fa",
+                "layout_source_hash_profile": "cutly.hash.sha256.font-static-glyf-layout-source-binding-be.v1",
+                "layout_source_hash": "sha256:70ecb8af2dc2f000a5a91562d599070bbde1bdb114b570ce4febc343b98e4210",
+                "shape_input_hash_profile": "cutly.hash.sha256.text-shape-input-be.v1",
+                "shape_input_hash": "sha256:58d6001db00cd994c2f097e6060cedb6d5034c574553fc7a1e204a8084aae4c1",
+                "shape_output_profile": "cutly.text-shaped-stream.logical-pen-q26_6.v1",
+                "shape_output_hash_profile": "cutly.hash.sha256.text-shaped-glyph-stream-be.v1",
+                "shape_output_hash": "sha256:a6cec95f5b2529a46241a8d6e723292dab587245fc7c1d9b7c1b5682552668b3",
+                "layout_receipt_profile": "cutly.layout.text-unwrapped-top-baseline-logical-align.receipt.v1",
+                "glyph_stream_hash_profile": "cutly.hash.sha256.text-normalized-shaped-glyph-stream-be.v1",
+                "glyph_stream_hash": "sha256:ce81c9b4e2599324dd7cd2a1e7c4aa1406ef0b0c4038483aec81d3f680bb42fc",
+                "scaled_outline_hash_profile": "cutly.hash.sha256.text-scaled-outline-set-be.v1",
+                "scaled_outline_hash": "sha256:656f36ef09a1726a3d086d129ea3ac47ff8afbdad5a87e02c93adc77d54fdc64",
+                "placement_hash_profile": "cutly.hash.sha256.text-glyph-placement-stream-be.v1",
+                "placement_hash": "sha256:941f47950ae7e3ae1d5d23272525a63f07d45f3a9d021bda1f2c888491d3ecee",
+                "layout_hash_profile": "cutly.hash.sha256.text-layout-binding-be.v1",
+                "layout_hash": "sha256:446a66238d9483c08f677225f8ec63d1d185dd8c02fbebc93e17404fadfb5f37",
+                "shaping_provenance_status": "cutly.text-shaping-provenance.provider-authenticated-by-assembly.v1",
+                "paint_provenance_status": "cutly.text-paint-provenance.frozen-source-static-fill.v1",
+                "capability_status": "provider-authenticated-static-text-layout-ready-for-private-raster",
+                "width_pixels": 540,
+                "height_pixels": 112,
+                "font_size_numerator": 38,
+                "font_size_denominator": 1,
+                "fill_r": 65535,
+                "fill_g": 50000,
+                "fill_b": 15000,
+                "fill_a": 65535,
+                "line_count": 1,
+                "glyph_count": 20,
+                "unique_glyph_count": 13,
+                "contour_count": 18,
+                "command_count": 180,
+                "command_point_occurrences": 222,
+                "canonical_binary_bytes": 17591,
+                "work_units": 264117,
+                "working_bytes": 429579,
+                "retained_bytes": 244776
+              },
+              "raster": {
+                "schema_version": 1,
+                "profile": "cutly.render.text-assembly.static-raster.receipt.v1",
+                "descriptor_hash_profile": "cutly.hash.sha256.text-assembly-descriptor-json.v1",
+                "descriptor_hash": "sha256:adfd200508853e4af1861fbd2faa0ec8e31b96e8c60632da2bfaa49f3707ff43",
+                "binding_hash_profile": "cutly.hash.sha256.text-assembly-static-raster-binding-be.v1",
+                "binding_hash": "sha256:288eaffd0b0c28863b8cf362658f67f2db0e3e09bd4d3beba1801e47f52ae671",
+                "assembly_hash_profile": "cutly.hash.sha256.text-assembly-binding-be.v1",
+                "assembly_hash": "sha256:aca9081bf4331c771a9840b9a650211e9c4e9daaad0ffb38a48e072ad28f01d0",
+                "inner_receipt_profile": "cutly.raster.text-glyf-unhinted-supersample8x8.receipt.v1",
+                "inner_raster_profile": "cutly.raster.text-glyf-unhinted-supersample8x8.v1",
+                "inner_binding_hash_profile": "cutly.hash.sha256.text-raster-binding-be.v1",
+                "inner_binding_hash": "sha256:078e66080ad78090b6cd961aaed0adbbb5641aba041f1e55762527df8d352c26",
+                "inner_shaping_status": "cutly.text-shaping-provenance.caller-layout-unverified.v1",
+                "shaping_provenance_status": "cutly.text-shaping-provenance.provider-authenticated-by-assembly.v1",
+                "paint_provenance_status": "cutly.text-paint-provenance.frozen-source-static-fill.v1",
+                "coverage_hash_profile": "cutly.hash.sha256.text-coverage-u8.v1",
+                "coverage_hash": "sha256:16b49fefa97aea24ab62f9b21f43beff0c9477f9a61a4ed42424147508220557",
+                "pixel_hash_profile": "cutly.hash.sha256.surface-rgba16be-pixels.v1",
+                "pixel_hash": "sha256:2d2739da55bb80c055d0f9fcbdacf307bcc5bf713781200acc88cfeb45c8dbc3",
+                "width_pixels": 540,
+                "height_pixels": 112,
+                "canonical_binary_bytes": 547874,
+                "work_units": 115107709,
+                "working_bytes": 686120,
+                "retained_bytes": 497169
+              },
+              "surface_identity": {
+                "width_pixels": 540,
+                "height_pixels": 112,
+                "pixel_hash_profile": "cutly.hash.sha256.surface-rgba16be-pixels.v1",
+                "pixel_hash": "sha256:2d2739da55bb80c055d0f9fcbdacf307bcc5bf713781200acc88cfeb45c8dbc3",
+                "surface_profile": "cutly.surface.linear-bt709-premultiplied-rgba16.v1"
+              }
+            }
+          ]
+        },
+        "text_provider_profile": "cutly.provider.text-layer.pinned-font-static-surface.v1",
+        "text_contract_version": 1,
+        "text_retained_surface_bytes": 1451520,
+        "total_retained_surface_bytes": 7572480
+      },
+      "video": null,
+      "max_video_frame_surface_bytes": 67108864
+    },
+    "visual_descriptor_hash": "sha256:293fc943140d0861aee5fb585a7769314331565622ee65edfd8aa3f9961d6792",
+    "audio_receipt": {
+      "schema_version": 2,
+      "profile": "cutly.audio.domain-compile.v2",
+      "document_hash": "sha256:b06edb6818d332468395b6a8402cf5858f0ea993382c374d0b40c51942aeb6d8",
+      "scope": {
+        "domain": "audio",
+        "selection": {
+          "timeline_id": "main",
+          "clip_ids": [
+            "music-clip"
+          ],
+          "transition_ids": null
+        },
+        "requested_range": {
+          "start": {
+            "value": 0,
+            "rate": 1
+          },
+          "duration": {
+            "value": 6,
+            "rate": 1
+          }
+        }
+      },
+      "limits": {
+        "max_bindings": 4096,
+        "max_probe_streams_per_binding": 256,
+        "max_timelines": 1024,
+        "max_audio_tracks_per_timeline": 4096,
+        "max_clips_per_track": 1000000,
+        "max_buses": 4096,
+        "max_block_samples": 1000000,
+        "max_exact_bits": 4096,
+        "max_document_nodes": 262144,
+        "max_tracks_per_timeline": 4096,
+        "max_canonical_document_bytes": 134217728,
+        "max_canonical_manifest_bytes": 4194304,
+        "max_capability_entries": 4096
+      },
+      "offered": {
+        "backend_id": "cutly.reconstruct.native-wav-buses.v2",
+        "track_kinds": [
+          "audio"
+        ],
+        "asset_kinds": [
+          "audio"
+        ],
+        "features": [
+          "cutly.audio.gain.v1",
+          "cutly.audio.pan.v1",
+          "cutly.audio.channel-matrix.stereo.v1",
+          "cutly.keyframes.v1",
+          "cutly.interpolation.hold.v1",
+          "cutly.interpolation.linear.v1",
+          "cutly.interpolation.cubic-bezier.v1",
+          "cutly.audio.route.v1",
+          "cutly.audio.limiter.sample-peak-instant.v1"
+        ]
+      },
+      "domain_descriptor_hash": "sha256:6b9ce807d2821284b5bb524f01c8b882e3724b9a6a17c3dcd17512f954c50d73",
+      "evaluator_descriptor_hash": "sha256:949d0fccc1fa22b133d1127d89d2ab871694232c9f4b987c513007ee2f958bc8",
+      "dsp_descriptor_hash": "sha256:5ed3dcd89cc908e2e55e1c9e9ff692ab51c2a7e5f4ad8feca5d3c1c210d2e2c4",
+      "config_hash": "sha256:fd439b62a130307c8aeff589ff99ce2f630105abdc05ef242f9fe2f2aabfd395",
+      "sources": [
+        {
+          "asset_id": "music",
+          "asset_index": 4,
+          "asset_kind": "audio",
+          "manifest_fingerprint": "sha256:04b5e44dbbb874f99c18b4c3edcf816a37d7f9d7f6be95072216e192d2e468d2",
+          "resource_content_hash": "sha256:55b7df65f1d398a7228c90076947cadf3609faec8e32389321ec7340f552cda0",
+          "resource_size_bytes": 1152044,
+          "stream_index": 0,
+          "sample_rate": 48000,
+          "channel_layout": "stereo",
+          "decoder_channels": [
+            "FL",
+            "FR"
+          ],
+          "decode_profile": "cutly.decode.wav-pcm-s16le.v1",
+          "selection_profile": "cutly.audio.select.pcm16-linear-source-time-terminal-hold.v1",
+          "retime_profile": "cutly.audio.retime.linear-varispeed-pitch-linked.v1"
+        }
+      ],
+      "original_receipt_hash": "sha256:9561cb7c4a865bb64b4c50ca32c5f914816c509527fb9923ab7677d8fe7e7eca"
+    },
+    "audio_receipt_projection_hash": "sha256:367b434721e1b40313453f0d6b2fe51d18dd2d9f8c97bd54e301c88f39277439",
+    "audio_descriptor_hash": "sha256:6b9ce807d2821284b5bb524f01c8b882e3724b9a6a17c3dcd17512f954c50d73",
+    "wav_manifest": {
+      "schema_version": 1,
+      "profile": "cutly.audio.source.verified-wav-pcm16-linear.v1",
+      "document_hash": "sha256:b06edb6818d332468395b6a8402cf5858f0ea993382c374d0b40c51942aeb6d8",
+      "assets": [
+        {
+          "asset_id": "music",
+          "asset_index": 4,
+          "encoded_content_hash": "sha256:55b7df65f1d398a7228c90076947cadf3609faec8e32389321ec7340f552cda0",
+          "content_hash_profile": "cutly.hash.sha256.encoded-wav-bytes.v1",
+          "sample_hash": "sha256:53c9cad968b72b3729ac64c3d1159753f1d30a3587d233350cdef7484388dcea",
+          "sample_hash_profile": "cutly.hash.sha256.pcm-s16be-interleaved.v1",
+          "decoded_sample_domain": "cutly.audio.sample.signed-pcm16-interleaved.v1",
+          "sample_rate": 48000,
+          "channels": 2,
+          "channel_layout": "stereo",
+          "decoder_channels": [
+            "FL",
+            "FR"
+          ],
+          "frame_count": 288000,
+          "decode_profile": "cutly.decode.wav-pcm-s16le.v1",
+          "selection_profile": "cutly.audio.select.pcm16-linear-source-time-terminal-hold.v1",
+          "retime_profile": "cutly.audio.retime.linear-varispeed-pitch-linked.v1",
+          "source_profile": "cutly.audio.source.bound-exact-sample.v1",
+          "sample_domain": "cutly.audio.sample.exact-rational-ordered-channels.v1",
+          "probe_implementation": "cutly.wavsource.strict-wav-probe.v1",
+          "probe_build_fingerprint": "sha256:d10e76d5bad8b21273facd26051b270e53355d98acdecd93e9c779a44fdfab1c",
+          "probe_options_fingerprint": "sha256:3096a2f35ca38aee75eb761df092a127425dd28ea93e60f6d51cfe0b8c0038d2",
+          "manifest_fingerprint": "sha256:04b5e44dbbb874f99c18b4c3edcf816a37d7f9d7f6be95072216e192d2e468d2"
+        }
+      ]
+    },
+    "pcm_config_hash": "sha256:e1fe693afefe2c11964767d1c2c5089af06b19bfc182599f20ca0d880b8d6b2f",
+    "video": [],
+    "validated_resources": [
+      {
+        "asset_id": "bg-1",
+        "kind": "image",
+        "content_hash": "sha256:4038aa49fa6771d6db8738093f0d13c2e153cf6b75e956ac3a55f545165392eb",
+        "size_bytes": 87103,
+        "locator_scheme": "cas",
+        "locator": "cas://sha256/4038aa49fa6771d6db8738093f0d13c2e153cf6b75e956ac3a55f545165392eb",
+        "materialization_profile": "cutly.materialized.document-v2.inspected-image.v2",
+        "inspection_fingerprint": "sha256:fa57ce3db50e25de959f458a88e08959bf91b1e20974e52718e26433f8675b32"
+      },
+      {
+        "asset_id": "bg-2",
+        "kind": "image",
+        "content_hash": "sha256:6436db1080c6fa487d19723d710500d8cf215e9c1635f16e4eec051e1cc94fc8",
+        "size_bytes": 110850,
+        "locator_scheme": "cas",
+        "locator": "cas://sha256/6436db1080c6fa487d19723d710500d8cf215e9c1635f16e4eec051e1cc94fc8",
+        "materialization_profile": "cutly.materialized.document-v2.inspected-image.v2",
+        "inspection_fingerprint": "sha256:2e28c3c8d78256899e2816a8a4341904f3f11dc273819c4b03b7f4609aefadb7"
+      },
+      {
+        "asset_id": "bg-3",
+        "kind": "image",
+        "content_hash": "sha256:d4533eebe16cc7855ff4812315dadeb3efdee7cbe99192e7eba7f62b97c4e153",
+        "size_bytes": 112394,
+        "locator_scheme": "cas",
+        "locator": "cas://sha256/d4533eebe16cc7855ff4812315dadeb3efdee7cbe99192e7eba7f62b97c4e153",
+        "materialization_profile": "cutly.materialized.document-v2.inspected-image.v2",
+        "inspection_fingerprint": "sha256:143dee928963b3684bf579e7390dfc2f426738deec16620161172c23bd82182e"
+      },
+      {
+        "asset_id": "font",
+        "kind": "font",
+        "content_hash": "sha256:948b2830a583dbc158bb97e6c7d47732e16cb3ae1264547dc7c92ac3eee481ec",
+        "size_bytes": 2380,
+        "locator_scheme": "cas",
+        "locator": "cas://sha256/948b2830a583dbc158bb97e6c7d47732e16cb3ae1264547dc7c92ac3eee481ec",
+        "materialization_profile": "cutly.materialized.document-v2.inspected-font.v2",
+        "inspection_fingerprint": "sha256:08ce2a1ace27b15c037d97a04e1d5735eb958b5508be8f0e70204083083e09d7"
+      },
+      {
+        "asset_id": "music",
+        "kind": "audio",
+        "content_hash": "sha256:55b7df65f1d398a7228c90076947cadf3609faec8e32389321ec7340f552cda0",
+        "size_bytes": 1152044,
+        "locator_scheme": "cas",
+        "locator": "cas://sha256/55b7df65f1d398a7228c90076947cadf3609faec8e32389321ec7340f552cda0",
+        "materialization_profile": "cutly.materialized.document-v2.probed-av.v2",
+        "probe_fingerprint": "sha256:04b5e44dbbb874f99c18b4c3edcf816a37d7f9d7f6be95072216e192d2e468d2"
+      }
+    ],
+    "evidence_semantics": "Unsigned host reconstruction receipt: actual retained bytes, probes and native source identities were checked during construction. Runtime mapping is explicit host policy, not a measured version string or runtimebundle signature. Receipt alone grants no authority and does not prove pixel/sample causality or cross-runtime equality.",
+    "fingerprint": "sha256:c5191edc241519cb2e66d34caf3730d0464fc0db6e676ef07b3fc06624764496"
+  },
+  "artifact": {
+    "uri": "file:///private/tmp/cutly-readme-demo-final-rSBbkf/cutly-readme-demo.mp4",
+    "content_hash": "sha256:5d418ebde16b0d583dafbdb4f8eda1b07d62829b5a2e369229cd8dc13050a14d",
+    "size_bytes": 313879,
+    "execution_manifest_fingerprint": "sha256:4cbce38548fdc7fa4e62620966fb38adbfeee2ffcc7ba64674881933fb31ed12",
+    "evidence_uri": "file:///private/tmp/cutly-readme-demo-final-rSBbkf/cutly-readme-demo.mp4.evidence.json",
+    "evidence_fingerprint": "sha256:e919822289615e54d0d57dbfd6ef6d9f4904c2ca4733f1927e202a0438d95aa9",
+    "duration": {
+      "value": 6,
+      "rate": 1
+    },
+    "frame_count": 144,
+    "sample_count": 288000
+  }
+}
