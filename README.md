@@ -64,17 +64,6 @@ Cutly deliberately does **not** bundle an arbitrary FFmpeg build, expose
 filesystem authority to an Agent, or treat a successful encoder exit as proof
 that the requested media was produced.
 
-## Native Rendering Proof
-
-[![Cutly native rendering demo: three scenes showing native image, vector, text, transition, and audio composition](videos/cutly-native-demo/cover.png)](videos/cutly-native-demo/cutly-native-demo.mp4)
-
-**[Play the 6-second demo rendered by Cutly](videos/cutly-native-demo/cutly-native-demo.mp4)** —
-three image assets, vector composition, pinned-font text, keyframed opacity,
-two dissolves, an audio bus and limiter, H.264/AAC output, and Evidence v2.
-
-[Evidence](videos/cutly-native-demo/cutly-native-demo.mp4.evidence.json) ·
-[Render metadata](videos/cutly-native-demo/cutly-native-demo.metadata.json)
-
 ## Quick Start
 
 ### 1. Clone and build
