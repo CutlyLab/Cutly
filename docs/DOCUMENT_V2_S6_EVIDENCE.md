@@ -1,12 +1,16 @@
 # Document v2 S6 production evidence
 
+> Historical stage ledger. The integrated source disposition is recorded in
+> `DOCUMENT_V2_NATIVE_SDK_ROADMAP.md`; early status statements below describe the checkpoint at
+> which the evidence was captured.
+
 ## Status — 2026-11-09
 
 **Implementation repaired, stable-source gates and local native acceptance passing; formal S6
 release acceptance is not yet claimed.**
-Working-tree baseline is `5a186be790bf9f70326e9779fd76356dd7fe716c`, branch
-`codex/m4-sdk-completion`, with unrelated release/archive changes preserved. No commit, push,
-package publication or default-daemon-profile switch was performed.
+The historical working-tree baseline is `5a186be790bf9f70326e9779fd76356dd7fe716c`, with
+release/archive changes preserved. No package publication or default-daemon-profile switch was
+part of this stage checkpoint.
 
 ## Implemented surfaces and limited results
 

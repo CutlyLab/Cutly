@@ -1,14 +1,17 @@
 # Document v2 S4 provider evidence
 
+> Historical stage ledger. The integrated source disposition is recorded in
+> `DOCUMENT_V2_NATIVE_SDK_ROADMAP.md`; early status statements below describe the checkpoint at
+> which the evidence was captured.
+
 ## Status — 2026-11-08
 
 **Partial implementation; S4 exit is not accepted.** This ledger records source slices,
 not a claim that the mixed production provider, M4, or the public SDK is complete.
 
-Source baseline: `5a186be790bf9f70326e9779fd76356dd7fe716c`, branch
-`codex/m4-sdk-completion`, with uncommitted S4/S5 source additions and the pre-existing
-release/archive changes preserved. Tests are working-tree evidence, not fixed-clean-revision
-release acceptance. No commit, push, tag, package publication or daemon default change occurred.
+Source baseline: `5a186be790bf9f70326e9779fd76356dd7fe716c`, with the then-current S4/S5
+source additions and release/archive changes preserved. Tests in this section are checkpoint
+evidence, not production release acceptance.
 
 ## Implemented slices
 

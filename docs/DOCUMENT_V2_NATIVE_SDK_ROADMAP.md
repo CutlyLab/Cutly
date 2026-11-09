@@ -4,26 +4,19 @@ Status: S0-S8 standalone source implementation complete; production release acce
 
 Updated: 2026-11-09
 
-Implementation branch: `codex/m4-sdk-completion` (isolated continuation worktree)
-
-Original handoff base commit: `0a19a82` (`feat: expose host-bound reference surfaces`)
+Integration branch: `main`
 
 ### Standalone execution baseline (2026-11-07)
 
-Implementation continues in Go; the proposed Rust rewrite is deferred. The active standalone
-branch began as `codex/video-sdk-core` at `f9f891a`. Work now continues in the owner-selected isolated
-worktree on `codex/m4-sdk-completion`, preserving previous implementation history. The original handoff SHA `0a19a82` is not
-present in this repository's history. Commit `cabbfbb` has the surface-bridge implementation and
-subject; this identifies the local code baseline, not a proof of commit equivalence or a rerun of
-the historical audit below.
+Implementation continues in Go; a Rust rewrite is outside the current roadmap. The stage evidence
+documents preserve the implementation checkpoints and test results that led to the integrated
+`main` source.
 
 Cutly is a standalone SDK product. Consumer-application integration is outside this roadmap and is
 not an M4 gate. Existing Cutly legacy compatibility gates remain mandatory.
 
-Begin with S1 and preserve the stage dependency gates. Save independently reviewable, tested
-boundaries as local commits; no push, package publication, tag, or daemon default switch is implied.
-S1 acceptance evidence is recorded in `DOCUMENT_V2_S1_EVIDENCE.md`; the active S2 ledger is
-`DOCUMENT_V2_S2_EVIDENCE.md`.
+The stage dependency gates remain part of the compatibility record. S1-S7 evidence is retained in
+the adjacent evidence documents; publication still follows `RELEASING.md`.
 
 The independent release-evidence runner is implemented and its three P2 audit findings were
 independently closed at `0f08c2e`; post-repair smoke and full repository gates passed. The local long
@@ -34,15 +27,14 @@ This release lane does not substitute for broad mixed-media SDK acceptance.
 
 S2 independently closed at repair checkpoint `9d9f96d` with P0=0, P1=0, P2=0 and final full Go,
 race, vet, tidy and documented target-compilation gates passed. See `DOCUMENT_V2_S2_EVIDENCE.md`.
-S3 durable preparation/reconstruction is now the active next stage; S4–S6 retain their upstream gates.
+S0-S8 source implementation is integrated. The remaining work is the external, owner-controlled
+release acceptance described below.
 
 ## 1. Purpose and completion boundary
 
-This document is the implementation plan for taking Cutly from its current restricted hard-cut RC
-and native reference-rendering components to a public, restart-safe Document v2 video-editing SDK.
-It is subordinate to the product scope in `docs/CUTLY-SDK-COMPLETE-PLAN.md`, but is deliberately
-stored inside the independent `cutly/` module so another agent can execute it without changing the
-three owner-authored, untracked planning documents in the parent repository.
+This document records the implementation path from the restricted hard-cut RC and native reference
+components to the public, restart-safe Document v2 video-editing SDK. It is maintained inside the
+standalone Cutly module together with its evidence and release gates.
 
 The target is the broad M4 boundary:
 
@@ -908,7 +900,7 @@ TypeScript gates once S7 is touched:
 
 ```bash
 npm --prefix sdk/typescript test
-npm --prefix sdk/typescript pack --dry-run
+npm --prefix sdk/typescript run pack:check
 ```
 
 Cross-target protocol/build gates:
@@ -934,11 +926,9 @@ applications are not part of the Cutly release boundary.
 - Record exact acceptance commands in the commit/PR handoff.
 - Before each commit: inspect `git status`, stage explicit paths, run `git diff --cached --check`.
 - Before each stage exit: request an independent read-only audit and close P0/P1/P2 findings.
-- Do not push, publish npm, tag or switch daemon defaults without owner authorization.
-- Do not stage the parent repository's untracked owner documents:
-  - `docs/CUTLY-SDK-COMPLETE-PLAN.md`
-  - `docs/REMOTION-HYPERFRAMES-SOURCE-AUDIT.md`
-  - `docs/VIDEOEDIT-ARCHITECTURE.md`
+- Pushes, tags, npm publication and daemon-default changes require maintainer authorization and
+  must follow `RELEASING.md`.
+- Keep local worktrees, runtime state, credentials and generated release artifacts out of Git.
 
 ## 16. Parallel release lane
 
@@ -959,18 +949,15 @@ The following can proceed beside S1-S7 but blocks S8 release:
 
 Deferred capabilities must produce stable preflight rejection. They must not be emulated silently.
 
-## 18. Next-agent start instructions
+## 18. Maintainer continuation instructions
 
-1. Confirm branch `codex/m4-sdk-completion` in the isolated worktree and inspect staged/unstaged files;
-   preserve deferred archive work. Do not switch or edit the original shared checkout.
-2. Read this document, the current stage evidence and existing protocol patterns before editing.
-   Work only inside the standalone Cutly repository.
-3. S1/S2 are complete; implement S3 durable v2 preparation and host-owned reconstruction additively.
-   Preserve legacy prepared/manifest/request/job/output/evidence APIs and every existing fixture.
-4. Freeze concrete receipt projections and record codecs with schemas and fixed fixtures; preserve
-   Document JSON number lexemes and separate structural verification from host authorization.
-5. Run full S3 exit gates and obtain independent read-only audit closure before S4.
-6. Update the status table below after each stage, including commit IDs and evidence paths.
+1. Start from current `main`, inspect staged and unstaged files, and preserve unrelated work.
+2. Read this roadmap, the relevant stage evidence and existing protocol patterns before editing.
+3. Preserve legacy prepared/manifest/request/job/output/evidence APIs and every frozen fixture.
+4. Add new receipt projections and record codecs through versioned schemas and fixed fixtures;
+   preserve Document JSON number lexemes and separate verification from host authorization.
+5. Run the complete gates in `CONTRIBUTING.md` and record externally controlled release evidence
+   only when it was produced by the owner-approved runtime and acceptance kits.
 
 ## 19. Handoff status table
 

@@ -1,0 +1,51 @@
+name: Bug report
+description: Report a reproducible Cutly defect
+title: "bug: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: Do not include vulnerabilities, private media, credentials, signing material or unsanitized absolute paths.
+  - type: input
+    id: version
+    attributes:
+      label: Cutly version or commit
+      placeholder: 0.1.0-rc.1 or commit SHA
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, architecture, Go/Node and FFmpeg/FFprobe versions as applicable.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Provide safe steps, commands and a minimal public fixture.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Preflight checks
+      options:
+        - label: I checked the known limitations and existing issues.
+          required: true
+        - label: This report contains no secrets, private media or vulnerability details.
+          required: true

@@ -1,0 +1,34 @@
+name: Feature request
+description: Propose an additive Cutly capability
+title: "feature: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Describe the integration or editing problem, not only a preferred implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed capability
+      description: Explain the expected public behavior and failure boundary.
+    validations:
+      required: true
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility considerations
+      description: Note affected schemas, profiles, SDKs, runtimes or platforms.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Preflight checks
+      options:
+        - label: I checked the roadmap, known limitations and existing issues.
+          required: true
+        - label: The proposal can be additive and does not reinterpret a frozen wire profile.
+          required: true

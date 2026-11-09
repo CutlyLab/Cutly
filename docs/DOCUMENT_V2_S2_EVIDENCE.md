@@ -3,8 +3,8 @@
 ## Scope and prerequisite
 
 - Execution date: 2026-11-07.
-- Standalone Go implementation began on `codex/video-sdk-core`; final S2 repair validation is on
-  isolated branch `codex/m4-sdk-completion`. Manyfy remains out of scope.
+- Standalone Go implementation began at the recorded S1 baseline; final S2 repair validation is
+  preserved in this ledger. Consumer-application integration remains out of scope.
 - S1 implementation checkpoint: `5e64a65`; stage-exit evidence committed in `99fccaf`.
 - S1 final full Go gates, documented cross-target subset and independent P0/P1/P2 closure are
   recorded in `DOCUMENT_V2_S1_EVIDENCE.md`.
@@ -210,7 +210,7 @@ availability, launch-byte binding, public SDK and mixed-media acceptance remain 
 | Full Go and target compilation gates | Passed with documented wasm subset | Commands and actual results above |
 | Legacy fixture preservation | Passed | No modified/deleted legacy fixture relative to `f9f891a` |
 | Independent read-only audit | Passed: P0=0, P1=0, P2=0 | Authorized resumed review and independent repair closure above; S3 unblocked |
-| Manyfy consumer acceptance | Deferred by owner | Not part of this execution scope |
+| Consumer-application acceptance | Out of scope | Not part of the standalone SDK stage boundary |
 
 ## Priority and independent-review handoff
 
@@ -242,5 +242,5 @@ owner selected “确认误报并授权重试” in that confirmation, authorizi
 scope without permission changes or evasion of further restrictions. The subsequent independent
 review launch was allowed and subsequently completed as recorded above. Authorization itself was
 not acceptance evidence: the independent findings closure and post-repair gates establish S2 exit.
-S3 is unblocked; S4–S6 still depend on their upstream stages. Manyfy remains deferred and
-publishing/default-switch authorization remains separate.
+S3 is unblocked; S4–S6 still depend on their upstream stages. Consumer integration remains outside
+this stage, and publishing/default-switch authorization remains separate.

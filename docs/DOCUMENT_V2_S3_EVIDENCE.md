@@ -1,12 +1,16 @@
 # Document v2 S3 evidence
 
+> Historical stage ledger. The integrated source disposition is recorded in
+> `DOCUMENT_V2_NATIVE_SDK_ROADMAP.md`; early status statements below describe the checkpoint at
+> which the evidence was captured.
+
 ## Status and prerequisite
 
-- Started 2026-11-07 in isolated branch `codex/m4-sdk-completion`.
+- Started 2026-11-07 from the independently accepted S2 checkpoint.
 - S2 independently accepted: repairs `9d9f96d`, evidence `0de7008`, P0=0/P1=0/P2=0.
 - S3 is in progress, not accepted. No restart reconstruction or broad M4 completion is claimed.
-- Manyfy and release/archive expansion remain deferred. Preserve their existing work; do not push,
-  publish npm, tag or switch daemon defaults without owner authorization.
+- Consumer integration and release publication remain separate. Preserve existing release work;
+  do not publish npm, tag or switch daemon defaults without maintainer authorization.
 
 ## Implementation boundaries
 

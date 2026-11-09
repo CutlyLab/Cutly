@@ -15,15 +15,15 @@ import (
 
 const cutlyModulePath = "github.com/CutlyLab/Cutly"
 
-var forbiddenImportPrefixes = []string{
-	"github.com/ruminate0810/Manify",
-	"github.com/LincanXu/Manyfy",
-	"github.com/CutlyLab/Manyfy",
+var allowedExternalImportPrefixes = []string{
+	cutlyModulePath,
+	"github.com/go-text/typesetting",
+	"github.com/google/jsonschema-go",
+	"golang.org/x/image",
 }
 
-// TestIndependentModuleBoundary keeps the extraction boundary executable. A nested module can be
-// copied to CutlyLab/Cutly only when neither production code nor tests reach back into the Manyfy
-// host application.
+// TestIndependentModuleBoundary keeps the standalone module boundary executable. Production code
+// and tests may import only the Cutly module and the dependencies declared for this repository.
 func TestIndependentModuleBoundary(t *testing.T) {
 	root := moduleRoot(t)
 	assertModulePath(t, root)
@@ -94,14 +94,22 @@ func checkImports(t *testing.T, root, path string) error {
 		if err != nil {
 			return fmt.Errorf("decode import in %s: %w", path, err)
 		}
-		for _, prefix := range forbiddenImportPrefixes {
+		if !strings.Contains(strings.Split(value, "/")[0], ".") {
+			continue
+		}
+		allowed := false
+		for _, prefix := range allowedExternalImportPrefixes {
 			if value == prefix || strings.HasPrefix(value, prefix+"/") {
-				relative, relErr := filepath.Rel(root, path)
-				if relErr != nil {
-					relative = path
-				}
-				t.Errorf("%s imports host package %q; Cutly must remain independently buildable", relative, value)
+				allowed = true
+				break
 			}
+		}
+		if !allowed {
+			relative, relErr := filepath.Rel(root, path)
+			if relErr != nil {
+				relative = path
+			}
+			t.Errorf("%s imports undeclared external package %q; Cutly must remain independently buildable", relative, value)
 		}
 	}
 	return nil

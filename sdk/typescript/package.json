@@ -2,6 +2,14 @@
   "name": "@cutly/sdk",
   "version": "0.1.0-rc.1",
   "description": "Typed protocol and headless client bindings for Cutly",
+  "keywords": [
+    "video",
+    "video-editing",
+    "sdk",
+    "agents",
+    "ffmpeg",
+    "deterministic"
+  ],
   "type": "module",
   "types": "./src/index.d.ts",
   "sideEffects": false,
@@ -28,6 +36,10 @@
     "type": "git",
     "url": "git+https://github.com/CutlyLab/Cutly.git",
     "directory": "sdk/typescript"
+  },
+  "homepage": "https://github.com/CutlyLab/Cutly#readme",
+  "bugs": {
+    "url": "https://github.com/CutlyLab/Cutly/issues"
   },
   "publishConfig": {
     "access": "public"

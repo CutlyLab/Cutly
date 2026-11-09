@@ -3,7 +3,7 @@
 ## Scope and prerequisite
 
 - Execution date: 2026-11-07.
-- Standalone Go Cutly; Manyfy work remains deferred.
+- Standalone Go Cutly; consumer-application integration remains outside this stage.
 - Owner reiterated completion of broad M4 after S2 implementation checkpoint `be42402`.
 - S7a is the independent Document v2 mutation/project core lane permitted by the roadmap. It
   depends on existing Document v2 semantics, not unaccepted S2 execution contracts.
@@ -132,7 +132,7 @@ git diff --check
 
 The final localv2 suite ran in 105.836s normal / 169.925s race; transactionv2 in 6.138s /
 42.995s; conformance in 7.209s / 36.624s. `buf5thtda` also exited 0 for final TypeScript tests
-and package-local dry-run. No npm publication, push, tag, daemon-default switch or Manyfy work.
+and package-local dry-run. No npm publication, tag or daemon-default switch was part of this stage.
 
 ## Stage disposition
 

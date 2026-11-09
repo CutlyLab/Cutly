@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/CutlyLab/Cutly/security/advisories/new
+    about: Report vulnerabilities privately. Do not disclose them in an issue.
+  - name: Support guide
+    url: https://github.com/CutlyLab/Cutly/blob/main/SUPPORT.md
+    about: Read the support and safe-reproduction guidance before opening an issue.

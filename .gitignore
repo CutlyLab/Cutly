@@ -1,4 +1,23 @@
 .DS_Store
+.claude/
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Local environment and credentials.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.mobileprovision
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
 # Go build and test output.
 /bin/
@@ -6,6 +25,7 @@
 *.test
 *.prof
 coverage.out
+coverage/
 
 # TypeScript package output.
 /sdk/typescript/node_modules/

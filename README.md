@@ -19,6 +19,7 @@ https://github.com/user-attachments/assets/dddd4cf1-ead7-4894-86bd-3c5ed1ac3346
 [Examples](examples/) · [Limitations](KNOWN_LIMITATIONS.md)
 
 [![Version](https://img.shields.io/badge/version-0.1.0--rc.1-111827)](CHANGELOG.md)
+[![CI](https://github.com/CutlyLab/Cutly/actions/workflows/ci.yml/badge.svg)](https://github.com/CutlyLab/Cutly/actions/workflows/ci.yml)
 [![Go](https://img.shields.io/badge/Go-1.25%2B-00ADD8?logo=go&logoColor=white)](go.mod)
 [![Node](https://img.shields.io/badge/Node-20%2B-339933?logo=node.js&logoColor=white)](sdk/typescript/package.json)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
@@ -53,7 +54,7 @@ Requirements: Go 1.25+, Node.js 20+, and FFmpeg/FFprobe for real-media render
 tests.
 
 ```bash
-git clone --branch codex/video-sdk-core https://github.com/CutlyLab/Cutly.git
+git clone https://github.com/CutlyLab/Cutly.git
 cd Cutly
 
 go build -o ./bin/cutly ./cmd/cutly
@@ -170,16 +171,22 @@ canonical integer JSON.
 | Native image/vector/static-text reference pixels | **Available as deterministic reference stages** | RGBA16 composition, exact transforms/crop/opacity, deterministic PNG, strict receipts |
 | Reference audio | **Available as deterministic reference stages** | Exact AudioGraph, WAV source, PCM16LE quantization, deterministic WAV |
 | Document v2 semantic RenderPlan | **Implemented and audited** | Additive `core/renderplanv2`; fixed schemas, fixtures, hostile corpus, cross-target gates |
-| Document v2 ExecutionManifest/RenderRequest | **Implemented; final independent audit pending** | Portable identity and host authorization exist; do not enter restart reconstruction yet |
+| Document v2 ExecutionManifest/RenderRequest | **Implemented and audited** | Portable identity, strict verification, host authorization and restart reconstruction are covered by conformance and hostile-input tests |
 | General mixed video/audio Document v2 export | **Implemented; release trust pending** | Temporal video/image/vector/text/audio providers, Prepared v2, chunk workers, H.264/AAC assembly and Evidence v2 |
 | Public Document v2 edit/render SDKs | **Implemented** | Go/TypeScript APIs, default-v2 CLI, `/v2/agent`, strict fixtures and durable project edits |
 | Document v2 Player/UI | **Implemented headlessly** | Exact audio-master player, bound frame/audio preview adapters and immutable mixed-media timeline primitives |
 | Optional browser/WebLayer | **Deferred** | Native rendering remains the default; browser layers are a later isolated capability |
 
-Stage evidence is recorded in
-[Document v2 S1](docs/DOCUMENT_V2_S1_EVIDENCE.md) and
-[Document v2 S2](docs/DOCUMENT_V2_S2_EVIDENCE.md). The full dependency-ordered
-plan lives in [DOCUMENT_V2_NATIVE_SDK_ROADMAP.md](docs/DOCUMENT_V2_NATIVE_SDK_ROADMAP.md).
+Stage evidence is recorded for
+[S1](docs/DOCUMENT_V2_S1_EVIDENCE.md),
+[S2](docs/DOCUMENT_V2_S2_EVIDENCE.md),
+[S3](docs/DOCUMENT_V2_S3_EVIDENCE.md),
+[S4](docs/DOCUMENT_V2_S4_EVIDENCE.md),
+[S5](docs/DOCUMENT_V2_S5_EVIDENCE.md),
+[S6](docs/DOCUMENT_V2_S6_EVIDENCE.md), and
+[S7a](docs/DOCUMENT_V2_S7A_EVIDENCE.md). The dependency-ordered history and
+remaining release-owner gates live in the
+[Document v2 roadmap](docs/DOCUMENT_V2_NATIVE_SDK_ROADMAP.md).
 
 ## Why Cutly?
 
@@ -309,6 +316,9 @@ published yet. See the [TypeScript SDK guide](sdk/typescript/README.md) and
 | [M4 release readiness](docs/M4_RELEASE_READINESS.md) | Restricted RC acceptance evidence and external release gates |
 | [Schema catalog](schemas/README.md) | Public JSON Schemas and conformance inventory |
 | [Security](SECURITY.md) | Vulnerability reporting |
+| [Contributing](CONTRIBUTING.md) | Development workflow, compatibility rules and checks |
+| [Support](SUPPORT.md) | Questions, bug reports and safe reproduction guidance |
+| [Code of Conduct](CODE_OF_CONDUCT.md) | Community participation expectations |
 | [Release process](RELEASING.md) | Tags, archives, npm provenance, checksums, and attestations |
 
 ## Development
@@ -327,7 +337,8 @@ npm --prefix sdk/typescript run pack:check
 The full race suite includes the HTTP daemon and may require permission to
 bind a local loopback port. Real render tests require FFmpeg and FFprobe.
 
-The repository also freezes schemas, canonical fixtures, dependency licenses,
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before proposing changes. The
+repository also freezes schemas, canonical fixtures, dependency licenses,
 an SPDX SBOM, portable command builds, and release provenance. New behavior
 must use an additive profile or schema; published wire semantics are never
 reinterpreted in place.
@@ -341,4 +352,5 @@ boundaries.
 
 ## License
 
-[Apache License 2.0](LICENSE)
+[Apache License 2.0](LICENSE). Attribution and third-party notices are in
+[NOTICE](NOTICE) and [deps/THIRD_PARTY_NOTICES.md](deps/THIRD_PARTY_NOTICES.md).

@@ -1,7 +1,7 @@
 # Document v2 local projects
 
 `project/localv2` is a standalone Go store for `documentv2.Document` and
-`transactionv2.Transaction`. It has no renderer, Manyfy, S2 or S3 dependency and
+`transactionv2.Transaction`. It has no renderer or execution-stage dependency and
 does not translate edits into legacy operations.
 
 ## API

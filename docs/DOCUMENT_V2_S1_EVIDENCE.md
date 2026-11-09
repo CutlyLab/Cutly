@@ -3,14 +3,14 @@
 ## Scope and baseline
 
 - Execution date: 2026-11-07.
-- Standalone branch: `codex/video-sdk-core`; starting commit: `f9f891a`.
+- Historical implementation baseline: commit `f9f891a`.
 - Language: existing Go implementation; Rust migration deferred by the owner.
 - Stage: S1 semantic render plan complete at `5e64a65`, with final gates and audit closure below.
   S2 implementation has not started at this stage-exit checkpoint.
 - Original handoff `0a19a82` is absent from local history. Local surface-bridge commit is
   `cabbfbb`; equivalence and historical audit results are not newly attested here.
-- Manyfy integration and consumer verification are deferred by the owner. No consumer result is
-  claimed, and no external project/module configuration is changed.
+- Consumer-application integration is outside the standalone Cutly release boundary. No external
+  consumer result is claimed by this stage ledger.
 
 ## Baseline checks
 
@@ -57,7 +57,7 @@ or a substitute for the historical S0 audit. The new plan package was not includ
 | Four-target cross-compilation | Passed after fixes with documented wasm subset | Three full targets; wasm core/protocol/conformance; exclusion below |
 | Legacy fixture preservation | Passed after fixes | No modified/deleted legacy fixture paths relative to `f9f891a`; only new prefixed vectors |
 | Independent read-only audit | Closed: no remaining verified P0/P1/P2 | Both P2 findings reproduced, repaired and independently rechecked; details below |
-| Manyfy consumer acceptance | Deferred by owner | Outside current execution scope; not passed |
+| Consumer-application acceptance | Out of scope | Not part of the standalone SDK stage boundary |
 
 ## Implementation checkpoint `9db5e5f`
 
