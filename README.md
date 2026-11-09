@@ -14,9 +14,9 @@ https://github.com/user-attachments/assets/dddd4cf1-ead7-4894-86bd-3c5ed1ac3346
 
 **[Download the 21-second Cutly launch film](videos/cutly-launch/renders/cutly-launch.mp4)**
 
-[Quick Start](#quick-start) · [How It Works](#how-it-works) ·
-[SDKs](#sdks-and-tools) · [Roadmap](docs/DOCUMENT_V2_NATIVE_SDK_ROADMAP.md) ·
-[Examples](examples/) · [Limitations](KNOWN_LIMITATIONS.md)
+[Quick Start](#quick-start) · [Architecture](#how-it-works) ·
+[SDKs](#sdks-and-tools) · [CLI](#cli-and-daemon) · [Status](#current-status) ·
+[Examples](examples/) · [Documentation](#documentation)
 
 [![Version](https://img.shields.io/badge/version-0.1.0--rc.1-111827)](CHANGELOG.md)
 [![CI](https://github.com/CutlyLab/Cutly/actions/workflows/ci.yml/badge.svg)](https://github.com/CutlyLab/Cutly/actions/workflows/ci.yml)
@@ -46,9 +46,27 @@ runtime and the release acceptance described in [RELEASING.md](RELEASING.md).
 > approximate renderer. The exact RC boundary is documented in
 > [KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md).
 
+## At a Glance
+
+| | Current source |
+| --- | --- |
+| Maturity | `0.1.0-rc.1`; M4 standalone SDK source complete, tagged production release pending |
+| License | Apache-2.0 |
+| Primary API | Document v2 over Go, TypeScript/JavaScript, CLI, or `/v2/agent` HTTP |
+| Project model | Durable versioned Document IR plus atomic Plan → Apply → Revert transactions |
+| Rendering | Native, Chrome-free video/image/vector/static-text/audio pipeline |
+| Output | H.264/AAC MP4 plus independently verifiable Evidence v2 |
+| Time model | Exact rational frame and sample clocks; no floating-point timeline identity |
+| Runtime model | Local/self-hosted; media paths, executables and trust policy remain host-owned |
+| Production targets | Linux and macOS; see [Platform Support](#platform-support) |
+
+Cutly deliberately does **not** bundle an arbitrary FFmpeg build, expose
+filesystem authority to an Agent, or treat a successful encoder exit as proof
+that the requested media was produced.
+
 ## Quick Start
 
-### Build from source
+### 1. Clone and build
 
 Requirements: Go 1.25+, Node.js 20+, and FFmpeg/FFprobe for real-media render
 tests.
@@ -59,6 +77,7 @@ cd Cutly
 
 go build -o ./bin/cutly ./cmd/cutly
 go build -o ./bin/cutlyd ./cmd/cutlyd
+go build -o ./bin/cutly-worker-v2 ./cmd/cutly-worker-v2
 
 ./bin/cutly version
 ./bin/cutly --help
@@ -70,7 +89,7 @@ Expected version output:
 cutly 0.1.0-rc.1 (Document v2 Agent schema 2; legacy Agent protocol v1)
 ```
 
-### Verify the SDK
+### 2. Verify the checkout
 
 ```bash
 go test ./...
@@ -81,7 +100,27 @@ npm --prefix sdk/typescript test
 For the complete race, packaging, cross-platform, and real-media gates, see
 [Development](#development).
 
-### Render through the public RC path
+### 3. Use the SDK as a dependency
+
+The Go façade is part of the root module. Until a public tag is published,
+pin an audited commit rather than depending on a moving branch:
+
+```bash
+go get github.com/CutlyLab/Cutly/sdk/go/cutly@<tag-or-commit>
+```
+
+The TypeScript package is dependency-free and prepared for npm publication.
+Before the first public npm release, build and install the exact local tarball:
+
+```bash
+npm pack ./sdk/typescript
+npm install ./cutly-sdk-0.1.0-rc.1.tgz
+```
+
+See the [Go SDK guide](sdk/go/README.md) and
+[TypeScript SDK guide](sdk/typescript/README.md) for complete client examples.
+
+### 4. Render through the public RC path
 
 The runnable Go and TypeScript examples exercise the complete supported flow:
 
@@ -94,6 +133,36 @@ Start with [examples/README.md](examples/README.md). It covers project
 initialization, the host-owned FFmpeg identities required by `cutlyd`, input
 authorization, exact-frame preview, render submission, recovery, and artifact
 validation.
+
+## CLI and Daemon
+
+The CLI defaults to the Document v2 profile. Every mutating operation is
+explicit; planning never applies an edit by itself.
+
+```text
+cutly init         Create a durable Document v2 or legacy-v1 project
+cutly doctor       Check the selected Agent endpoint and installed routes
+cutly project      Inspect status, history and capabilities
+cutly edit         Plan, apply, discard or revert a typed transaction
+cutly render       Plan, prepare, preflight, preview, submit or inspect a render
+cutly call         Send a strict Agent request envelope
+cutly canonicalize Validate and canonicalize the integer JSON wire profile
+```
+
+Run `cutly --help` for action names and exit codes. `cutlyd` is the loopback
+host process: it owns project state, authorized media roots, prepared
+environments, the scheduler, workers, cache, FFmpeg runtime and artifact
+publication. Rendering is opt-in and requires physically separate project,
+input, state and output roots.
+
+> [!WARNING]
+> `cutlyd` is a local Agent daemon, not an internet authentication gateway.
+> Keep it on loopback or place it behind your own authenticated transport.
+> Never accept runtime trust keys, executable digests or arbitrary filesystem
+> roots from an Agent request.
+
+The exact daemon flags and development-runtime boundary are documented in
+[cmd/cutlyd/README.md](cmd/cutlyd/README.md).
 
 ## With an AI Agent
 
@@ -188,6 +257,20 @@ Stage evidence is recorded for
 remaining release-owner gates live in the
 [Document v2 roadmap](docs/DOCUMENT_V2_NATIVE_SDK_ROADMAP.md).
 
+## Platform Support
+
+| Target | Build | Native render runtime | Notes |
+| --- | --- | --- | --- |
+| Linux `amd64` / `arm64` | Supported | Release target | Requires an approved signed FFmpeg/FFprobe bundle |
+| macOS `amd64` / `arm64` | Supported | Release target | Requires an approved signed FFmpeg/FFprobe bundle |
+| Windows `amd64` | Supported | Fails closed in this RC | Secure inherited-handle runtime confinement is not yet equivalent |
+| FreeBSD `amd64` | Supported | Not a release runtime target | Portable build coverage only |
+| `js/wasm` | Protocol/core compile coverage | No native render runtime | Useful for compatibility checks, not media execution |
+
+The TypeScript SDK requires Node.js 20 or newer. Platform compilation does not
+imply that an encoder, codec, signed runtime or capability is installed; clients
+must inspect capabilities and complete preflight.
+
 ## Why Cutly?
 
 - **Agent-first edits** — agents propose typed operations; they do not mutate
@@ -239,6 +322,24 @@ media engine.
 | Render | [`render`](render/) | Native pixels/PCM, providers, compositor, scheduler, cache/checkpoint, FFmpeg backend |
 | Schemas | [`schemas`](schemas/) | Versioned public JSON Schemas |
 | Conformance | [`conformance`](conformance/) | Shared canonical, valid, invalid, and hostile protocol fixtures |
+
+### Repository layout
+
+```text
+agent/              Agent envelopes, routing and durable project actions
+cmd/                cutly, cutlyd, worker and FFmpeg supervisor commands
+core/               Document v2, exact evaluator, transactions and render plans
+media/              Probe, decode, runtime-bundle and media admission boundaries
+project/            Durable local project stores
+render/             Providers, compositor, scheduler, cache, workers and assembly
+schemas/            Versioned public JSON Schemas
+sdk/go/cutly/       Public Go façade
+sdk/typescript/     Public dependency-free JavaScript package and declarations
+conformance/        Cross-language fixtures and hostile protocol cases
+deps/               Locked dependency notices, license texts and SPDX SBOM
+examples/           Runnable Go and TypeScript Agent/render clients
+docs/               API, compatibility, migration, evidence and release policy
+```
 
 ## Go SDK
 
@@ -302,6 +403,23 @@ The npm package is prepared in source but is not claimed as publicly
 published yet. See the [TypeScript SDK guide](sdk/typescript/README.md) and
 [release checklist](RELEASING.md).
 
+## Trust and Verification Model
+
+Cutly separates data validity from permission to execute:
+
+- **Schemas and canonical codecs** prove that a record is well formed.
+- **Fingerprints and receipts** bind the exact Document, plan, environment,
+  provider, runtime, job and artifact identities.
+- **Host authorization** decides which media paths, executable bytes, roots
+  and output destinations may actually be used.
+- **Preflight** rechecks the frozen environment before durable work begins.
+- **Evidence** binds the published artifact to decoded frame/audio domains;
+  process success alone is insufficient.
+
+Projects, media, fonts, Agent envelopes, manifests and renderer output are all
+treated as untrusted input. The production runtime policy is in
+[CODEC_AND_RUNTIME_POLICY.md](docs/CODEC_AND_RUNTIME_POLICY.md).
+
 ## Documentation
 
 | Document | Purpose |
@@ -320,6 +438,47 @@ published yet. See the [TypeScript SDK guide](sdk/typescript/README.md) and
 | [Support](SUPPORT.md) | Questions, bug reports and safe reproduction guidance |
 | [Code of Conduct](CODE_OF_CONDUCT.md) | Community participation expectations |
 | [Release process](RELEASING.md) | Tags, archives, npm provenance, checksums, and attestations |
+
+## Versioning and Release State
+
+Package releases follow SemVer, while every public wire schema/profile is
+versioned independently and remains immutable once published. A new behavior
+uses an additive schema or profile; it does not reinterpret existing canonical
+bytes. See [Compatibility](docs/COMPATIBILITY.md) and
+[SemVer and deprecation](docs/SEMVER_AND_DEPRECATION.md).
+
+The repository currently contains the complete `0.1.0-rc.1` source and release
+automation. A production tag is intentionally separate from source completion:
+the maintainer must provide approved runtime fingerprints, trusted public keys,
+signed Linux/macOS acceptance kits and npm/GitHub release authority. The tag
+workflow then runs mixed-media smoke, 100 daemon-kill recoveries and a one-hour
+soak before publication.
+
+## Frequently Asked Questions
+
+### Does Cutly require Chrome?
+
+No. The base document, edit, preview and render architecture is native. An
+optional isolated browser/WebLayer is deferred and will not become the project
+database or default renderer.
+
+### Does Cutly ship FFmpeg?
+
+No. Source builds can use an explicitly unsafe local development mode for
+testing. Production packages accept only the maintainer-approved signed media
+runtime described in the codec/runtime policy.
+
+### Is Cutly a complete desktop editor?
+
+No. Cutly is an SDK and local Agent/render workbench: it ships headless player
+and timeline primitives, not a finished DOM UI. Product applications provide
+their own interface, authentication and deployment policy.
+
+### Can an Agent directly edit files or choose executables?
+
+No. Agents propose typed transactions and render requests. The host owns
+filesystem roots, media observations, runtime identity, worker admission and
+publication policy.
 
 ## Development
 
