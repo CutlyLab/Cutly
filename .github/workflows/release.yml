@@ -15,7 +15,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Check out tagged source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -83,7 +83,7 @@ jobs:
             runtime_fingerprint_var: CUTLY_MEDIA_RUNTIME_FINGERPRINT_FREEBSD_AMD64
     steps:
       - name: Check out tagged source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -149,7 +149,7 @@ jobs:
             kit_sha_var: CUTLY_ACCEPTANCE_KIT_SHA256_DARWIN_AMD64
     steps:
       - name: Check out tagged source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -213,7 +213,7 @@ jobs:
       id-token: write
     steps:
       - name: Check out tagged source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Node
         uses: actions/setup-node@v4
