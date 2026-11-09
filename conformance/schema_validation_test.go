@@ -76,28 +76,34 @@ func TestSchemasCompileAndValidateInstances(t *testing.T) {
 	}
 
 	validInstances := map[string]string{
-		"cutly.agent-request.v1.schema.json":                  "agent/protocol/testdata/agent-request-v1.canonical.json",
-		"cutly.agent-result.v1.schema.json":                   "agent/protocol/testdata/agent-result-v1.canonical.json",
-		"cutly.document.v1.schema.json":                       "conformance/fixtures/document-v1.valid.json",
-		"cutly.document.v2.schema.json":                       "conformance/fixtures/document-v2.valid.json",
-		"cutly.transaction.v1.schema.json":                    "conformance/fixtures/transaction-v1.valid.json",
-		"cutly.document-v2-transaction.v2.schema.json":        "conformance/fixtures/document-v2-transaction-numbers.valid.json",
-		"cutly.project-plan.document-v2.v2.schema.json":       "conformance/fixtures/document-v2-project-plan.valid.json",
-		"cutly.project-commit.document-v2.v2.schema.json":     "conformance/fixtures/document-v2-project-commit.valid.json",
-		"cutly.project-history.document-v2.v2.schema.json":    "conformance/fixtures/document-v2-project-history.valid.json",
-		"cutly.render-plan.v2.schema.json":                    "conformance/fixtures/render-plan-v2.valid.json",
-		"cutly.render-plan.v3.schema.json":                    "conformance/fixtures/render-plan-v3.valid.json",
-		"cutly.document-v2-render-plan.v1.schema.json":        "conformance/fixtures/document-v2-render-plan-gap.valid.json",
-		"cutly.document-v2-execution-manifest.v2.schema.json": "conformance/fixtures/document-v2-execution-gap-silence.valid.json",
-		"cutly.document-v2-render-request.v2.schema.json":     "conformance/fixtures/document-v2-render-request-fractional.valid.json",
-		"cutly.probe-manifest.v1.schema.json":                 "media/probe/testdata/probe-manifest-v1.valid.json",
-		"cutly.media-runtime-bundle.v1.schema.json":           "conformance/fixtures/media-runtime-bundle-v1.valid.json",
-		"cutly.execution-manifest.v1.schema.json":             "render/api/testdata/execution-manifest-v1.valid.json",
-		"cutly.render-job.v1.schema.json":                     "render/api/testdata/render-job-v1.valid.json",
-		"cutly.render-job-history.v1.schema.json":             "render/scheduler/testdata/job-history-page-v1.canonical.json",
-		"cutly.exact-frame-request.v1.schema.json":            "render/api/testdata/exact-frame-request-v1.valid.json",
-		"cutly.evidence-manifest.v1.schema.json":              "render/evidence/testdata/evidence-manifest-v1.valid.json",
+		"cutly.agent-request.document-v2.v2.schema.json":        "conformance/fixtures/agent-request-document-v2.valid.json",
+		"cutly.agent-result.document-v2.v2.schema.json":         "conformance/fixtures/agent-result-document-v2.valid.json",
+		"cutly.agent-request.v1.schema.json":                    "agent/protocol/testdata/agent-request-v1.canonical.json",
+		"cutly.agent-result.v1.schema.json":                     "agent/protocol/testdata/agent-result-v1.canonical.json",
+		"cutly.document.v1.schema.json":                         "conformance/fixtures/document-v1.valid.json",
+		"cutly.document.v2.schema.json":                         "conformance/fixtures/document-v2.valid.json",
+		"cutly.transaction.v1.schema.json":                      "conformance/fixtures/transaction-v1.valid.json",
+		"cutly.document-v2-transaction.v2.schema.json":          "conformance/fixtures/document-v2-transaction-numbers.valid.json",
+		"cutly.project-plan.document-v2.v2.schema.json":         "conformance/fixtures/document-v2-project-plan.valid.json",
+		"cutly.project-commit.document-v2.v2.schema.json":       "conformance/fixtures/document-v2-project-commit.valid.json",
+		"cutly.project-history.document-v2.v2.schema.json":      "conformance/fixtures/document-v2-project-history.valid.json",
+		"cutly.render-plan.v2.schema.json":                      "conformance/fixtures/render-plan-v2.valid.json",
+		"cutly.render-plan.v3.schema.json":                      "conformance/fixtures/render-plan-v3.valid.json",
+		"cutly.document-v2-render-plan.v1.schema.json":          "conformance/fixtures/document-v2-render-plan-gap.valid.json",
+		"cutly.document-v2-execution-manifest.v2.schema.json":   "conformance/fixtures/document-v2-execution-gap-silence.valid.json",
+		"cutly.document-v2-render-request.v2.schema.json":       "conformance/fixtures/document-v2-render-request-fractional.valid.json",
+		"cutly.prepared-environment.document-v2.v2.schema.json": "conformance/fixtures/document-v2-prepared-numbers.valid.json",
+		"cutly.resource-inspection.document-v2.v2.schema.json":  "conformance/fixtures/document-v2-resource-inspection-png.valid.json",
+		"cutly.probe-manifest.v1.schema.json":                   "media/probe/testdata/probe-manifest-v1.valid.json",
+		"cutly.media-runtime-bundle.v1.schema.json":             "conformance/fixtures/media-runtime-bundle-v1.valid.json",
+		"cutly.execution-manifest.v1.schema.json":               "render/api/testdata/execution-manifest-v1.valid.json",
+		"cutly.render-job.v1.schema.json":                       "render/api/testdata/render-job-v1.valid.json",
+		"cutly.render-job-history.v1.schema.json":               "render/scheduler/testdata/job-history-page-v1.canonical.json",
+		"cutly.exact-frame-request.v1.schema.json":              "render/api/testdata/exact-frame-request-v1.valid.json",
+		"cutly.evidence-manifest.v1.schema.json":                "render/evidence/testdata/evidence-manifest-v1.valid.json",
 	}
+	validInstances[assemblySchemaV2] = "conformance/fixtures/document-v2-chunk-assembly-mixed.valid.json"
+	validInstances["cutly.evidence-manifest.document-v2.v2.schema.json"] = "conformance/fixtures/evidence-document-v2-mixed.valid.json"
 	if len(validInstances) != len(resolved) {
 		t.Fatalf("schema fixture inventory mismatch: %d schemas, %d valid instances", len(resolved), len(validInstances))
 	}
@@ -455,8 +461,14 @@ func mutateCriticalSchemaInvalid(t *testing.T, name string, value map[string]any
 		value["schema_version"] = int64(999)
 	case "cutly.document-v2-execution-manifest.v2.schema.json":
 		value["visual"].(map[string]any)["enabled"] = false
+	case "cutly.chunk-assembly-request.document-v2.v2.schema.json":
+		value["output"].(map[string]any)["intermediate"].(map[string]any)["video_surface_profile"] = "rgba8"
 	case "cutly.document-v2-render-request.v2.schema.json":
 		value["execution_manifest"].(map[string]any)["output"].(map[string]any)["frame_clock"] = nil
+	case "cutly.prepared-environment.document-v2.v2.schema.json":
+		value["document"] = nil
+	case "cutly.resource-inspection.document-v2.v2.schema.json":
+		value["png"] = nil
 	case "cutly.probe-manifest.v1.schema.json":
 		value["resource"].(map[string]any)["content_hash"] = "sha256:invalid"
 	case "cutly.media-runtime-bundle.v1.schema.json":
@@ -469,12 +481,18 @@ func mutateCriticalSchemaInvalid(t *testing.T, name string, value map[string]any
 		value["events"].([]any)[0].(map[string]any)["state"] = "complete"
 	case "cutly.exact-frame-request.v1.schema.json":
 		value["artifact_uri"] = "https://example.invalid/frame.png"
+	case "cutly.evidence-manifest.document-v2.v2.schema.json":
+		value["schema_version"] = int64(999)
 	case "cutly.evidence-manifest.v1.schema.json":
 		value["decoded_video"].(map[string]any)["chunks"].([]any)[0].(map[string]any)["count"] = int64(0)
 	case "cutly.agent-request.v1.schema.json":
 		value["action"] = "unknown"
 	case "cutly.agent-result.v1.schema.json":
 		value["action"] = "unknown"
+	case "cutly.agent-request.document-v2.v2.schema.json":
+		value["payload_profile"] = "cutly.agent-payload.edit.apply.document-v2.v2"
+	case "cutly.agent-result.document-v2.v2.schema.json":
+		value["schema_version"] = int64(1)
 	default:
 		t.Fatalf("no critical invalid case for schema %s", name)
 	}

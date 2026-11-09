@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.cutly.dev/cutly.agent-request.document-v2.v2.schema.json",
+  "title": "Cutly Document v2 Agent Request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "profile", "request_id", "tool", "action", "project_id", "payload_profile", "payload"],
+  "properties": {
+    "schema_version": {"const": 2},
+    "profile": {"const": "cutly.agent-request.document-v2.v2"},
+    "request_id": {"$ref": "#/$defs/identity"},
+    "tool": {"enum": ["cutly_project", "cutly_edit", "cutly_render"]},
+    "action": {"$ref": "#/$defs/identity"},
+    "project_id": {"$ref": "#/$defs/identity"},
+    "payload_profile": {"$ref": "#/$defs/identity"},
+    "payload": {"type": "object"}
+  },
+  "oneOf": [
+    {"$ref": "#/$defs/project_inspect"},
+    {"$ref": "#/$defs/project_status"},
+    {"$ref": "#/$defs/project_history"},
+    {"$ref": "#/$defs/project_capabilities"},
+    {"$ref": "#/$defs/edit_plan"},
+    {"$ref": "#/$defs/edit_apply"},
+    {"$ref": "#/$defs/edit_discard"},
+    {"$ref": "#/$defs/edit_revert"},
+    {"$ref": "#/$defs/render_plan"},
+    {"$ref": "#/$defs/render_prepare"},
+    {"$ref": "#/$defs/render_preflight"},
+    {"$ref": "#/$defs/render_frame"},
+    {"$ref": "#/$defs/render_submit"},
+    {"$ref": "#/$defs/render_status"},
+    {"$ref": "#/$defs/render_history"},
+    {"$ref": "#/$defs/render_cancel"}
+  ],
+  "$defs": {
+    "identity": {"type": "string", "minLength": 1, "maxLength": 4096, "pattern": "^\\S(?:[\\s\\S]*\\S)?$"},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "uint64": {"type": "integer", "minimum": 0, "maximum": 18446744073709551615},
+    "int64": {"type": "integer", "minimum": -9223372036854775808, "maximum": 9223372036854775807},
+    "empty_payload": {"type": "object", "additionalProperties": false},
+    "project_history_payload": {
+      "type": "object", "additionalProperties": false,
+      "properties": {"after_sequence": {"$ref": "#/$defs/uint64"}, "limit": {"$ref": "#/$defs/uint64"}}
+    },
+    "transaction_id_payload": {
+      "type": "object", "additionalProperties": false, "required": ["transaction_id"],
+      "properties": {"transaction_id": {"$ref": "#/$defs/identity"}}
+    },
+    "render_identity_payload": {
+      "type": "object", "additionalProperties": false,
+      "required": ["plan_fingerprint", "execution_manifest_fingerprint"],
+      "properties": {"plan_fingerprint": {"$ref": "#/$defs/digest"}, "execution_manifest_fingerprint": {"$ref": "#/$defs/digest"}}
+    },
+    "job_id_payload": {
+      "type": "object", "additionalProperties": false, "required": ["job_id"],
+      "properties": {"job_id": {"$ref": "#/$defs/identity"}}
+    },
+
+    "project_inspect": {"properties": {"tool": {"const": "cutly_project"}, "action": {"const": "inspect"}, "payload_profile": {"const": "cutly.agent-payload.project.inspect.document-v2.v2"}, "payload": {"$ref": "#/$defs/empty_payload"}}},
+    "project_status": {"properties": {"tool": {"const": "cutly_project"}, "action": {"const": "status"}, "payload_profile": {"const": "cutly.agent-payload.project.status.document-v2.v2"}, "payload": {"$ref": "#/$defs/empty_payload"}}},
+    "project_history": {"properties": {"tool": {"const": "cutly_project"}, "action": {"const": "history"}, "payload_profile": {"const": "cutly.agent-payload.project.history.document-v2.v2"}, "payload": {"$ref": "#/$defs/project_history_payload"}}},
+    "project_capabilities": {"properties": {"tool": {"const": "cutly_project"}, "action": {"const": "capabilities"}, "payload_profile": {"const": "cutly.agent-payload.project.capabilities.document-v2.v2"}, "payload": {"$ref": "#/$defs/empty_payload"}}},
+
+    "edit_plan": {"properties": {"tool": {"const": "cutly_edit"}, "action": {"const": "plan"}, "payload_profile": {"const": "cutly.agent-payload.edit.plan.document-v2.v2"}, "payload": {"type": "object", "additionalProperties": false, "required": ["transaction"], "properties": {"transaction": {"$ref": "cutly.document-v2-transaction.v2.schema.json"}}}}},
+    "edit_apply": {"properties": {"tool": {"const": "cutly_edit"}, "action": {"const": "apply"}, "payload_profile": {"const": "cutly.agent-payload.edit.apply.document-v2.v2"}, "payload": {"$ref": "#/$defs/transaction_id_payload"}}},
+    "edit_discard": {"properties": {"tool": {"const": "cutly_edit"}, "action": {"const": "discard"}, "payload_profile": {"const": "cutly.agent-payload.edit.discard.document-v2.v2"}, "payload": {"$ref": "#/$defs/transaction_id_payload"}}},
+    "edit_revert": {"properties": {"tool": {"const": "cutly_edit"}, "action": {"const": "revert"}, "payload_profile": {"const": "cutly.agent-payload.edit.revert.document-v2.v2"}, "payload": {"type": "object", "additionalProperties": false, "required": ["target_transaction_id", "transaction_id", "idempotency_key"], "properties": {"target_transaction_id": {"$ref": "#/$defs/identity"}, "transaction_id": {"$ref": "#/$defs/identity"}, "idempotency_key": {"$ref": "#/$defs/identity"}}}}},
+
+    "render_plan": {"properties": {"tool": {"const": "cutly_render"}, "action": {"const": "plan"}, "payload_profile": {"const": "cutly.agent-payload.render.plan.document-v2.v2"}, "payload": {"type": "object", "additionalProperties": false, "required": ["range", "target"], "properties": {"range": {"$ref": "https://cutly.dev/schemas/cutly.document-v2-render-plan.v1.schema.json#/$defs/range"}, "target": {"$ref": "https://cutly.dev/schemas/cutly.document-v2-render-plan.v1.schema.json#/$defs/target"}}}}},
+    "render_prepare": {"properties": {"tool": {"const": "cutly_render"}, "action": {"const": "prepare"}, "payload_profile": {"const": "cutly.agent-payload.render.prepare.document-v2.v2"}, "payload": {"type": "object", "additionalProperties": false, "required": ["environment"], "properties": {"environment": {"$ref": "https://cutly.dev/schemas/cutly.prepared-environment.document-v2.v2.schema.json"}}}}},
+    "render_preflight": {"properties": {"tool": {"const": "cutly_render"}, "action": {"const": "preflight"}, "payload_profile": {"const": "cutly.agent-payload.render.preflight.document-v2.v2"}, "payload": {"$ref": "#/$defs/render_identity_payload"}}},
+    "render_frame": {"properties": {"tool": {"const": "cutly_render"}, "action": {"const": "frame"}, "payload_profile": {"const": "cutly.agent-payload.render.frame.document-v2.v2"}, "payload": {"type": "object", "additionalProperties": false, "required": ["profile", "plan_fingerprint", "execution_manifest_fingerprint", "composition_frame_index"], "properties": {"profile": {"const": "cutly.preview-frame.document-v2.v2"}, "plan_fingerprint": {"$ref": "#/$defs/digest"}, "execution_manifest_fingerprint": {"$ref": "#/$defs/digest"}, "composition_frame_index": {"$ref": "#/$defs/int64"}}}}},
+    "render_submit": {"properties": {"tool": {"const": "cutly_render"}, "action": {"const": "submit"}, "payload_profile": {"const": "cutly.agent-payload.render.submit.document-v2.v2"}, "payload": {"type": "object", "additionalProperties": false, "required": ["job"], "properties": {"job": {"$ref": "https://schemas.cutly.dev/render-job/v1"}}}}},
+    "render_status": {"properties": {"tool": {"const": "cutly_render"}, "action": {"const": "status"}, "payload_profile": {"const": "cutly.agent-payload.render.status.document-v2.v2"}, "payload": {"$ref": "#/$defs/job_id_payload"}}},
+    "render_history": {"properties": {"tool": {"const": "cutly_render"}, "action": {"const": "history"}, "payload_profile": {"const": "cutly.agent-payload.render.history.document-v2.v2"}, "payload": {"type": "object", "additionalProperties": false, "required": ["job_id"], "properties": {"job_id": {"$ref": "#/$defs/identity"}, "after_sequence": {"$ref": "#/$defs/uint64"}, "limit": {"$ref": "#/$defs/uint64"}}}}},
+    "render_cancel": {"properties": {"tool": {"const": "cutly_render"}, "action": {"const": "cancel"}, "payload_profile": {"const": "cutly.agent-payload.render.cancel.document-v2.v2"}, "payload": {"$ref": "#/$defs/job_id_payload"}}}
+  }
+}

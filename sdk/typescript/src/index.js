@@ -1,16 +1,57 @@
 export {
   CANONICAL_JSON_PROFILE,
+  NUMBER_PRESERVING_JSON_PROFILE,
   CanonicalJSONError,
   canonicalizeJSON,
   canonicalizeJSONString,
+  canonicalizeNumberPreservingJSON,
+  canonicalizeNumberPreservingJSONString,
   decodeCanonicalJSON,
   digestCanonicalJSON,
   digestCanonicalValue,
+  digestNumberPreservingJSON,
+  digestNumberPreservingJSONWithoutRootMember,
   encodeCanonicalValue,
+  extractNumberPreservingRootMember,
 } from "./canonical-json.js";
 
 export {
+  AGENT_V2_MEDIA_TYPE,
+  AGENT_V2_REQUEST_PROFILE,
+  AGENT_V2_RESULT_PROFILE,
+  AGENT_V2_SCHEMA_VERSION,
+  AgentProtocolV2Error,
+  CutlyAgentV2Client,
+  HTTPAgentV2Transport,
+  createAgentRequestV2,
+  createAgentTransactionRequestV2,
+  decodeAgentResultV2,
+} from "./client-v2.js";
+
+export {
+  MAX_TRANSACTION_V2_BYTES,
+  TRANSACTION_V2_PROFILE,
+  TRANSACTION_V2_SCHEMA_VERSION,
+  TransactionV2Error,
+  buildTransactionV2,
+  deleteClipV2,
+  decodeTransactionV2,
+  moveClipV2,
+  retrackClipV2,
+  setClipPropertiesV2,
+  transactionDigestV2,
+  trimClipV2,
+} from "./transaction-v2.js";
+
+export {
+  DOCUMENT_V2_UI_PROFILE,
+  documentV2TimelinePrimitives,
+} from "./ui-v2.js";
+
+export {
   PLAYER_PROFILE,
+  DOCUMENT_V2_PLAYER_PROFILE,
+  DocumentV2Player,
   HeadlessPlayer,
   PlayerStateError,
   frameIndexAtSample,
@@ -67,3 +108,10 @@ export {
   PreviewFrameError,
   createExactFrameRequest,
 } from "./preview.js";
+
+export {
+  DOCUMENT_V2_AUDIO_PREVIEW_PROFILE,
+  DOCUMENT_V2_FRAME_PREVIEW_PROFILE,
+  DocumentV2PreviewAdapter,
+  DocumentV2PreviewError,
+} from "./preview-v2.js";

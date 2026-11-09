@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cutly.dev/schemas/cutly.resource-inspection.document-v2.v2.schema.json",
+  "title": "Cutly Resource Inspection Document v2",
+  "description": "Static native PNG or sfnt/glyf core identity claims, not proof of inspection, locator authorization, outline validity or shaping capability. Audio uses the existing ProbeManifest, not this union. No live Surface, Font, encoded bytes or host limits are serialized. Font workload counters are deterministic portable parser charges. The Go codec additionally enforces self fingerprints, content/size equality, pixel-area limits, table coverage/order, required table lengths, cmap relationships and workload equations. Exact integer token grammar, UTF-8 byte-count limits on identifiers and Go Unicode whitespace handling are wire-codec requirements, not fully expressible by JSON Schema.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "profile", "canonical_json_profile", "resource", "inspector", "fingerprint"],
+  "properties": {
+    "schema_version": {"const": 2},
+    "profile": {"const": "cutly.resource-inspection.document-v2.v2"},
+    "canonical_json_profile": {"const": "cutly.json.canonical-integer.v1"},
+    "resource": {"$ref": "#/$defs/resource"},
+    "inspector": {"$ref": "#/$defs/inspector"},
+    "png": {"$ref": "#/$defs/png"},
+    "font": {"$ref": "#/$defs/font"},
+    "fingerprint": {"$ref": "#/$defs/digest"}
+  },
+  "oneOf": [
+    {
+      "required": ["png"],
+      "not": {"required": ["font"]},
+      "properties": {
+        "resource": {"properties": {"kind": {"const": "image"}}},
+        "inspector": {"properties": {
+          "profile": {"const": "cutly.decode.png-rgba8-explicit-srgb.v1"},
+          "descriptor_fingerprint": {"const": "sha256:4e718e38ad76247a3a443196f27b3505724831995783ac9970a5395f6814f32c"}
+        }}
+      }
+    },
+    {
+      "required": ["font"],
+      "not": {"required": ["png"]},
+      "properties": {
+        "resource": {"properties": {"kind": {"const": "font"}}},
+        "inspector": {"properties": {
+          "profile": {"const": "cutly.font.sfnt-single-face-static-glyf-core.v1"},
+          "descriptor_fingerprint": {"const": "sha256:32db45644d8c5bf0c61537ecafbc0f9192d9653ecf3130d304f8b566fe6707c8"}
+        }}
+      }
+    }
+  ],
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "resource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["asset_id", "kind", "content_hash", "size_bytes"],
+      "properties": {
+        "asset_id": {"type": "string", "minLength": 1, "maxLength": 1024, "pattern": "\\S"},
+        "kind": {"enum": ["image", "font"]},
+        "content_hash": {"$ref": "#/$defs/digest"},
+        "size_bytes": {"type": "integer", "minimum": 1, "maximum": 1073741824}
+      }
+    },
+    "inspector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "descriptor_fingerprint"],
+      "properties": {
+        "profile": {"type": "string"},
+        "descriptor_fingerprint": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "png": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "height", "srgb_rendering_intent", "encoded_content_hash", "pixel_hash", "decode_profile", "normalization_profile", "surface_profile", "content_hash_profile"],
+      "properties": {
+        "width": {"type": "integer", "minimum": 1, "maximum": 2147483647},
+        "height": {"type": "integer", "minimum": 1, "maximum": 2147483647},
+        "srgb_rendering_intent": {"type": "integer", "minimum": 0, "maximum": 3},
+        "encoded_content_hash": {"$ref": "#/$defs/digest"},
+        "pixel_hash": {"$ref": "#/$defs/digest"},
+        "decode_profile": {"const": "cutly.decode.png-rgba8-explicit-srgb.v1"},
+        "normalization_profile": {"const": "cutly.color.rgba8-srgb-straight-to-linear-bt709-premultiplied-rgba16.v1"},
+        "surface_profile": {"const": "cutly.surface.linear-bt709-premultiplied-rgba16.v1"},
+        "content_hash_profile": {"const": "cutly.hash.sha256.encoded-png-bytes.v1"}
+      }
+    },
+    "font": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "profile", "content_hash_profile", "content_hash", "table_hash_profile", "cmap_profile", "layout_table_status", "glyf_table_status", "metric_extrema_status", "encoded_bytes", "table_count", "num_glyphs", "units_per_em", "hhea_ascender", "number_of_h_metrics", "index_to_loc_format", "cmap_record_count", "cmap_format4_segments", "cmap_format12_groups", "cmap_mapping_slots", "cmap_mapping_count", "opaque_layout_tables", "tables", "work_units", "working_bytes", "retained_bytes"],
+      "properties": {
+        "schema_version": {"const": 1},
+        "profile": {"const": "cutly.font.sfnt-single-face-static-glyf-core.receipt.v1"},
+        "content_hash_profile": {"const": "cutly.hash.sha256.font-sfnt-complete-bytes.v1"},
+        "content_hash": {"$ref": "#/$defs/digest"},
+        "table_hash_profile": {"const": "cutly.hash.sha256.font-sfnt-table-bytes.v1"},
+        "cmap_profile": {"const": "cutly.font.cmap-unicode-format4-12.v1"},
+        "layout_table_status": {"const": "opaque_unvalidated_not_shape_authorized"},
+        "glyf_table_status": {"const": "opaque_ranges_not_outline_authorized"},
+        "metric_extrema_status": {"const": "declared_unverified"},
+        "encoded_bytes": {"type": "integer", "minimum": 4, "maximum": 1073741824, "multipleOf": 4},
+        "table_count": {"type": "integer", "minimum": 7, "maximum": 4095},
+        "num_glyphs": {"type": "integer", "minimum": 1, "maximum": 65535},
+        "units_per_em": {"type": "integer", "minimum": 16, "maximum": 16384},
+        "hhea_ascender": {"type": "integer", "minimum": -32768, "maximum": 32767},
+        "number_of_h_metrics": {"type": "integer", "minimum": 1, "maximum": 65535},
+        "index_to_loc_format": {"type": "integer", "minimum": 0, "maximum": 1},
+        "cmap_record_count": {"type": "integer", "minimum": 1, "maximum": 4},
+        "cmap_format4_segments": {"type": "integer", "minimum": 0, "maximum": 131068, "not": {"const": 1}},
+        "cmap_format12_groups": {"type": "integer", "minimum": 0, "maximum": 1048576},
+        "cmap_mapping_slots": {"type": "integer", "minimum": 0, "maximum": 4194304},
+        "cmap_mapping_count": {"type": "integer", "minimum": 0, "maximum": 1112064},
+        "opaque_layout_tables": {"type": "array", "maxItems": 3, "uniqueItems": true, "items": {"enum": ["GDEF", "GPOS", "GSUB"]}},
+        "tables": {"type": "array", "minItems": 7, "maxItems": 4095, "items": {"$ref": "#/$defs/table"}},
+        "work_units": {"type": "integer", "minimum": 0, "maximum": 1152921504606846976},
+        "working_bytes": {"type": "integer", "minimum": 0, "maximum": 2147483648},
+        "retained_bytes": {"type": "integer", "minimum": 0, "maximum": 2147483648}
+      }
+    },
+    "table": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tag", "offset", "length", "checksum", "content_hash"],
+      "properties": {
+        "tag": {"enum": ["cmap", "glyf", "head", "hhea", "hmtx", "loca", "maxp", "DSIG", "OS/2", "cvt ", "fpgm", "gasp", "name", "post", "prep", "GDEF", "GPOS", "GSUB"]},
+        "offset": {"type": "integer", "minimum": 0, "maximum": 4294967295, "multipleOf": 4},
+        "length": {"type": "integer", "minimum": 0, "maximum": 4294967295},
+        "checksum": {"type": "integer", "minimum": 0, "maximum": 4294967295},
+        "content_hash": {"$ref": "#/$defs/digest"}
+      }
+    }
+  }
+}

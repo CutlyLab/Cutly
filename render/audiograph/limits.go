@@ -1,6 +1,7 @@
 package audiograph
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"reflect"
@@ -12,6 +13,7 @@ import (
 // overestimates encoding/json so hostile strings/raw messages can be rejected before canonical
 // encoding allocates a document- or manifest-sized buffer.
 type valueMeasure struct {
+	ctx          context.Context
 	nodes        uint64
 	encodedUpper uint64
 	nodeLimit    uint64
@@ -19,10 +21,14 @@ type valueMeasure struct {
 }
 
 func preflightValueLimits(value any, nodeLimit, byteLimit uint64) (string, error) {
+	return preflightValueLimitsContext(nil, value, nodeLimit, byteLimit)
+}
+
+func preflightValueLimitsContext(ctx context.Context, value any, nodeLimit, byteLimit uint64) (string, error) {
 	if nodeLimit == 0 || byteLimit == 0 {
 		return "/", fmt.Errorf("preflight limits must be positive")
 	}
-	measure := valueMeasure{nodeLimit: nodeLimit, byteLimit: byteLimit}
+	measure := valueMeasure{ctx: ctx, nodeLimit: nodeLimit, byteLimit: byteLimit}
 	if err := measure.addNodes(1); err != nil {
 		return "/", err
 	}
@@ -56,6 +62,11 @@ func (measure *valueMeasure) addEscapedBytes(length int) error {
 }
 
 func (measure *valueMeasure) walk(value reflect.Value) error {
+	if measure.ctx != nil {
+		if err := checkContext(measure.ctx, "admission"); err != nil {
+			return err
+		}
+	}
 	if !value.IsValid() {
 		return nil
 	}

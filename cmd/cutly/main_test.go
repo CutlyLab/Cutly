@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"testing"
 
 	agentprotocol "github.com/CutlyLab/Cutly/agent/protocol"
+	"github.com/CutlyLab/Cutly/agent/protocolv2"
 	"github.com/CutlyLab/Cutly/core/videoedit"
 	cutly "github.com/CutlyLab/Cutly/sdk/go/cutly"
 )
@@ -30,7 +32,7 @@ func TestInitCommandCreatesAndReplaysLocalProject(t *testing.T) {
 	}
 	root := t.TempDir()
 	projectDir := filepath.Join(root, "project")
-	args := []string{"init", "--project-dir", projectDir, "--document", "-"}
+	args := []string{"init", "--project-dir", projectDir, "--document", "-", "--profile", "legacy-v1"}
 	var firstOut, firstErr bytes.Buffer
 	code := run(context.Background(), args, bytes.NewReader(raw), &firstOut, &firstErr, nil)
 	if code != 0 || firstErr.Len() != 0 {
@@ -73,10 +75,34 @@ func TestInitCommandCreatesAndReplaysLocalProject(t *testing.T) {
 	fileProjectDir := filepath.Join(root, "file-project")
 	var fileOut, fileErr bytes.Buffer
 	code = run(context.Background(), []string{
-		"init", "--project-dir", fileProjectDir, "--document", documentPath,
+		"init", "--project-dir", fileProjectDir, "--document", documentPath, "--profile", "legacy-v1",
 	}, strings.NewReader("unused"), &fileOut, &fileErr, nil)
 	if code != 0 || fileErr.Len() != 0 {
 		t.Fatalf("file init code=%d stdout=%q stderr=%q", code, fileOut.String(), fileErr.String())
+	}
+}
+
+func TestInitDefaultsToDocumentV2(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "conformance", "fixtures", "document-v2.valid.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	projectDir := filepath.Join(t.TempDir(), "document-v2")
+	var stdout, stderr bytes.Buffer
+	code := run(context.Background(), []string{"init", "--project-dir", projectDir}, bytes.NewReader(raw), &stdout, &stderr, nil)
+	if code != 0 || stderr.Len() != 0 || !strings.Contains(stdout.String(), `"profile":"cutly.cli-project-init.document-v2.v2"`) {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	resolved, err := filepath.EvalSymlinks(projectDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	project, err := cutly.OpenLocalProjectV2(resolved)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snapshot, err := project.Inspect(context.Background()); err != nil || snapshot.Document.ID != "fixture-document-v2" {
+		t.Fatalf("snapshot=%+v err=%v", snapshot, err)
 	}
 }
 
@@ -94,9 +120,12 @@ func TestReadInputEnforcesStdinAndFileBounds(t *testing.T) {
 }
 
 func TestActionCommandUsesPublicProtocolAndExitCodes(t *testing.T) {
-	factory := func(endpoint string) (cutly.Transport, error) {
+	factory := func(endpoint, profile string) (cutly.Transport, error) {
 		if endpoint != "http://test.invalid/agent" {
 			t.Fatalf("endpoint = %q", endpoint)
+		}
+		if profile != "legacy-v1" {
+			t.Fatalf("profile = %q", profile)
 		}
 		return cutly.TransportFunc(func(_ context.Context, raw []byte) ([]byte, error) {
 			request, err := agentprotocol.DecodeRequest(raw)
@@ -124,6 +153,7 @@ func TestActionCommandUsesPublicProtocolAndExitCodes(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := run(context.Background(), []string{
 		"edit", "apply",
+		"--profile", "legacy-v1",
 		"--endpoint", "http://test.invalid/agent",
 		"--project", "project-1",
 		"--request-id", "request-1",
@@ -134,14 +164,41 @@ func TestActionCommandUsesPublicProtocolAndExitCodes(t *testing.T) {
 	}
 }
 
+func TestActionCommandDefaultsToDocumentV2(t *testing.T) {
+	factory := func(endpoint, profile string) (cutly.Transport, error) {
+		if endpoint != "http://test.invalid/v2" || profile != "document-v2" {
+			t.Fatalf("endpoint=%q profile=%q", endpoint, profile)
+		}
+		return cutly.TransportFunc(func(ctx context.Context, raw []byte) ([]byte, error) {
+			request, err := protocolv2.DecodeRequest(ctx, raw)
+			if err != nil {
+				return nil, err
+			}
+			if request.Tool != protocolv2.ToolProject || request.Action != "status" || request.ProjectID != "project-v2" {
+				t.Fatalf("request=%+v", request)
+			}
+			return protocolv2.CanonicalResult(ctx, protocolv2.Result{
+				SchemaVersion: protocolv2.SchemaVersion, Profile: protocolv2.ResultProfile, OK: true,
+				RequestID: request.RequestID, Tool: request.Tool, Action: request.Action, ProjectID: request.ProjectID,
+				State: "available", Diagnostics: []videoedit.Diagnostic{}, Receipt: json.RawMessage(`{"profile":"cutly.project-status.document-v2.v2"}`),
+			})
+		}), nil
+	}
+	var stdout, stderr bytes.Buffer
+	code := run(context.Background(), []string{"project", "status", "--endpoint", "http://test.invalid/v2", "--project", "project-v2", "--request-id", "request-v2"}, strings.NewReader(""), &stdout, &stderr, factory)
+	if code != 0 || stderr.Len() != 0 || !strings.Contains(stdout.String(), `"profile":"cutly.agent-result.document-v2.v2"`) {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+}
+
 func TestCallRejectsCorrelationAndUsage(t *testing.T) {
-	factory := func(string) (cutly.Transport, error) {
+	factory := func(string, string) (cutly.Transport, error) {
 		return cutly.TransportFunc(func(context.Context, []byte) ([]byte, error) {
 			return agentprotocol.CanonicalResult(validCLIResult("other"))
 		}), nil
 	}
 	var stdout, stderr bytes.Buffer
-	code := run(context.Background(), []string{"call", "--endpoint", "http://test.invalid"}, strings.NewReader(
+	code := run(context.Background(), []string{"call", "--profile", "legacy-v1", "--endpoint", "http://test.invalid"}, strings.NewReader(
 		`{"protocol_version":1,"request_id":"r","tool":"cutly_project","action":"inspect","project_id":"p","payload":{}}`,
 	), &stdout, &stderr, factory)
 	if code != exitFailure || !strings.Contains(stderr.String(), "correlation") {
@@ -159,7 +216,7 @@ func TestTransportFactoryFailure(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := run(context.Background(), []string{
 		"doctor", "--endpoint", "bad", "--request-id", "r",
-	}, strings.NewReader(""), &stdout, &stderr, func(string) (cutly.Transport, error) {
+	}, strings.NewReader(""), &stdout, &stderr, func(string, string) (cutly.Transport, error) {
 		return nil, errors.New("offline")
 	})
 	if code != exitFailure || !strings.Contains(stderr.String(), "offline") {

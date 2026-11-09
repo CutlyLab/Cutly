@@ -130,6 +130,16 @@ func (p ProviderPolicy) MeasureLocalDevelopmentExecutable(ctx context.Context, h
 	return measureProviderExecutable(ctx, hostSelectedAbsolutePath)
 }
 
+// MeasureProviderExecutableBinding measures a host-selected executable without
+// granting release authorization. It exists for an already-launched child to
+// bind its own bytes to a request that the packaged parent authorized before
+// exec. The opaque result can be passed to trusted in-process constructors, but
+// it must never replace ProviderPolicy.MeasurePackagedExecutable at a launch
+// boundary.
+func MeasureProviderExecutableBinding(ctx context.Context, hostSelectedAbsolutePath string) (ProviderExecutableIdentity, error) {
+	return measureProviderExecutable(ctx, hostSelectedAbsolutePath)
+}
+
 func canonicalProviderSHA256(value string) bool {
 	if len(value) != 71 || value[:7] != "sha256:" {
 		return false

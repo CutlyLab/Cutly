@@ -1,6 +1,7 @@
 package audiograph
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"math/big"
@@ -171,7 +172,7 @@ type compiledBus struct {
 // mutable slices.
 type Program struct {
 	documentHash string
-	evaluator    *evaluator.Program
+	evaluator    clipEvaluator
 	bindings     map[documentv2.ID]compiledBinding
 	timelines    map[documentv2.ID]compiledTimeline
 	buses        []compiledBus
@@ -371,8 +372,12 @@ func normalizeLimits(value Limits) (Limits, []documentv2.Diagnostic) {
 }
 
 func preflightRawLimits(document documentv2.Document, offered videoedit.BackendCapabilities, bindings []MediaBinding, limits Limits) []documentv2.Diagnostic {
+	return preflightRawLimitsContext(nil, document, offered, bindings, limits)
+}
+
+func preflightRawLimitsContext(ctx context.Context, document documentv2.Document, offered videoedit.BackendCapabilities, bindings []MediaBinding, limits Limits) []documentv2.Diagnostic {
 	var diagnostics []documentv2.Diagnostic
-	if path, err := preflightValueLimits(document, uint64(limits.MaxDocumentNodes), limits.MaxCanonicalDocumentBytes); err != nil {
+	if path, err := preflightValueLimitsContext(ctx, document, uint64(limits.MaxDocumentNodes), limits.MaxCanonicalDocumentBytes); err != nil {
 		diagnostics = append(diagnostics, compileDiagnostic(CodeCompileLimit, path, err.Error()))
 		return diagnostics
 	}
@@ -389,7 +394,7 @@ func preflightRawLimits(document documentv2.Document, offered videoedit.BackendC
 			fmt.Sprintf("capability entry count %d exceeds limit %d", capabilityEntries, limits.MaxCapabilityEntries)))
 		return diagnostics
 	}
-	if _, err := preflightValueLimits(offered, uint64(limits.MaxCapabilityEntries)+16, limits.MaxCanonicalManifestBytes); err != nil {
+	if _, err := preflightValueLimitsContext(ctx, offered, uint64(limits.MaxCapabilityEntries)+16, limits.MaxCanonicalManifestBytes); err != nil {
 		diagnostics = append(diagnostics, compileDiagnostic(CodeCompileLimit, "/offered", err.Error()))
 		return diagnostics
 	}
@@ -403,13 +408,16 @@ func preflightRawLimits(document documentv2.Document, offered videoedit.BackendC
 		diagnostics = append(diagnostics, compileDiagnostic(CodeCompileLimit, "/bindings", fmt.Sprintf("binding count %d exceeds limit %d", len(bindings), limits.MaxBindings)))
 	}
 	for bindingIndex, binding := range bindings {
+		if ctx != nil && ctx.Err() != nil {
+			return []documentv2.Diagnostic{domainCanceledDiagnostic()}
+		}
 		streamLimit := uint64(limits.MaxProbeStreamsPerBinding)
 		if streamLimit > (math.MaxUint64-64)/16 {
 			diagnostics = append(diagnostics, compileDiagnostic(CodeCompileLimit, fmt.Sprintf("/bindings/%d/manifest", bindingIndex), "manifest node limit overflows"))
 			continue
 		}
 		manifestNodeLimit := streamLimit*16 + 64
-		if _, err := preflightValueLimits(binding.Manifest, manifestNodeLimit, limits.MaxCanonicalManifestBytes); err != nil {
+		if _, err := preflightValueLimitsContext(ctx, binding.Manifest, manifestNodeLimit, limits.MaxCanonicalManifestBytes); err != nil {
 			diagnostics = append(diagnostics, compileDiagnostic(CodeCompileLimit, fmt.Sprintf("/bindings/%d/manifest", bindingIndex), err.Error()))
 		}
 		if len(binding.Manifest.Streams) > limits.MaxProbeStreamsPerBinding {
@@ -422,6 +430,9 @@ func preflightRawLimits(document documentv2.Document, offered videoedit.BackendC
 		}
 	}
 	for timelineIndex, timeline := range document.Timelines {
+		if ctx != nil && ctx.Err() != nil {
+			return []documentv2.Diagnostic{domainCanceledDiagnostic()}
+		}
 		if len(timeline.Tracks) > limits.MaxTracksPerTimeline {
 			diagnostics = append(diagnostics, compileDiagnostic(CodeCompileLimit, fmt.Sprintf("/timelines/%d/tracks", timelineIndex),
 				fmt.Sprintf("track count %d exceeds limit %d", len(timeline.Tracks), limits.MaxTracksPerTimeline)))
@@ -429,6 +440,9 @@ func preflightRawLimits(document documentv2.Document, offered videoedit.BackendC
 		}
 		audioTracks := 0
 		for trackIndex, track := range timeline.Tracks {
+			if ctx != nil && ctx.Err() != nil {
+				return []documentv2.Diagnostic{domainCanceledDiagnostic()}
+			}
 			if len(track.Clips) > limits.MaxClipsPerTrack {
 				diagnostics = append(diagnostics, compileDiagnostic(CodeCompileLimit,
 					fmt.Sprintf("/timelines/%d/tracks/%d/clips", timelineIndex, trackIndex),
@@ -448,9 +462,17 @@ func preflightRawLimits(document documentv2.Document, offered videoedit.BackendC
 }
 
 func compileBindings(values []MediaBinding, assets map[documentv2.ID]documentv2.Asset, limits Limits, diagnostics *[]documentv2.Diagnostic) map[documentv2.ID]compiledBinding {
+	return compileBindingsContext(nil, values, assets, limits, diagnostics)
+}
+
+func compileBindingsContext(ctx context.Context, values []MediaBinding, assets map[documentv2.ID]documentv2.Asset, limits Limits, diagnostics *[]documentv2.Diagnostic) map[documentv2.ID]compiledBinding {
 	result := make(map[documentv2.ID]compiledBinding, len(values))
 	seenBindings := make(map[documentv2.ID]struct{}, len(values))
 	for index, value := range values {
+		if ctx != nil && ctx.Err() != nil {
+			*diagnostics = append(*diagnostics, domainCanceledDiagnostic())
+			return nil
+		}
 		path := fmt.Sprintf("/bindings/%d", index)
 		if strings.TrimSpace(string(value.AssetID)) == "" {
 			*diagnostics = append(*diagnostics, compileDiagnostic(CodeBindingInvalid, path+"/asset_id", "asset_id is required"))
@@ -507,6 +529,10 @@ func compileBindings(values []MediaBinding, assets map[documentv2.ID]documentv2.
 		}
 		var selected *probe.Stream
 		for streamIndex := range manifest.Streams {
+			if ctx != nil && ctx.Err() != nil {
+				*diagnostics = append(*diagnostics, domainCanceledDiagnostic())
+				return nil
+			}
 			if manifest.Streams[streamIndex].Index == value.StreamIndex {
 				selected = &manifest.Streams[streamIndex]
 				break

@@ -188,6 +188,7 @@ type Providers struct {
 // Result binds the complete target/profile identity and ordered source union. Surface is an
 // immutable runtime value and is intentionally omitted from serialization.
 type Result struct {
+	DomainScopeHash                 string                  `json:"domain_scope_hash,omitempty"`
 	SchemaVersion                   int                     `json:"schema_version"`
 	Profile                         string                  `json:"profile"`
 	TimelineID                      documentv2.ID           `json:"timeline_id"`

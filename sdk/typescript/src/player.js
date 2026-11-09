@@ -3,6 +3,7 @@ const INT64_MAX = (1n << 63n) - 1n;
 const UINT64_MAX = (1n << 64n) - 1n;
 
 export const PLAYER_PROFILE = "cutly.player.exact-audio-master.v1";
+export const DOCUMENT_V2_PLAYER_PROFILE = "cutly.player.document-v2.exact-audio-master.v2";
 
 export class PlayerStateError extends Error {
   constructor(code, detail) {
@@ -52,7 +53,7 @@ export class HeadlessPlayer {
 
   snapshot() {
     return Object.freeze({
-      profile: PLAYER_PROFILE,
+      profile: this.#config.profile,
       revision: this.#config.revision.toString(),
       phase: this.#phase,
       desiredPlaying: this.#desiredPlaying,
@@ -182,7 +183,7 @@ export class HeadlessPlayer {
     if (this.#frameIndex === null) throw playerError("PLAYER.NO_FRAME", "the configured frame range is empty");
     this.#requestSequence += 1n;
     return Object.freeze({
-      profile: PLAYER_PROFILE,
+      profile: this.#config.profile,
       revision: this.#config.revision.toString(),
       seekEpoch: this.#epoch.toString(),
       requestID: this.#requestSequence.toString(),
@@ -195,7 +196,7 @@ export class HeadlessPlayer {
   acceptFrame(token) {
     if (!token || typeof token !== "object") return false;
     if (
-      token.profile !== PLAYER_PROFILE ||
+      token.profile !== this.#config.profile ||
       token.revision !== this.#config.revision.toString() ||
       token.seekEpoch !== this.#epoch.toString() ||
       token.requestID !== this.#requestSequence.toString() ||
@@ -229,6 +230,18 @@ export class HeadlessPlayer {
     if (this.#listeners.size === 0) return;
     const event = Object.freeze({ kind, state: this.snapshot() });
     for (const listener of [...this.#listeners]) listener(event);
+  }
+}
+
+// DocumentV2Player selects the explicit v2 player identity while reusing the
+// same exact audio-master clock, seek/buffer state machine and stale-frame gate.
+export class DocumentV2Player extends HeadlessPlayer {
+  constructor(config) {
+    super({ ...config, profile: DOCUMENT_V2_PLAYER_PROFILE });
+  }
+
+  load(config) {
+    return super.load({ ...config, profile: DOCUMENT_V2_PLAYER_PROFILE });
   }
 }
 
@@ -268,7 +281,11 @@ function normalizeConfig(config) {
   const sampleClock = normalizeSampleClock(config.sampleClock);
   const frameRange = normalizeRange(config.frameRange, "frameRange", false);
   const sampleRange = normalizeRange(config.sampleRange, "sampleRange", false);
-  return { revision, frameClock, sampleClock, frameRange, sampleRange };
+  const profile = config.profile ?? PLAYER_PROFILE;
+  if (profile !== PLAYER_PROFILE && profile !== DOCUMENT_V2_PLAYER_PROFILE) {
+    throw playerError("PLAYER.PROFILE_INVALID", "unsupported player profile");
+  }
+  return { profile, revision, frameClock, sampleClock, frameRange, sampleRange };
 }
 
 function normalizeFrameClock(clock) {

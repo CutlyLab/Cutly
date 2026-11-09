@@ -14,6 +14,7 @@ export interface CanonicalJSONLimits {
 }
 
 export declare const CANONICAL_JSON_PROFILE: "cutly.json.canonical-integer.v1";
+export declare const NUMBER_PRESERVING_JSON_PROFILE: "cutly.json.number-preserving.v1";
 
 export declare class CanonicalJSONError extends Error {
   readonly code: CanonicalJSONErrorCode;
@@ -28,6 +29,22 @@ export declare function canonicalizeJSONString(
 
 export declare function canonicalizeJSON(
   input: string | Uint8Array,
+  limits?: CanonicalJSONLimits,
+): Uint8Array;
+
+export declare function canonicalizeNumberPreservingJSONString(
+  input: string | Uint8Array,
+  limits?: CanonicalJSONLimits,
+): string;
+
+export declare function canonicalizeNumberPreservingJSON(
+  input: string | Uint8Array,
+  limits?: CanonicalJSONLimits,
+): Uint8Array;
+
+export declare function extractNumberPreservingRootMember(
+  input: string | Uint8Array,
+  member: string,
   limits?: CanonicalJSONLimits,
 ): Uint8Array;
 
@@ -74,6 +91,93 @@ export declare function digestCanonicalValue(
   limits?: CanonicalJSONLimits,
 ): Promise<CanonicalJSONDigest>;
 
+export interface NumberPreservingJSONDigest {
+  profile: typeof NUMBER_PRESERVING_JSON_PROFILE;
+  digest: `sha256:${string}`;
+  canonical: Uint8Array;
+}
+
+export declare function digestNumberPreservingJSON(
+  input: string | Uint8Array,
+  limits?: CanonicalJSONLimits,
+): Promise<NumberPreservingJSONDigest>;
+
+export declare function digestNumberPreservingJSONWithoutRootMember(
+  input: string | Uint8Array,
+  member: string,
+  limits?: CanonicalJSONLimits,
+): Promise<NumberPreservingJSONDigest>;
+
+export declare const TRANSACTION_V2_PROFILE: "cutly.transaction.document-v2.number-preserving.v2";
+export declare const TRANSACTION_V2_SCHEMA_VERSION: 2;
+export declare const MAX_TRANSACTION_V2_BYTES: number;
+
+export declare class TransactionV2Error extends Error {
+  readonly code: string;
+  constructor(code: string, detail: string);
+}
+
+export interface DecodedTransactionV2 {
+  readonly schemaVersion: 2;
+  readonly profile: typeof TRANSACTION_V2_PROFILE;
+  readonly id: string;
+  readonly idempotencyKey: string;
+  readonly documentId: string;
+  readonly expectedRevision: string;
+  readonly expectedDocumentHash: `sha256:${string}`;
+  readonly digest: `sha256:${string}`;
+  readonly operationCount: number;
+  readonly canonical: Uint8Array;
+}
+
+export declare function decodeTransactionV2(input: string | Uint8Array): Promise<DecodedTransactionV2>;
+export declare function transactionDigestV2(input: string | Uint8Array): Promise<`sha256:${string}`>;
+export declare function moveClipV2(input: { id: string; clipId: string; at: RationalTimeLike }): TypedOperation;
+export declare function trimClipV2(input: { id: string; clipId: string; timelineRange: TimeRangeInput; sourceRange: TimeRangeInput }): TypedOperation;
+export declare function deleteClipV2(input: { id: string; trackId: string; clipId: string }): TypedOperation;
+export declare function retrackClipV2(input: { id: string; clipId: string; trackId: string; position: IntegerLike }): TypedOperation;
+export declare function setClipPropertiesV2(input: { id: string; clipId: string; value?: CanonicalJSONInput }): TypedOperation;
+export declare function buildTransactionV2(input: {
+  id: string;
+  idempotencyKey: string;
+  documentId: string;
+  expectedRevision: IntegerLike;
+  expectedDocumentHash: `sha256:${string}`;
+  operations: readonly TypedOperation[];
+}): Promise<DecodedTransactionV2>;
+
+export declare const DOCUMENT_V2_UI_PROFILE: "cutly.headless-ui.document-v2.v2";
+export interface DocumentV2UIClipPrimitive {
+  readonly profile: typeof DOCUMENT_V2_UI_PROFILE;
+  readonly kind: "clip";
+  readonly id: string;
+  readonly track_id: string;
+  readonly track_kind: "video" | "audio" | "text" | "vector" | "annotation";
+  readonly asset_id: string;
+  readonly asset_kind: string;
+  readonly timeline_range: { readonly start: ExactRationalTime; readonly duration: ExactRationalTime };
+  readonly source_range: { readonly start: ExactRationalTime; readonly duration: ExactRationalTime };
+  readonly disabled: boolean;
+  readonly keyframe_lane_ids: readonly string[];
+}
+export interface DocumentV2UITrackPrimitive {
+  readonly profile: typeof DOCUMENT_V2_UI_PROFILE;
+  readonly kind: "track";
+  readonly id: string;
+  readonly track_kind: "video" | "audio" | "text" | "vector" | "annotation";
+  readonly audio_bus_id: string;
+  readonly clips: readonly DocumentV2UIClipPrimitive[];
+}
+export interface DocumentV2UITimelinePrimitive {
+  readonly profile: typeof DOCUMENT_V2_UI_PROFILE;
+  readonly kind: "timeline";
+  readonly document_id: string;
+  readonly timeline_id: string;
+  readonly revision: bigint;
+  readonly tracks: readonly DocumentV2UITrackPrimitive[];
+}
+export declare function documentV2TimelinePrimitives(document: Readonly<Record<string, unknown>>, timelineId: string): DocumentV2UITimelinePrimitive;
+
 export type IntegerLike = string | number | bigint;
 
 export interface RationalTimeLike {
@@ -112,7 +216,7 @@ export interface WireTickRange {
 }
 
 export interface PlayerSnapshot {
-  profile: typeof PLAYER_PROFILE;
+  profile: typeof PLAYER_PROFILE | typeof DOCUMENT_V2_PLAYER_PROFILE;
   revision: string;
   phase: PlayerPhase;
   desiredPlaying: boolean;
@@ -125,7 +229,7 @@ export interface PlayerSnapshot {
 }
 
 export interface FrameRequestToken {
-  profile: typeof PLAYER_PROFILE;
+  profile: typeof PLAYER_PROFILE | typeof DOCUMENT_V2_PLAYER_PROFILE;
   revision: string;
   seekEpoch: string;
   requestID: string;
@@ -138,6 +242,7 @@ export interface PlayerEvent {
 }
 
 export declare const PLAYER_PROFILE: "cutly.player.exact-audio-master.v1";
+export declare const DOCUMENT_V2_PLAYER_PROFILE: "cutly.player.document-v2.exact-audio-master.v2";
 
 export type PlayerStateErrorCode =
   | "PLAYER.BUFFER_RANGE_INVALID"
@@ -145,6 +250,7 @@ export type PlayerStateErrorCode =
   | "PLAYER.INTEGER_INVALID"
   | "PLAYER.LOOP_RANGE_INVALID"
   | "PLAYER.NO_FRAME"
+  | "PLAYER.PROFILE_INVALID"
   | "PLAYER.RANGE_INVALID"
   | "PLAYER.TIME_OVERFLOW";
 
@@ -166,6 +272,11 @@ export declare class HeadlessPlayer {
   setLoopFrameRange(range: TickRangeLike | null): PlayerSnapshot;
   requestFrame(): FrameRequestToken;
   acceptFrame(token: FrameRequestToken): boolean;
+}
+
+export declare class DocumentV2Player extends HeadlessPlayer {
+  constructor(config: HeadlessPlayerConfig);
+  load(config: HeadlessPlayerConfig): PlayerSnapshot;
 }
 
 export declare function frameIndexAtSample(
@@ -348,6 +459,115 @@ export declare function selectionPrimitive(input?: {
   trackIDs?: readonly string[];
   clipIDs?: readonly string[];
 }): UISelectionPrimitive;
+
+export type AgentToolV2 = "cutly_project" | "cutly_edit" | "cutly_render";
+export type AgentActionV2 = ProjectAction | EditAction | "plan" | "prepare" | "preflight" | "frame" | "submit" | "status" | "history" | "cancel";
+export declare const AGENT_V2_SCHEMA_VERSION: 2;
+export declare const AGENT_V2_REQUEST_PROFILE: "cutly.agent-request.document-v2.v2";
+export declare const AGENT_V2_RESULT_PROFILE: "cutly.agent-result.document-v2.v2";
+export declare const AGENT_V2_MEDIA_TYPE: "application/cutly-agent-document-v2+json";
+export declare class AgentProtocolV2Error extends Error {
+  readonly code: string;
+  constructor(code: string, detail: string, cause?: unknown);
+}
+export interface AgentRequestV2Handle {
+  readonly requestId: string;
+  readonly tool: AgentToolV2;
+  readonly action: AgentActionV2;
+  readonly projectId: string;
+  readonly canonical: Uint8Array;
+}
+export interface AgentResultV2Handle {
+  readonly schemaVersion: 2;
+  readonly profile: typeof AGENT_V2_RESULT_PROFILE;
+  readonly ok: boolean;
+  readonly requestId: string;
+  readonly tool: AgentToolV2;
+  readonly action: AgentActionV2;
+  readonly projectId: string;
+  readonly state: string;
+  readonly diagnostics: readonly AgentDiagnostic[];
+  readonly receipt: Uint8Array;
+  readonly canonical: Uint8Array;
+}
+export declare function createAgentRequestV2(input: {
+  requestId: string;
+  tool: AgentToolV2;
+  action: AgentActionV2;
+  projectId: string;
+  payload?: CanonicalJSONInput | string | Uint8Array;
+}): AgentRequestV2Handle;
+export declare function createAgentTransactionRequestV2(input: {
+  requestId: string;
+  projectId: string;
+  transaction: DecodedTransactionV2;
+}): AgentRequestV2Handle;
+export declare function decodeAgentResultV2(input: string | Uint8Array): AgentResultV2Handle;
+export interface AgentV2Transport {
+  roundTrip(request: Uint8Array, options?: { signal?: AbortSignal }): Promise<string | Uint8Array> | string | Uint8Array;
+}
+export declare class CutlyAgentV2Client {
+  constructor(transport: AgentV2Transport | ((request: Uint8Array, options?: { signal?: AbortSignal }) => Promise<string | Uint8Array> | string | Uint8Array));
+  call(request: AgentRequestV2Handle, options?: { signal?: AbortSignal }): Promise<AgentResultV2Handle>;
+  callAction(input: Parameters<typeof createAgentRequestV2>[0], options?: { signal?: AbortSignal }): Promise<AgentResultV2Handle>;
+  inspectProject(input: AgentActionIdentity, options?: { signal?: AbortSignal }): Promise<AgentResultV2Handle>;
+  projectStatus(input: AgentActionIdentity, options?: { signal?: AbortSignal }): Promise<AgentResultV2Handle>;
+  projectHistory(input: AgentActionIdentity & { afterSequence?: IntegerLike; limit?: IntegerLike }, options?: { signal?: AbortSignal }): Promise<AgentResultV2Handle>;
+  planEdit(input: AgentActionIdentity & { transaction: DecodedTransactionV2 }, options?: { signal?: AbortSignal }): Promise<AgentResultV2Handle>;
+  applyEdit(input: AgentTransactionAction, options?: { signal?: AbortSignal }): Promise<AgentResultV2Handle>;
+  discardEdit(input: AgentTransactionAction, options?: { signal?: AbortSignal }): Promise<AgentResultV2Handle>;
+  revertEdit(input: AgentTransactionAction & { targetTransactionId: string; idempotencyKey: string }, options?: { signal?: AbortSignal }): Promise<AgentResultV2Handle>;
+  capabilities(input: AgentActionIdentity, options?: { signal?: AbortSignal }): Promise<AgentResultV2Handle>;
+  planRender(input: AgentActionIdentity & { range: CanonicalJSONInput; target: CanonicalJSONInput }, options?: { signal?: AbortSignal }): Promise<AgentResultV2Handle>;
+  prepareRender(input: AgentActionIdentity & { environment: CanonicalJSONInput | string | Uint8Array }, options?: { signal?: AbortSignal }): Promise<AgentResultV2Handle>;
+  preflightRender(input: AgentActionIdentity & { planFingerprint: string; executionManifestFingerprint: string }, options?: { signal?: AbortSignal }): Promise<AgentResultV2Handle>;
+  renderFrame(input: AgentActionIdentity & { planFingerprint: string; executionManifestFingerprint: string; compositionFrameIndex: IntegerLike }, options?: { signal?: AbortSignal }): Promise<AgentResultV2Handle>;
+  submitRender(input: AgentActionIdentity & { job: CanonicalJSONInput }, options?: { signal?: AbortSignal }): Promise<AgentResultV2Handle>;
+  renderStatus(input: AgentJobAction, options?: { signal?: AbortSignal }): Promise<AgentResultV2Handle>;
+  renderHistory(input: AgentJobAction & { afterSequence?: IntegerLike; limit?: IntegerLike }, options?: { signal?: AbortSignal }): Promise<AgentResultV2Handle>;
+  cancelRender(input: AgentJobAction, options?: { signal?: AbortSignal }): Promise<AgentResultV2Handle>;
+}
+export declare class HTTPAgentV2Transport implements AgentV2Transport {
+  constructor(endpoint: string | URL, options?: { fetch?: typeof fetch });
+  roundTrip(request: Uint8Array, options?: { signal?: AbortSignal }): Promise<Uint8Array>;
+}
+
+export declare const DOCUMENT_V2_FRAME_PREVIEW_PROFILE: "cutly.preview-frame.document-v2.v2";
+export declare const DOCUMENT_V2_AUDIO_PREVIEW_PROFILE: "cutly.preview-audio.document-v2.v2";
+export declare class DocumentV2PreviewError extends Error {
+  readonly code: string;
+  constructor(code: string, detail: string, cause?: unknown);
+}
+export interface DocumentV2FramePreviewRequest {
+  readonly profile: typeof DOCUMENT_V2_FRAME_PREVIEW_PROFILE;
+  readonly plan_fingerprint: `sha256:${string}`;
+  readonly execution_manifest_fingerprint: `sha256:${string}`;
+  readonly composition_frame_index: string;
+}
+export interface DocumentV2FramePreviewResult extends DocumentV2FramePreviewRequest {
+  readonly content_hash: `sha256:${string}`;
+  readonly uri: string;
+}
+export interface DocumentV2AudioPreviewRequest {
+  readonly profile: typeof DOCUMENT_V2_AUDIO_PREVIEW_PROFILE;
+  readonly plan_fingerprint: `sha256:${string}`;
+  readonly execution_manifest_fingerprint: `sha256:${string}`;
+  readonly sample_range: { readonly first: string; readonly count: string };
+}
+export interface DocumentV2AudioPreviewResult extends DocumentV2AudioPreviewRequest {
+  readonly content_hash: `sha256:${string}`;
+  readonly pcm_profile: string;
+}
+export declare class DocumentV2PreviewAdapter {
+  constructor(config: {
+    planFingerprint: `sha256:${string}`;
+    executionManifestFingerprint: `sha256:${string}`;
+    renderFrame: (request: DocumentV2FramePreviewRequest, options: { signal?: AbortSignal }) => Promise<DocumentV2FramePreviewResult> | DocumentV2FramePreviewResult;
+    renderAudio?: (request: DocumentV2AudioPreviewRequest, options: { signal?: AbortSignal }) => Promise<DocumentV2AudioPreviewResult> | DocumentV2AudioPreviewResult;
+  });
+  renderCurrentFrame(player: DocumentV2Player, options?: { signal?: AbortSignal }): Promise<Readonly<{ request: DocumentV2FramePreviewRequest; frame: DocumentV2FramePreviewResult; token: Readonly<Record<string, string>>; presented: boolean }>>;
+  renderAudioRange(range: { first: IntegerLike; count: IntegerLike }, options?: { signal?: AbortSignal }): Promise<DocumentV2AudioPreviewResult>;
+}
 
 export type AgentTool = "cutly_project" | "cutly_edit" | "cutly_render";
 export type ProjectAction = "inspect" | "status" | "history" | "capabilities";

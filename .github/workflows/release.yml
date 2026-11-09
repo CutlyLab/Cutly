@@ -65,16 +65,22 @@ jobs:
         include:
           - goos: linux
             goarch: amd64
+            runtime_fingerprint_var: CUTLY_MEDIA_RUNTIME_FINGERPRINT_LINUX_AMD64
           - goos: linux
             goarch: arm64
+            runtime_fingerprint_var: CUTLY_MEDIA_RUNTIME_FINGERPRINT_LINUX_ARM64
           - goos: darwin
             goarch: amd64
+            runtime_fingerprint_var: CUTLY_MEDIA_RUNTIME_FINGERPRINT_DARWIN_AMD64
           - goos: darwin
             goarch: arm64
+            runtime_fingerprint_var: CUTLY_MEDIA_RUNTIME_FINGERPRINT_DARWIN_ARM64
           - goos: windows
             goarch: amd64
+            runtime_fingerprint_var: CUTLY_MEDIA_RUNTIME_FINGERPRINT_WINDOWS_AMD64
           - goos: freebsd
             goarch: amd64
+            runtime_fingerprint_var: CUTLY_MEDIA_RUNTIME_FINGERPRINT_FREEBSD_AMD64
     steps:
       - name: Check out tagged source
         uses: actions/checkout@v4
@@ -85,32 +91,32 @@ jobs:
           go-version-file: go.mod
           cache: false
 
-      - name: Build command archives
+      - name: Download locked build dependencies
+        run: go mod download
+
+      - name: Build and inspect command archives
         shell: bash
         env:
-          CGO_ENABLED: "0"
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
+          TARGET_GOOS: ${{ matrix.goos }}
+          TARGET_GOARCH: ${{ matrix.goarch }}
+          MEDIA_RUNTIME_FINGERPRINT: ${{ vars[matrix.runtime_fingerprint_var] }}
+          MEDIA_RUNTIME_TRUSTED_KEYS: ${{ vars.CUTLY_MEDIA_RUNTIME_TRUSTED_KEYS }}
         run: |
+          test -n "${MEDIA_RUNTIME_FINGERPRINT}"
+          test -n "${MEDIA_RUNTIME_TRUSTED_KEYS}"
           version="${GITHUB_REF_NAME#v}"
-          package="cutly-${version}-${GOOS}-${GOARCH}"
-          output="${RUNNER_TEMP}/${package}"
-          mkdir "${output}"
-          suffix=""
-          if [[ "${GOOS}" = "windows" ]]; then suffix=".exe"; fi
-          go build -trimpath -ldflags='-s -w' -o "${output}/cutly${suffix}" ./cmd/cutly
-          go build -trimpath -ldflags='-s -w' -o "${output}/cutlyd${suffix}" ./cmd/cutlyd
-          cp LICENSE "${output}/LICENSE"
-          cp cmd/cutlyd/README.md "${output}/CUTLYD.md"
-          mkdir -p "${output}/deps/licenses"
-          cp deps/THIRD_PARTY_NOTICES.md deps/sbom.spdx.json deps/dependency-lock.json "${output}/deps/"
-          cp deps/licenses/* "${output}/deps/licenses/"
-          if [[ "${GOOS}" = "windows" ]]; then
-            cd "${RUNNER_TEMP}"
-            zip -q -r "${package}.zip" "${package}"
-          else
-            tar -C "${RUNNER_TEMP}" -czf "${RUNNER_TEMP}/${package}.tar.gz" "${package}"
+          smoke=()
+          if [[ "${TARGET_GOOS}/${TARGET_GOARCH}" = "$(go env GOOS)/$(go env GOARCH)" ]]; then
+            smoke=(--smoke)
           fi
+          go run ./internal/cmd/release-archive \
+            --repo . \
+            --target "${TARGET_GOOS}/${TARGET_GOARCH}" \
+            --output "${RUNNER_TEMP}" \
+            --version "${version}" \
+            --media-runtime-bundle-fingerprint "${MEDIA_RUNTIME_FINGERPRINT}" \
+            --media-runtime-trusted-keys "${MEDIA_RUNTIME_TRUSTED_KEYS}" \
+            "${smoke[@]}"
 
       - name: Upload command archive
         uses: actions/upload-artifact@v4
@@ -120,11 +126,86 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  native-acceptance:
+    name: Native acceptance ${{ matrix.goos }}/${{ matrix.goarch }}
+    needs:
+      - verify
+      - build
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 100
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            kit_url_var: CUTLY_ACCEPTANCE_KIT_URL_LINUX_AMD64
+            kit_sha_var: CUTLY_ACCEPTANCE_KIT_SHA256_LINUX_AMD64
+          - runner: macos-14
+            goos: darwin
+            goarch: amd64
+            kit_url_var: CUTLY_ACCEPTANCE_KIT_URL_DARWIN_AMD64
+            kit_sha_var: CUTLY_ACCEPTANCE_KIT_SHA256_DARWIN_AMD64
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Download packaged commands
+        uses: actions/download-artifact@v4
+        with:
+          name: cutly-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: ${{ runner.temp }}/commands
+
+      - name: Download owner-approved signed acceptance kit
+        shell: bash
+        env:
+          KIT_URL: ${{ vars[matrix.kit_url_var] }}
+          KIT_SHA256: ${{ vars[matrix.kit_sha_var] }}
+        run: |
+          test -n "${KIT_URL}"
+          test -n "${KIT_SHA256}"
+          curl --fail --location --proto '=https' --tlsv1.2 \
+            --output "${RUNNER_TEMP}/acceptance-kit.tar.gz" "${KIT_URL}"
+          actual_sha="$(shasum -a 256 "${RUNNER_TEMP}/acceptance-kit.tar.gz" | awk '{print $1}')"
+          test "${actual_sha}" = "${KIT_SHA256}"
+          mkdir "${RUNNER_TEMP}/acceptance-kit" "${RUNNER_TEMP}/commands-unpacked"
+          tar -xzf "${RUNNER_TEMP}/acceptance-kit.tar.gz" -C "${RUNNER_TEMP}/acceptance-kit"
+          tar -xzf "${RUNNER_TEMP}/commands/"*.tar.gz -C "${RUNNER_TEMP}/commands-unpacked"
+
+      - name: Run mixed smoke, 100 daemon kills and one-hour soak
+        shell: bash
+        run: |
+          command_root="$(find "${RUNNER_TEMP}/commands-unpacked" -mindepth 1 -maxdepth 1 -type d -name 'cutly-*' -print -quit)"
+          kit_root="${RUNNER_TEMP}/acceptance-kit"
+          test -x "${command_root}/cutlyd"
+          test -x "${command_root}/cutly-worker-v2"
+          test -d "${kit_root}/runtime-bundle"
+          test -f "${kit_root}/environment.json"
+          test -f "${kit_root}/host-config.json"
+          test -f "${kit_root}/sdk-digest.txt"
+          export CUTLY_TEST_NATIVE_DAEMON="${command_root}/cutlyd"
+          export CUTLY_TEST_NATIVE_WORKER="${command_root}/cutly-worker-v2"
+          export CUTLY_TEST_NATIVE_RUNTIME_BUNDLE="${kit_root}/runtime-bundle"
+          export CUTLY_TEST_NATIVE_ENVIRONMENT="${kit_root}/environment.json"
+          export CUTLY_TEST_NATIVE_HOST_CONFIG="${kit_root}/host-config.json"
+          export CUTLY_TEST_NATIVE_SDK_DIGEST="$(tr -d '\r\n' < "${kit_root}/sdk-digest.txt")"
+          for mode in smoke fault100 soak; do
+            CUTLY_TEST_NATIVE_ACCEPTANCE="${mode}" go test -count=1 -run '^TestNativeV2ProcessAcceptance$' ./cmd/cutlyd
+          done
+
   publish-npm:
     name: Publish npm package with provenance
     needs:
       - verify
       - build
+      - native-acceptance
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

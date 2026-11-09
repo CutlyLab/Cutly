@@ -1,25 +1,24 @@
 # Cutly Document v2 Native SDK execution plan
 
-Status: handoff-ready execution plan
+Status: S0-S8 standalone source implementation complete; production release acceptance pending
 
-Updated: 2026-11-07
+Updated: 2026-11-09
 
-Implementation branch: `codex/video-sdk-core`
+Implementation branch: `codex/m4-sdk-completion` (isolated continuation worktree)
 
 Original handoff base commit: `0a19a82` (`feat: expose host-bound reference surfaces`)
 
 ### Standalone execution baseline (2026-11-07)
 
 Implementation continues in Go; the proposed Rust rewrite is deferred. The active standalone
-branch is `codex/video-sdk-core`, starting at `f9f891a`. The original handoff SHA `0a19a82` is not
+branch began as `codex/video-sdk-core` at `f9f891a`. Work now continues in the owner-selected isolated
+worktree on `codex/m4-sdk-completion`, preserving previous implementation history. The original handoff SHA `0a19a82` is not
 present in this repository's history. Commit `cabbfbb` has the surface-bridge implementation and
 subject; this identifies the local code baseline, not a proof of commit equivalence or a rerun of
 the historical audit below.
 
-The owner has deferred Manyfy integration work. Execute and validate within standalone Cutly only:
-do not edit the sibling consumer, create replacement module files, or run its consumer tests in this
-execution scope. Existing Cutly legacy compatibility gates remain mandatory. Manyfy acceptance is
-explicitly deferred, not passed, and must be tracked separately from standalone SDK readiness.
+Cutly is a standalone SDK product. Consumer-application integration is outside this roadmap and is
+not an M4 gate. Existing Cutly legacy compatibility gates remain mandatory.
 
 Begin with S1 and preserve the stage dependency gates. Save independently reviewable, tested
 boundaries as local commits; no push, package publication, tag, or daemon default switch is implied.
@@ -27,11 +26,15 @@ S1 acceptance evidence is recorded in `DOCUMENT_V2_S1_EVIDENCE.md`; the active S
 `DOCUMENT_V2_S2_EVIDENCE.md`.
 
 The independent release-evidence runner is implemented and its three P2 audit findings were
-independently closed at `0f08c2e`; post-repair smoke and full repository gates passed. A real long
-restricted-RC observation is running, not accepted yet. See `RELEASE_EVIDENCE_RUNNER.md` for exact
-scope, dirty-source caveats and results. This parallel lane does not close S2, unlock S3–S6, or
-substitute for the broad mixed-media SDK lifecycle. Actual built archive inspection is the next
-independent packaging verification task; workflow text checks alone are not artifact evidence.
+independently closed at `0f08c2e`; post-repair smoke and full repository gates passed. The local long
+restricted-RC observation completed successfully (227 calls), but concurrent source changes prevent
+fixed-revision acceptance. See `RELEASE_EVIDENCE_RUNNER.md` for exact scope and source caveats.
+Archive tooling is retained but its independent acceptance is deferred to prioritize the mainline.
+This release lane does not substitute for broad mixed-media SDK acceptance.
+
+S2 independently closed at repair checkpoint `9d9f96d` with P0=0, P1=0, P2=0 and final full Go,
+race, vet, tidy and documented target-compilation gates passed. See `DOCUMENT_V2_S2_EVIDENCE.md`.
+S3 durable preparation/reconstruction is now the active next stage; S4–S6 retain their upstream gates.
 
 ## 1. Purpose and completion boundary
 
@@ -71,20 +74,18 @@ and all of its v1/v3 protocols remain supported while the Document v2 path is ad
 - restricted FFmpeg hard-cut render path, scheduler, Go/TS RC SDK, CLI and experimental Player;
 - fixed protocol fixtures, fault injection and architecture tests across the existing RC surface.
 
-### 2.2 Important gaps that remain
+### 2.2 Completed additive boundaries
 
-- `core/videoedit.RenderPlan` v3 represents the legacy video/audio model, not the full Document v2
-  image/vector/text/transition/AudioBus semantics.
-- `render/api.ExecutionManifest` v1 cannot identity-bind a Document v2 visual/audio program.
-- `render/prepared.Environment` v1 cannot reconstruct a Document v2 program after restart.
-- production `cutlyd` does not wire real Document v2 Surface/PCM providers or a chunk assembler.
-- the current reference visual native source path does not yet provide temporal video decode.
-- Evidence v1 authenticates decoded RGBA8 output, while pre-codec video chunks are canonical
-  RGBA16; changing Evidence v1 would be a compatibility break.
-- current durable checkpoints are job-scoped and do not by themselves provide verified cross-job
-  warm chunk reuse.
-- public Go edit/project/render APIs, TypeScript SDK, CLI, Agent and Player are still primarily on
-  the legacy document/render path.
+- Document v2 has independent semantic RenderPlan, ExecutionManifest, RenderRequest, prepared
+  environment and Evidence v2 profiles; legacy v1/v3 profiles remain byte-compatible.
+- `cutlyd --render-native-v2` wires mixed Surface/PCM providers, temporal video decode, isolated
+  streaming workers, durable job-neutral chunk reuse and H.264/AAC assembly.
+- Public Go and TypeScript SDKs, the default-v2 CLI, `/v2/agent`, exact-frame preview and headless
+  Player/UI primitives expose the Document v2 lifecycle without translating through legacy types.
+- Action-specific Agent schemas correlate every tool/action/profile with a closed payload, while
+  runtime paths, trust roots, executable identities and publication authority stay host-owned.
+- The remaining work is release-owner acceptance: approved production trust material, signed
+  Linux/macOS acceptance kits, target CI/review, tag, publication and clean-consumer verification.
 
 ### 2.3 Completed handoff checkpoint
 
@@ -151,8 +152,8 @@ Every implementation stage must preserve these rules:
     publication and recovery must never expose an unauthenticated artifact.
 11. **Owned immutable values.** Public results do not retain caller-owned slices, maps, byte
     buffers, mutable documents or live resource handles.
-12. **Manyfy compatibility.** The independent Cutly module never imports Manyfy. Existing Manyfy
-    consumers and the restricted RC remain green after every public-boundary change.
+12. **Standalone boundary.** Cutly production code and tests do not import a consumer application.
+    The restricted RC remains green after every public-boundary change.
 
 ## 5. Stage S0 — host-bound reference surface bridge
 
@@ -862,7 +863,7 @@ The input must include video, image, vector, pinned-font text and audio.
 - Windows compile plus stable refusal where a safe handle profile is not implemented;
 - signed/pinned FFmpeg and FFprobe bundle identity;
 - SBOM, NOTICE, dependency licenses and codec policy;
-- Manyfy compatibility smoke;
+- standalone clean-consumer Go and npm package smoke;
 - standalone Cutly repository sync, checksums and provenance/attestation.
 - published API reference, migration guide, compatibility matrix and SemVer/deprecation policy from
   S7, verified against the packaged artifacts.
@@ -922,16 +923,8 @@ CGO_ENABLED=0 GOOS=js GOARCH=wasm go test -exec=true ./...
 Platform-specific filesystem/process packages may use a documented compatible subset, but pure
 protocol packages must pass all four targets.
 
-From the parent Manyfy repository after a public/boundary change, run the complete Go consumer
-suite rather than only `internal/` packages:
-
-```bash
-go test ./...
-```
-
-Also run the explicit Manyfy-to-Cutly consumer smoke/E2E selected for the changed boundary. Run
-frontend and desktop builds only when those consumers are deliberately changed. Do not hide
-unrelated user changes or stage parent runtime data.
+Run the clean-consumer Go module and packed npm import smoke from temporary directories. Consumer
+applications are not part of the Cutly release boundary.
 
 ## 15. Commit and audit discipline
 
@@ -968,15 +961,15 @@ Deferred capabilities must produce stable preflight rejection. They must not be 
 
 ## 18. Next-agent start instructions
 
-1. Confirm branch `codex/video-sdk-core` and inspect staged/unstaged files; preserve unrelated work.
-   Use the standalone baseline above rather than requiring the absent historical `0a19a82`.
+1. Confirm branch `codex/m4-sdk-completion` in the isolated worktree and inspect staged/unstaged files;
+   preserve deferred archive work. Do not switch or edit the original shared checkout.
 2. Read this document, the current stage evidence and existing protocol patterns before editing.
-   Manyfy work and consumer tests remain deferred by the owner.
-3. S1 is complete; continue S2 additively in `render/api`. Preserve legacy manifest/request/job,
-   output/evidence contracts and all existing canonical fixtures.
-4. Freeze concrete profiles/types, strict codecs, schemas and minimal canonical fixtures together;
-   separate structural identity verification from host-owned execution authorization.
-5. Run the full S2 exit gate and obtain independent read-only audit closure before S3.
+   Work only inside the standalone Cutly repository.
+3. S1/S2 are complete; implement S3 durable v2 preparation and host-owned reconstruction additively.
+   Preserve legacy prepared/manifest/request/job/output/evidence APIs and every existing fixture.
+4. Freeze concrete receipt projections and record codecs with schemas and fixed fixtures; preserve
+   Document JSON number lexemes and separate structural verification from host authorization.
+5. Run full S3 exit gates and obtain independent read-only audit closure before S4.
 6. Update the status table below after each stage, including commit IDs and evidence paths.
 
 ## 19. Handoff status table
@@ -985,11 +978,11 @@ Deferred capabilities must produce stable preflight rejection. They must not be 
 | --- | --- | --- |
 | S0 Surface bridge | Complete | `0a19a82`; P0/P1/P2=0 |
 | S1 Document v2 plan | Complete | `74edd28`, `9db5e5f`, `5e64a65`; final gates passed with documented wasm subset; independent P0/P1/P2 closure in `DOCUMENT_V2_S1_EVIDENCE.md` |
-| S2 Manifest/request v2 | Implemented; independent audit blocked | `5bb222d`, `8cb6172`, `66a0b0b`, `0951ad3`; full Go/target gates passed; reviewer service terminated before final closure; see `DOCUMENT_V2_S2_EVIDENCE.md`; do not enter S3 |
-| S3 Prepared v2 | Not started | Depends on verified S1/S2 |
-| S4 Provider bundle | Not started | Depends on restart-safe S3 |
-| S5 Assembler/Evidence v2 | Not started | Depends on real S4 providers |
-| S6 Production runtime/cache | Not started | Depends on S3-S5 |
-| S7a Mutation/project core | Complete | `ea396d3`: typed core, durable store, schemas/fixtures, final full/race/vet/cross-target gates and independent reviews; see `DOCUMENT_V2_S7A_EVIDENCE.md`; S2 remains blocked |
-| S7 Public SDK/CLI/Agent | Not started | Depends on S6 and audited S7a |
-| S8 Player/UI/release | Not started | Depends on S6/S7 and parallel release lane |
+| S2 Manifest/request v2 | Complete | `5bb222d`, `8cb6172`, `66a0b0b`, `0951ad3`, repairs `9d9f96d`; final full Go/target gates passed; independent P0/P1/P2=0; see `DOCUMENT_V2_S2_EVIDENCE.md` |
+| S3 Prepared v2 | Source complete | Durable record, restart reconstruction, factory/preflight bridge, strict codecs/schemas and resource admission are implemented. Full current-source normal/race/vet/tidy and cross-target gates pass; see `DOCUMENT_V2_S3_EVIDENCE.md`. |
+| S4 Provider bundle | Source complete; production trust acceptance pending | Additive evaluator/audio V2, complete video scanner/helpers, temporal compositor/referencevisual V3 and MixedFactory are implemented. A controlled FFmpeg 9.0.2 runtime with zscale and static x264/zimg passed real H.264+WAV mixed smoke, fault100 and one-hour soak. Owner-approved signed runtime artifacts remain an external release input. |
+| S5 Assembler/Evidence v2 | Source complete; production trust acceptance pending | Additive assembly and Evidence v2 schemas/codecs/fixtures, callback immutability, daemon/supervisor identity propagation, encoder recovery and parent-SIGKILL behavior are implemented and locally exercised. Owner-signed release evidence remains external. |
+| S6 Production runtime/cache | Source complete; owner release-kit acceptance pending | Worker parent-death liveness, fd5 large-chunk streaming, durable job-neutral cache, checkpoint convergence and native service/daemon are implemented. Current-source normal/race/vet/tidy and Linux amd64/386, Windows amd64 and js/wasm gates pass. Controlled smoke, 100/100 daemon-kill recovery and a 1h0m0.756s soak (1,737 renders; 11,376 KiB retained RSS growth) passed. |
+| S7a Mutation/project core | Complete | `ea396d3`: typed core, durable store, schemas/fixtures, final full/race/vet/cross-target gates and independent reviews; see `DOCUMENT_V2_S7A_EVIDENCE.md`; public S7 still depends on S6 |
+| S7 Public SDK/CLI/Agent | Source complete | Public Go/TypeScript v2 transactions, projects, render identities, strict Agent v2 HTTP clients/server, default-v2 CLI and daemon `/v2/agent` project/edit/plan/prepare/preflight/frame/submit/status/history/cancel integration are present. Action-correlated schemas, full Go normal/race/vet, conformance, 63 TypeScript tests and npm pack inspection pass. |
+| S8 Player/UI/release | Player/UI and release source complete; external release acceptance pending | `DocumentV2Player`, immutable v2 UI primitives, bound frame/audio preview adapters, API/migration/compatibility/codec policy docs, release archives and fail-closed acceptance-kit workflow are present. Formal owner-signed Linux/macOS kits, tagged CI and published artifact verification remain external. |

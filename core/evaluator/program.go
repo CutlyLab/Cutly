@@ -83,7 +83,29 @@ func compileFrozen(
 	hash string,
 	diagnostics []documentv2.Diagnostic,
 ) (*Program, []documentv2.Diagnostic) {
+	return compileFrozenSelection(ctx, frozen, hash, diagnostics, nil)
+}
 
+// compileFrozenSelection retains the full frozen graph's positions while compiling only the
+// explicitly authorized clips. A nil scope preserves the legacy whole-document compiler.
+func compileFrozenSelection(
+	ctx context.Context,
+	frozen documentv2.Document,
+	hash string,
+	diagnostics []documentv2.Diagnostic,
+	scope *DomainScope,
+) (*Program, []documentv2.Diagnostic) {
+	var selected, selectedTransitions map[documentv2.ID]struct{}
+	if scope != nil {
+		selected = make(map[documentv2.ID]struct{}, len(scope.Selection.ClipIDs))
+		for _, id := range scope.Selection.ClipIDs {
+			selected[id] = struct{}{}
+		}
+		selectedTransitions = make(map[documentv2.ID]struct{}, len(scope.Selection.TransitionIDs))
+		for _, id := range scope.Selection.TransitionIDs {
+			selectedTransitions[id] = struct{}{}
+		}
+	}
 	assets := make(map[documentv2.ID]documentv2.Asset, len(frozen.Assets))
 	for _, asset := range frozen.Assets {
 		assets[asset.ID] = asset
@@ -106,6 +128,9 @@ func compileFrozen(
 		if err := checkpoint(); err != nil {
 			return nil, append(diagnostics, compileDiagnostic(err))
 		}
+		if scope != nil && timeline.ID != scope.Selection.TimelineID {
+			continue
+		}
 		clipIndex := make(map[documentv2.ID]*compiledClip)
 		compiledTracks := make([]compiledTrack, len(timeline.Tracks))
 		for trackPosition, track := range timeline.Tracks {
@@ -119,6 +144,11 @@ func compileFrozen(
 			for clipPosition, clip := range track.Clips {
 				if err := checkpoint(); err != nil {
 					return nil, append(diagnostics, compileDiagnostic(err))
+				}
+				if scope != nil {
+					if _, authorized := selected[clip.ID]; !authorized {
+						continue
+					}
 				}
 				end, endErr := clip.TimelineRange.End()
 				if endErr != nil {
@@ -162,8 +192,16 @@ func compileFrozen(
 			if err := checkpoint(); err != nil {
 				return nil, append(diagnostics, compileDiagnostic(err))
 			}
+			if scope != nil {
+				if _, authorized := selectedTransitions[transition.ID]; !authorized {
+					continue
+				}
+			}
 			outgoing := clipIndex[transition.OutgoingClipID]
 			incoming := clipIndex[transition.IncomingClipID]
+			if outgoing == nil || incoming == nil {
+				return nil, append(diagnostics, compileDiagnostic(ErrProgramLookup))
+			}
 			cut, cutErr := outgoing.timelineRange.End()
 			if cutErr != nil {
 				return nil, append(diagnostics, compileDiagnostic(cutErr))

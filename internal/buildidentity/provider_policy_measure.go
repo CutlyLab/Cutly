@@ -25,6 +25,12 @@ type providerDirectory struct {
 // Ancestor and file identity snapshots also reject observed path replacements.
 // Platforms without those native guarantees fail closed.
 func measureProviderExecutable(ctx context.Context, path string) (identity ProviderExecutableIdentity, err error) {
+	defer func() {
+		if recover() != nil {
+			identity = ProviderExecutableIdentity{}
+			err = fmt.Errorf("%w: measurement panic", ErrProviderExecutableInvalid)
+		}
+	}()
 	if ctx == nil {
 		return identity, fmt.Errorf("%w: nil context", ErrProviderExecutableInvalid)
 	}

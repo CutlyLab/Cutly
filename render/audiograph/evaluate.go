@@ -173,6 +173,9 @@ func (program *Program) EvaluateAt(ctx context.Context, timelineID documentv2.ID
 	legacySignals := make([]routedSignal, 0, len(timeline.tracks))
 
 	for _, track := range timeline.tracks {
+		if err := checkContext(ctx, "timeline.tracks"); err != nil {
+			return Evaluation{}, err
+		}
 		clip, active := track.activeClip(atBig)
 		if !active {
 			continue

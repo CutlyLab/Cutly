@@ -14,18 +14,20 @@ import (
 	"time"
 
 	agentprotocol "github.com/CutlyLab/Cutly/agent/protocol"
+	"github.com/CutlyLab/Cutly/agent/protocolv2"
 	"github.com/CutlyLab/Cutly/protocol/canonicaljson"
 	cutly "github.com/CutlyLab/Cutly/sdk/go/cutly"
 )
 
 const (
-	defaultEndpoint = "http://127.0.0.1:9817/v1/agent"
-	exitFailure     = 1
-	exitUsage       = 2
-	exitRejected    = 3
+	defaultEndpointV1 = "http://127.0.0.1:9817/v1/agent"
+	defaultEndpointV2 = "http://127.0.0.1:9817/v2/agent"
+	exitFailure       = 1
+	exitUsage         = 2
+	exitRejected      = 3
 )
 
-type transportFactory func(string) (cutly.Transport, error)
+type transportFactory func(string, string) (cutly.Transport, error)
 
 func main() {
 	os.Exit(run(context.Background(), os.Args[1:], os.Stdin, os.Stdout, os.Stderr, defaultTransport))
@@ -41,7 +43,7 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 		writeUsage(stdout)
 		return 0
 	case "version":
-		_, _ = fmt.Fprintf(stdout, "cutly %s (agent protocol v%d)\n", cutly.Version, agentprotocol.ProtocolVersion)
+		_, _ = fmt.Fprintf(stdout, "cutly %s (Document v2 Agent schema %d; legacy Agent protocol v%d)\n", cutly.Version, protocolv2.SchemaVersion, agentprotocol.ProtocolVersion)
 		return 0
 	case "canonicalize":
 		return runCanonicalize(args[1:], stdin, stdout, stderr)
@@ -79,8 +81,13 @@ func runInit(ctx context.Context, args []string, stdin io.Reader, stdout, stderr
 	flags := flag.NewFlagSet("init", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	projectDir := flags.String("project-dir", "", "local Cutly project directory")
-	documentPath := flags.String("document", "-", "Document v1 JSON file, or - for stdin")
+	documentPath := flags.String("document", "-", "Document JSON file, or - for stdin")
+	profile := flags.String("profile", "document-v2", "project profile: document-v2 or legacy-v1")
 	if err := flags.Parse(args); err != nil || flags.NArg() != 0 || strings.TrimSpace(*projectDir) == "" {
+		return exitUsage
+	}
+	if *profile != "document-v2" && *profile != "legacy-v1" {
+		_, _ = fmt.Fprintf(stderr, "cutly: unsupported project profile %q\n", *profile)
 		return exitUsage
 	}
 	if ctx == nil {
@@ -96,11 +103,6 @@ func runInit(ctx context.Context, args []string, stdin io.Reader, stdout, stderr
 		_, _ = fmt.Fprintf(stderr, "cutly: read project document: %v\n", err)
 		return exitFailure
 	}
-	document, err := cutly.DecodeDocumentV1(raw)
-	if err != nil {
-		_, _ = fmt.Fprintf(stderr, "cutly: invalid project document: %v\n", err)
-		return exitFailure
-	}
 	absolute, err := filepath.Abs(*projectDir)
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "cutly: resolve project directory: %v\n", err)
@@ -111,18 +113,49 @@ func runInit(ctx context.Context, args []string, stdin io.Reader, stdout, stderr
 		_, _ = fmt.Fprintf(stderr, "cutly: create project directory: %v\n", err)
 		return exitFailure
 	}
-	project, err := cutly.CreateLocalProjectV1(ctx, absolute, document)
+	resolved, err := filepath.EvalSymlinks(absolute)
 	if err != nil {
-		_, _ = fmt.Fprintf(stderr, "cutly: initialize project: %v\n", err)
+		_, _ = fmt.Fprintf(stderr, "cutly: resolve real project directory: %v\n", err)
 		return exitFailure
 	}
-	snapshot, err := project.Inspect(ctx)
-	if err != nil {
-		_, _ = fmt.Fprintf(stderr, "cutly: inspect initialized project: %v\n", err)
-		return exitFailure
+	var receiptProfile, documentHash string
+	if *profile == "legacy-v1" {
+		document, decodeErr := cutly.DecodeDocumentV1(raw)
+		if decodeErr != nil {
+			_, _ = fmt.Fprintf(stderr, "cutly: invalid legacy project document: %v\n", decodeErr)
+			return exitFailure
+		}
+		project, createErr := cutly.CreateLocalProjectV1(ctx, resolved, document)
+		if createErr != nil {
+			_, _ = fmt.Fprintf(stderr, "cutly: initialize project: %v\n", createErr)
+			return exitFailure
+		}
+		snapshot, inspectErr := project.Inspect(ctx)
+		if inspectErr != nil {
+			_, _ = fmt.Fprintf(stderr, "cutly: inspect initialized project: %v\n", inspectErr)
+			return exitFailure
+		}
+		receiptProfile, documentHash = "cutly.cli-project-init.v1", snapshot.DocumentHash
+	} else {
+		document, decodeErr := cutly.DecodeDocument(raw)
+		if decodeErr != nil {
+			_, _ = fmt.Fprintf(stderr, "cutly: invalid Document v2 project: %v\n", decodeErr)
+			return exitFailure
+		}
+		project, createErr := cutly.CreateLocalProjectV2(ctx, resolved, document)
+		if createErr != nil {
+			_, _ = fmt.Fprintf(stderr, "cutly: initialize project: %v\n", createErr)
+			return exitFailure
+		}
+		snapshot, inspectErr := project.Inspect(ctx)
+		if inspectErr != nil {
+			_, _ = fmt.Fprintf(stderr, "cutly: inspect initialized project: %v\n", inspectErr)
+			return exitFailure
+		}
+		receiptProfile, documentHash = "cutly.cli-project-init.document-v2.v2", snapshot.DocumentHash
 	}
 	receipt, err := canonicaljson.Marshal(initReceipt{
-		Profile: "cutly.cli-project-init.v1", ProjectDir: absolute, DocumentHash: snapshot.DocumentHash,
+		Profile: receiptProfile, ProjectDir: resolved, DocumentHash: documentHash,
 	})
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "cutly: encode init receipt: %v\n", err)
@@ -162,20 +195,36 @@ func runCanonicalize(args []string, stdin io.Reader, stdout, stderr io.Writer) i
 func runCall(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer, factory transportFactory) int {
 	flags := flag.NewFlagSet("call", flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	endpoint := flags.String("endpoint", endpointDefault(), "Cutly Agent HTTP endpoint")
+	profile := flags.String("profile", "document-v2", "Agent profile: document-v2 or legacy-v1")
+	endpoint := flags.String("endpoint", "", "Cutly Agent HTTP endpoint")
 	requestPath := flags.String("request", "-", "canonical Agent request file, or - for stdin")
 	timeout := flags.Duration("timeout", 30*time.Second, "request timeout")
-	if err := flags.Parse(args); err != nil || flags.NArg() != 0 || *timeout <= 0 {
+	if err := flags.Parse(args); err != nil || flags.NArg() != 0 || *timeout <= 0 || (*profile != "document-v2" && *profile != "legacy-v1") {
 		return exitUsage
 	}
-	raw, err := readInput(*requestPath, stdin, agentprotocol.MaxRequestBytes)
+	if *endpoint == "" {
+		*endpoint = endpointDefault(*profile)
+	}
+	maximum := agentprotocol.MaxRequestBytes
+	if *profile == "document-v2" {
+		maximum = protocolv2.MaxRequestBytes
+	}
+	raw, err := readInput(*requestPath, stdin, maximum)
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "cutly: read request: %v\n", err)
 		return exitFailure
 	}
+	if *profile == "document-v2" {
+		request, decodeErr := protocolv2.DecodeRequest(ctx, raw)
+		if decodeErr != nil {
+			_, _ = fmt.Fprintf(stderr, "cutly: invalid Document v2 request: %v\n", decodeErr)
+			return exitFailure
+		}
+		return executeV2(ctx, request, *endpoint, *timeout, stdout, stderr, factory)
+	}
 	request, err := agentprotocol.DecodeRequest(raw)
 	if err != nil {
-		_, _ = fmt.Fprintf(stderr, "cutly: invalid request: %v\n", err)
+		_, _ = fmt.Fprintf(stderr, "cutly: invalid legacy request: %v\n", err)
 		return exitFailure
 	}
 	return execute(ctx, request, *endpoint, *timeout, stdout, stderr, factory)
@@ -192,17 +241,25 @@ func runAction(
 ) int {
 	flags := flag.NewFlagSet(string(tool)+" "+action, flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	endpoint := flags.String("endpoint", endpointDefault(), "Cutly Agent HTTP endpoint")
+	profile := flags.String("profile", "document-v2", "Agent profile: document-v2 or legacy-v1")
+	endpoint := flags.String("endpoint", "", "Cutly Agent HTTP endpoint")
 	projectID := flags.String("project", "", "project identity")
 	requestID := flags.String("request-id", "", "stable request identity; generated when omitted")
 	payloadPath := flags.String("payload", "", "payload JSON file, or - for stdin; default {}")
 	timeout := flags.Duration("timeout", 30*time.Second, "request timeout")
-	if err := flags.Parse(args); err != nil || flags.NArg() != 0 || *timeout <= 0 {
+	if err := flags.Parse(args); err != nil || flags.NArg() != 0 || *timeout <= 0 || (*profile != "document-v2" && *profile != "legacy-v1") {
 		return exitUsage
+	}
+	if *endpoint == "" {
+		*endpoint = endpointDefault(*profile)
 	}
 	payload := json.RawMessage(`{}`)
 	if *payloadPath != "" {
-		raw, err := readInput(*payloadPath, stdin, agentprotocol.MaxRequestBytes)
+		maximum := agentprotocol.MaxRequestBytes
+		if *profile == "document-v2" {
+			maximum = protocolv2.MaxRequestBytes
+		}
+		raw, err := readInput(*payloadPath, stdin, maximum)
 		if err != nil {
 			_, _ = fmt.Fprintf(stderr, "cutly: read payload: %v\n", err)
 			return exitFailure
@@ -217,7 +274,27 @@ func runAction(
 		}
 		*requestID = generated
 	}
-	request, err := cutly.NewRequest(*requestID, tool, action, *projectID, payload)
+	if *profile == "document-v2" {
+		v2Action := action
+		if tool == agentprotocol.ToolRender && action == "render" {
+			v2Action = "submit"
+		}
+		v2ProjectID := *projectID
+		if tool == agentprotocol.ToolProject && action == "capabilities" && v2ProjectID == "" {
+			v2ProjectID = "capabilities"
+		}
+		request, err := cutly.NewAgentRequestV2(ctx, *requestID, cutly.AgentToolV2(tool), v2Action, v2ProjectID, payload)
+		if err != nil {
+			_, _ = fmt.Fprintf(stderr, "cutly: invalid Document v2 action request: %v\n", err)
+			return exitFailure
+		}
+		return executeV2(ctx, request, *endpoint, *timeout, stdout, stderr, factory)
+	}
+	legacyAction := action
+	if tool == agentprotocol.ToolRender && action == "submit" {
+		legacyAction = "render"
+	}
+	request, err := cutly.NewRequest(*requestID, tool, legacyAction, *projectID, payload)
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "cutly: invalid action request: %v\n", err)
 		return exitFailure
@@ -233,7 +310,7 @@ func execute(
 	stdout, stderr io.Writer,
 	factory transportFactory,
 ) int {
-	transport, err := factory(endpoint)
+	transport, err := factory(endpoint, "legacy-v1")
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "cutly: configure transport: %v\n", err)
 		return exitFailure
@@ -265,15 +342,54 @@ func execute(
 	return 0
 }
 
-func defaultTransport(endpoint string) (cutly.Transport, error) {
+func executeV2(ctx context.Context, request protocolv2.Request, endpoint string, timeout time.Duration, stdout, stderr io.Writer, factory transportFactory) int {
+	transport, err := factory(endpoint, "document-v2")
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "cutly: configure transport: %v\n", err)
+		return exitFailure
+	}
+	client, err := cutly.NewAgentClientV2(transport)
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "cutly: configure client: %v\n", err)
+		return exitFailure
+	}
+	requestCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	result, err := client.Call(requestCtx, request)
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "cutly: call failed: %v\n", err)
+		return exitFailure
+	}
+	encoded, err := cutly.CanonicalAgentResultV2(requestCtx, result)
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "cutly: encode result: %v\n", err)
+		return exitFailure
+	}
+	if _, err := stdout.Write(append(encoded, '\n')); err != nil {
+		_, _ = fmt.Fprintf(stderr, "cutly: write result: %v\n", err)
+		return exitFailure
+	}
+	if !result.OK {
+		return exitRejected
+	}
+	return 0
+}
+
+func defaultTransport(endpoint, profile string) (cutly.Transport, error) {
+	if profile == "document-v2" {
+		return cutly.NewAgentHTTPTransportV2(endpoint, nil)
+	}
 	return cutly.NewHTTPTransport(endpoint, nil)
 }
 
-func endpointDefault() string {
+func endpointDefault(profile string) string {
 	if configured := strings.TrimSpace(os.Getenv("CUTLY_ENDPOINT")); configured != "" {
 		return configured
 	}
-	return defaultEndpoint
+	if profile == "document-v2" {
+		return defaultEndpointV2
+	}
+	return defaultEndpointV1
 }
 
 func readInput(path string, stdin io.Reader, maximum int) ([]byte, error) {
@@ -309,17 +425,17 @@ func newRequestID() (string, error) {
 func writeUsage(writer io.Writer) {
 	_, _ = io.WriteString(writer, `Usage:
   cutly version
-  cutly init --project-dir DIR [--document FILE|-]
+  cutly init --project-dir DIR [--document FILE|-] [--profile document-v2|legacy-v1]
   cutly canonicalize [--input FILE|-]
-  cutly call --request FILE|- [--endpoint URL]
-  cutly doctor [--endpoint URL] [--request-id ID]
-  cutly project ACTION --project ID [--payload FILE|-]
-  cutly edit ACTION --project ID [--payload FILE|-]
-  cutly render ACTION --project ID [--payload FILE|-]
+  cutly call --request FILE|- [--profile document-v2|legacy-v1] [--endpoint URL]
+  cutly doctor [--profile document-v2|legacy-v1] [--endpoint URL] [--request-id ID]
+  cutly project ACTION --project ID [--payload FILE|-] [--profile document-v2|legacy-v1]
+  cutly edit ACTION --project ID [--payload FILE|-] [--profile document-v2|legacy-v1]
+  cutly render ACTION --project ID [--payload FILE|-] [--profile document-v2|legacy-v1]
 
 Project actions: inspect, status, history, capabilities
 Edit actions:    plan, apply, discard, revert
-Render actions:  plan, prepare, preflight, frame, render, status, cancel
+Render actions:  plan, prepare, preflight, frame, submit, status, history, cancel
 
 Exit codes: 0 success, 1 transport/input failure, 2 usage, 3 business rejection.
 `)

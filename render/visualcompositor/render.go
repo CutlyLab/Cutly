@@ -20,7 +20,15 @@ func (program *Program) RenderAt(
 	timelineID documentv2.ID,
 	at documentv2.RationalTime,
 	providers Providers,
-) (Result, error) {
+) (result Result, err error) {
+	defer func() {
+		if program != nil && program.domainScope != nil {
+			if recover() != nil {
+				result = Result{}
+				err = compositorError(CodeSourceFailed, "domain/render/panic", ErrSourceFailed)
+			}
+		}
+	}()
 	resolved, err := program.validateRuntime(ctx, providers)
 	if err != nil {
 		return Result{}, err
@@ -38,7 +46,15 @@ func (program *Program) RenderFrame(
 	clock videoedit.FrameClock,
 	compositionFrameIndex int64,
 	providers Providers,
-) (FrameResult, error) {
+) (frameResult FrameResult, err error) {
+	defer func() {
+		if program != nil && program.domainScope != nil {
+			if recover() != nil {
+				frameResult = FrameResult{}
+				err = compositorError(CodeSourceFailed, "domain/frame/panic", ErrSourceFailed)
+			}
+		}
+	}()
 	resolved, err := program.validateRuntime(ctx, providers)
 	if err != nil {
 		return FrameResult{}, err
@@ -185,8 +201,9 @@ func (program *Program) renderEvaluation(
 		return Result{}, err
 	}
 	result := Result{
-		SchemaVersion: ResultSchemaVersion, Profile: profileForConfig(program.config),
-		TimelineID: evaluated.TimelineID, TimelineTime: evaluated.TimelineTime,
+		SchemaVersion: ResultSchemaVersion, Profile: program.profile(),
+		DomainScopeHash: program.domainScopeHash,
+		TimelineID:      evaluated.TimelineID, TimelineTime: evaluated.TimelineTime,
 		Width: program.config.Width, Height: program.config.Height,
 		DocumentHash: program.documentHash, BuildFingerprint: program.config.BuildFingerprint,
 		NativeSourceContractVersion:     rastercompositor.NativeSourceContractVersion,

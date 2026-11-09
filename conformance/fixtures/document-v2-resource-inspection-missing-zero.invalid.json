@@ -1,0 +1,93 @@
+{
+  "canonical_json_profile": "cutly.json.canonical-integer.v1",
+  "fingerprint": "sha256:3568b726c60d186d6bc249c94e31c7a3a3ee4a69c3c9df9b82369a22301d8277",
+  "font": {
+    "cmap_format12_groups": 0,
+    "cmap_format4_segments": 2,
+    "cmap_mapping_count": 1,
+    "cmap_mapping_slots": 2,
+    "cmap_profile": "cutly.font.cmap-unicode-format4-12.v1",
+    "cmap_record_count": 1,
+    "content_hash": "sha256:dd93a040f53dce0abe8743b140642f60f4d08079b90f09cdabf5a8a4f05fe09d",
+    "content_hash_profile": "cutly.hash.sha256.font-sfnt-complete-bytes.v1",
+    "encoded_bytes": 308,
+    "glyf_table_status": "opaque_ranges_not_outline_authorized",
+    "hhea_ascender": 800,
+    "layout_table_status": "opaque_unvalidated_not_shape_authorized",
+    "metric_extrema_status": "declared_unverified",
+    "num_glyphs": 2,
+    "number_of_h_metrics": 1,
+    "opaque_layout_tables": [],
+    "profile": "cutly.font.sfnt-single-face-static-glyf-core.receipt.v1",
+    "retained_bytes": 18492,
+    "schema_version": 1,
+    "table_count": 7,
+    "table_hash_profile": "cutly.hash.sha256.font-sfnt-table-bytes.v1",
+    "tables": [
+      {
+        "checksum": 786548,
+        "content_hash": "sha256:948e8294435f08cfd3470b30e6669d31b9a5ea92db760aa53360e2eb751f1c67",
+        "length": 44,
+        "offset": 124,
+        "tag": "cmap"
+      },
+      {
+        "checksum": 0,
+        "content_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "length": 0,
+        "offset": 168,
+        "tag": "glyf"
+      },
+      {
+        "checksum": 1595097317,
+        "content_hash": "sha256:d972d5fd50ebf0be8bf4a77e91301f56fa63d6111c42565377a720dc58bddd5a",
+        "length": 54,
+        "offset": 168,
+        "tag": "head"
+      },
+      {
+        "checksum": 52560174,
+        "content_hash": "sha256:8d6b05d79c845ef7eb382b1912b657042554e68b797fa01e6c333f47392e1c8e",
+        "length": 36,
+        "offset": 224,
+        "tag": "hhea"
+      },
+      {
+        "checksum": 32768000,
+        "content_hash": "sha256:e83e8fbfba22a636d72820fe8d14e0b6a862d98a06e2d142f4e10cd0b35b12ca",
+        "length": 6,
+        "offset": 260,
+        "tag": "hmtx"
+      },
+      {
+        "checksum": 0,
+        "content_hash": "sha256:b0f66adc83641586656866813fd9dd0b8ebb63796075661ba45d1aa8089e1d44",
+        "length": 6,
+        "offset": 268,
+        "tag": "loca"
+      },
+      {
+        "checksum": 196609,
+        "content_hash": "sha256:5edb2bcec1e12b7df37c1b3aedd8ef6c7c35ad6b998d716082a4a529811ab551",
+        "length": 32,
+        "offset": 276,
+        "tag": "maxp"
+      }
+    ],
+    "units_per_em": 1000,
+    "work_units": 2988,
+    "working_bytes": 65568
+  },
+  "inspector": {
+    "descriptor_fingerprint": "sha256:32db45644d8c5bf0c61537ecafbc0f9192d9653ecf3130d304f8b566fe6707c8",
+    "profile": "cutly.font.sfnt-single-face-static-glyf-core.v1"
+  },
+  "profile": "cutly.resource-inspection.document-v2.v2",
+  "resource": {
+    "asset_id": "resource-inspection-font",
+    "content_hash": "sha256:dd93a040f53dce0abe8743b140642f60f4d08079b90f09cdabf5a8a4f05fe09d",
+    "kind": "font",
+    "size_bytes": 308
+  },
+  "schema_version": 2
+}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -10,16 +11,21 @@ import (
 
 	"github.com/CutlyLab/Cutly/agent/ffmpeghost"
 	"github.com/CutlyLab/Cutly/agent/projectlocal"
+	"github.com/CutlyLab/Cutly/agent/projectlocalv2"
+	agentprotocol "github.com/CutlyLab/Cutly/agent/protocol"
+	"github.com/CutlyLab/Cutly/agent/protocolv2"
 	"github.com/CutlyLab/Cutly/agent/renderexec"
 	"github.com/CutlyLab/Cutly/agent/renderplan"
 	"github.com/CutlyLab/Cutly/agent/renderprepare"
 	"github.com/CutlyLab/Cutly/agent/renderqueue"
 	"github.com/CutlyLab/Cutly/agent/router"
+	"github.com/CutlyLab/Cutly/agent/routerv2"
 	"github.com/CutlyLab/Cutly/cache/cas"
 	"github.com/CutlyLab/Cutly/core/videoedit"
 	cutlyffprobe "github.com/CutlyLab/Cutly/media/ffprobe"
 	"github.com/CutlyLab/Cutly/media/proberegistry"
 	"github.com/CutlyLab/Cutly/project/local"
+	"github.com/CutlyLab/Cutly/project/localv2"
 	renderapi "github.com/CutlyLab/Cutly/render/api"
 	"github.com/CutlyLab/Cutly/render/backendstage"
 	checkpointlocal "github.com/CutlyLab/Cutly/render/checkpoint/local"
@@ -32,8 +38,27 @@ import (
 )
 
 type application struct {
-	handler *router.Router
+	handler *applicationHandler
 	render  *renderApplication
+}
+
+type applicationHandler struct {
+	legacy *router.Router
+	v2     *routerv2.Router
+}
+
+func (handler *applicationHandler) HandleAgent(ctx context.Context, request agentprotocol.Request) (agentprotocol.Result, error) {
+	if handler == nil || handler.legacy == nil {
+		return agentprotocol.Result{}, errors.New("cutlyd: legacy Agent handler is unavailable")
+	}
+	return handler.legacy.HandleAgent(ctx, request)
+}
+
+func (handler *applicationHandler) HandleAgentV2(ctx context.Context, request protocolv2.Request) (protocolv2.Result, error) {
+	if handler == nil || handler.v2 == nil {
+		return protocolv2.Result{}, errors.New("cutlyd: Document v2 Agent handler is unavailable")
+	}
+	return handler.v2.HandleAgentV2(ctx, request)
 }
 
 func buildApplication(ctx context.Context, configuration config) (*application, error) {
@@ -43,26 +68,90 @@ func buildApplication(ctx context.Context, configuration config) (*application, 
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	routes, projects, err := buildProjectComponents(configuration)
+	var routes []router.Route
+	var routesV2 []routerv2.Route
+	var projects *projectlocal.Registry
+	var err error
+	if configuration.nativeV2.enabled {
+		routesV2, err = buildProjectRoutesV2(configuration)
+	} else {
+		routes, projects, err = buildProjectComponents(configuration)
+	}
 	if err != nil {
 		return nil, err
 	}
 	var render *renderApplication
 	if configuration.render.enabled {
-		render, err = buildRenderApplication(ctx, configuration, projects)
+		if configuration.nativeV2.enabled {
+			render, err = buildRenderApplicationV2(ctx, configuration)
+		} else {
+			render, err = buildRenderApplication(ctx, configuration, projects)
+		}
 		if err != nil {
 			return nil, err
 		}
 		routes = append(routes, render.routes...)
+		if configuration.nativeV2.enabled {
+			routesV2 = append(routesV2, adaptNativeRoutesV2(render.routes)...)
+		}
 	}
-	handler, err := router.New(routes...)
+	legacy, err := router.New(routes...)
 	if err != nil {
 		if render != nil {
 			_ = render.Close()
 		}
 		return nil, fmt.Errorf("cutlyd: initialize action router: %w", err)
 	}
-	return &application{handler: handler, render: render}, nil
+	v2, err := routerv2.New(routesV2...)
+	if err != nil {
+		if render != nil {
+			_ = render.Close()
+		}
+		return nil, fmt.Errorf("cutlyd: initialize Document v2 action router: %w", err)
+	}
+	return &application{handler: &applicationHandler{legacy: legacy, v2: v2}, render: render}, nil
+}
+
+func buildProjectRoutesV2(configuration config) ([]routerv2.Route, error) {
+	if configuration.projectDir == "" {
+		return nil, nil
+	}
+	project, err := localv2.New(configuration.projectDir, localv2.Options{})
+	if err != nil {
+		return nil, fmt.Errorf("open local Document v2 project: %w", err)
+	}
+	registry, err := projectlocalv2.NewRegistry(map[string]*localv2.Service{configuration.projectID: project})
+	if err != nil {
+		return nil, fmt.Errorf("register local Document v2 project: %w", err)
+	}
+	actions, err := projectlocalv2.New(registry)
+	if err != nil {
+		return nil, fmt.Errorf("initialize local Document v2 project actions: %w", err)
+	}
+	return actions.Routes(), nil
+}
+
+func adaptNativeRoutesV2(routes []router.Route) []routerv2.Route {
+	result := make([]routerv2.Route, 0, len(routes))
+	for _, route := range routes {
+		action := route.Action
+		if action == "render" {
+			action = "submit"
+		}
+		if protocolv2.PayloadProfile(protocolv2.Tool(route.Tool), action) == "" {
+			continue
+		}
+		handler := route.Handler
+		legacyAction := route.Action
+		result = append(result, routerv2.Route{Tool: protocolv2.Tool(route.Tool), Action: action, Handler: routerv2.ActionFunc(func(ctx context.Context, request protocolv2.Request) (routerv2.Outcome, error) {
+			outcome, err := handler.Execute(ctx, agentprotocol.Request{ProtocolVersion: agentprotocol.ProtocolVersion, RequestID: request.RequestID, Tool: agentprotocol.Tool(request.Tool), Action: legacyAction, ProjectID: request.ProjectID, Payload: append(json.RawMessage(nil), request.Payload...)})
+			if err != nil {
+				return routerv2.Outcome{}, err
+			}
+			return routerv2.Outcome{OK: outcome.OK, State: outcome.State, Diagnostics: outcome.Diagnostics, Receipt: outcome.Receipt}, nil
+		})})
+	}
+	return result
 }
 
 func buildProjectRoutes(configuration config) ([]router.Route, error) {
@@ -104,11 +193,12 @@ func (application *application) Close() error {
 }
 
 type renderApplication struct {
-	routes  []router.Route
-	workers *workerPool
-	backend *ffmpegbackend.Backend
-	journal *schedulerlocal.Journal
-	owner   *renderStateOwnerLock
+	routes   []router.Route
+	workers  *workerPool
+	backend  *ffmpegbackend.Backend
+	journal  *schedulerlocal.Journal
+	owner    *renderStateOwnerLock
+	nativeV2 *nativeApplicationV2
 
 	closeOnce sync.Once
 	closeErr  error
@@ -324,6 +414,7 @@ func (application *renderApplication) Close() error {
 			application.workers.Close()
 		}
 		application.closeErr = errors.Join(
+			application.nativeV2.Close(),
 			closeFFmpegBackend(application.backend),
 			closeSchedulerJournal(application.journal),
 			application.owner.Close(),

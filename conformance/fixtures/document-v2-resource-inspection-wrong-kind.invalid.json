@@ -1,0 +1,27 @@
+{
+  "canonical_json_profile": "cutly.json.canonical-integer.v1",
+  "fingerprint": "sha256:0a65f5d1b33cda03e8953f98de0af1f23dfb46c2d1d2ea71539e7cf2a7cd90cf",
+  "inspector": {
+    "descriptor_fingerprint": "sha256:4e718e38ad76247a3a443196f27b3505724831995783ac9970a5395f6814f32c",
+    "profile": "cutly.decode.png-rgba8-explicit-srgb.v1"
+  },
+  "png": {
+    "content_hash_profile": "cutly.hash.sha256.encoded-png-bytes.v1",
+    "decode_profile": "cutly.decode.png-rgba8-explicit-srgb.v1",
+    "encoded_content_hash": "sha256:1b649324e3955b7908bfd5e04e2c96a98a5e14392d7c8848fef432aab54141ed",
+    "height": 1,
+    "normalization_profile": "cutly.color.rgba8-srgb-straight-to-linear-bt709-premultiplied-rgba16.v1",
+    "pixel_hash": "sha256:868ad3c1d2a3c1b93bff2ee57aae7814317483a2a1d0a24abc7a23dd744749d2",
+    "srgb_rendering_intent": 2,
+    "surface_profile": "cutly.surface.linear-bt709-premultiplied-rgba16.v1",
+    "width": 2
+  },
+  "profile": "cutly.resource-inspection.document-v2.v2",
+  "resource": {
+    "asset_id": "resource-inspection-png",
+    "content_hash": "sha256:1b649324e3955b7908bfd5e04e2c96a98a5e14392d7c8848fef432aab54141ed",
+    "kind": "font",
+    "size_bytes": 92
+  },
+  "schema_version": 2
+}

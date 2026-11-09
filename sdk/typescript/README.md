@@ -17,10 +17,11 @@ numbers, `undefined`, accessors, sparse arrays, class instances and cycles fail
 closed. `decodeCanonicalJSON` returns immutable null-prototype objects and
 bigint number tokens.
 
-The release-candidate Agent client uses the same strict envelope for project,
-edit, and render actions. Request IDs are caller-owned for deterministic retry;
-business rejection is returned as `ok: false`, while transport and correlation
-failures throw `AgentProtocolError`.
+Document v2 uses the independent `CutlyAgentV2Client` and
+`HTTPAgentV2Transport` at `/v2/agent`. Its receipts remain exact canonical
+bytes so arbitrary-precision metadata is never rounded through JavaScript
+`Number`. The frozen restricted RC client below remains available for
+explicit legacy integrations.
 
 ```js
 import {
@@ -97,6 +98,11 @@ terminal-state polling using the same validators.
 NTSC-safe bigint frame selection, seek/revision epochs, explicit buffering,
 frame-grid looping and stale asynchronous frame rejection. It owns no DOM and
 does not mutate a Cutly Document.
+
+`DocumentV2Player` selects the v2 player profile. Bind it to native or daemon
+providers with `DocumentV2PreviewAdapter`, which validates plan/manifest,
+frame/sample ranges and stale-request identity before presenting a frame or
+returning a PCM preview block.
 
 `HeadlessTimeline` holds only selection/playhead state and dispatches the seven
 versioned transaction operations. Its trim/move/split/delete/retrack/property

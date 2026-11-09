@@ -108,7 +108,7 @@ func (backend *Backend) decodeSequence(ctx context.Context, request decodedReque
 		return evidence.DecodedSequence{}, 0, fmt.Errorf("%w: decoded %s pipe: %v", ErrCommand, request.unit, err)
 	}
 	if err := command.Start(); err != nil {
-		return evidence.DecodedSequence{}, 0, fmt.Errorf("%w: start decoded %s evidence: %v", ErrCommand, request.unit, err)
+		return evidence.DecodedSequence{}, 0, fmt.Errorf("%w: start decoded %s evidence: %w", ErrCommand, request.unit, err)
 	}
 	hash := sha256.New()
 	buffer := make([]byte, 128*1024)

@@ -108,21 +108,22 @@ func DefaultConfigV2(width, height int) Config {
 // transition-aware expression extension that is intentionally absent from the frozen v1
 // expression manifest. Text fields are nil/omitted in v1 and mandatory, even when empty, in v2.
 type SourceManifest struct {
-	SchemaVersion                   int                      `json:"schema_version"`
-	Profile                         string                   `json:"profile"`
-	DocumentHash                    string                   `json:"document_hash"`
-	NativePNG                       nativepngsource.Manifest `json:"native_png"`
-	Expression                      expressionlayer.Manifest `json:"expression"`
-	ExpressionHandleProfile         string                   `json:"expression_handle_profile"`
-	ExpressionHandleContractVersion int                      `json:"expression_handle_contract_version"`
-	VectorTransitionScopeProfile    string                   `json:"vector_transition_scope_profile"`
-	NativeRetainedSurfaceBytes      uint64                   `json:"native_retained_surface_bytes"`
-	ExpressionRetainedSurfaceBytes  uint64                   `json:"expression_retained_surface_bytes"`
-	Text                            *textlayer.Manifest      `json:"text,omitempty"`
-	TextProviderProfile             string                   `json:"text_provider_profile,omitempty"`
-	TextContractVersion             int                      `json:"text_contract_version,omitempty"`
-	TextRetainedSurfaceBytes        uint64                   `json:"text_retained_surface_bytes,omitempty"`
-	TotalRetainedSurfaceBytes       uint64                   `json:"total_retained_surface_bytes"`
+	SchemaVersion                   int                                  `json:"schema_version"`
+	Profile                         string                               `json:"profile"`
+	DocumentHash                    string                               `json:"document_hash"`
+	NativePNG                       nativepngsource.Manifest             `json:"native_png"`
+	Expression                      expressionlayer.Manifest             `json:"expression"`
+	ExpressionHandleProfile         string                               `json:"expression_handle_profile"`
+	ExpressionHandleContractVersion int                                  `json:"expression_handle_contract_version"`
+	VectorTransitionScopeProfile    string                               `json:"vector_transition_scope_profile"`
+	NativeRetainedSurfaceBytes      uint64                               `json:"native_retained_surface_bytes"`
+	ExpressionRetainedSurfaceBytes  uint64                               `json:"expression_retained_surface_bytes"`
+	Text                            *textlayer.Manifest                  `json:"text,omitempty"`
+	TextProviderProfile             string                               `json:"text_provider_profile,omitempty"`
+	TextContractVersion             int                                  `json:"text_contract_version,omitempty"`
+	TextRetainedSurfaceBytes        uint64                               `json:"text_retained_surface_bytes,omitempty"`
+	DomainScope                     *visualcompositor.DomainScopeBinding `json:"domain_scope,omitempty"`
+	TotalRetainedSurfaceBytes       uint64                               `json:"total_retained_surface_bytes"`
 }
 
 // Program retains only immutable dependency programs/providers and value receipts.
@@ -136,6 +137,7 @@ type Program struct {
 	v2           bool
 	manifest     SourceManifest
 	diagnostics  []documentv2.Diagnostic
+	domainScope  *evaluator.DomainScope
 }
 
 func Compile(ctx context.Context, document documentv2.Document, bindings []Binding, config Config) (*Program, []documentv2.Diagnostic, error) {
@@ -162,6 +164,10 @@ func compile(
 	config Config,
 	v2 bool,
 ) (*Program, []documentv2.Diagnostic, error) {
+	return compileMode(ctx, document, bindings, fontBindings, config, v2, nil)
+}
+
+func compileMode(ctx context.Context, document documentv2.Document, bindings []Binding, fontBindings []textlayer.FontBinding, config Config, v2 bool, domain *evaluator.DomainScope) (*Program, []documentv2.Diagnostic, error) {
 	if ctx == nil {
 		return nil, nil, pipelineError(CodeContextInvalid, "context", ErrContextInvalid)
 	}
@@ -178,7 +184,7 @@ func compile(
 	// The dependency's conservative typed-graph preflight must run before any wrapper-sized
 	// canonical allocation. Its immutable Program is retained after the wrapper independently
 	// freezes an equivalent value and cross-checks the hash used by both providers.
-	preflightVisual, diagnostics := visualcompositor.Compile(ctx, document, visualConfig)
+	preflightVisual, diagnostics := compileVisual(ctx, document, visualConfig, domain)
 	diagnostics = cloneDiagnostics(diagnostics)
 	if preflightVisual == nil || documentv2.HasErrorDiagnostics(diagnostics) {
 		return nil, diagnostics, classifyVisualCompile(ctx, diagnostics)
@@ -216,6 +222,10 @@ func compile(
 	}
 	if preflightVisual.DocumentHash() != documentHash {
 		return nil, diagnostics, pipelineError(CodeStageMismatch, "compile/preflight_visual", ErrStageMismatch)
+	}
+	if domain != nil {
+		owned := preflightVisual.Scope()
+		domain = &owned
 	}
 	visual := preflightVisual
 	if visual.DocumentHash() != documentHash || visual.Config() != visualConfig {
@@ -302,6 +312,11 @@ func compile(
 		manifest.TextContractVersion = textlayer.ContractVersion
 		manifest.TextRetainedSurfaceBytes = textRetained
 	}
+	if domain != nil {
+		manifest.Profile = DomainManifestProfileV1
+		binding := preflightVisual.ScopeBinding()
+		manifest.DomainScope = &binding
+	}
 	if !validCombinedManifestMode(manifest, normalized, v2) {
 		return nil, diagnostics, pipelineError(CodeStageMismatch, "compile/source_manifest", ErrStageMismatch)
 	}
@@ -310,7 +325,7 @@ func compile(
 	}
 	program := &Program{
 		documentHash: documentHash, config: normalized, visual: visual, native: native, expression: expression,
-		text: text, v2: v2, manifest: cloneSourceManifest(manifest), diagnostics: cloneDiagnostics(diagnostics),
+		text: text, v2: v2, domainScope: domain, manifest: cloneSourceManifest(manifest), diagnostics: cloneDiagnostics(diagnostics),
 	}
 	if err := contextError(ctx, "compile/publish"); err != nil {
 		return nil, diagnostics, err
@@ -843,6 +858,10 @@ func (program *Program) SourceManifest() SourceManifest {
 }
 
 func cloneSourceManifest(value SourceManifest) SourceManifest {
+	if value.DomainScope != nil {
+		cloned := cloneScopeBinding(*value.DomainScope)
+		value.DomainScope = &cloned
+	}
 	value.NativePNG = cloneNativeManifest(value.NativePNG)
 	value.Expression = cloneExpressionManifest(value.Expression)
 	if value.Text != nil {
@@ -1073,6 +1092,12 @@ func validCombinedManifestMode(value SourceManifest, config Config, v2 bool) boo
 			value.TextProviderProfile == textlayer.ProfileV1 && value.TextContractVersion == textlayer.ContractVersion &&
 			value.TextRetainedSurfaceBytes == textRetained
 	}
+	if value.DomainScope != nil {
+		if !v2 || !validDomainManifestScope(*value.DomainScope) {
+			return false
+		}
+		expectedProfile = DomainManifestProfileV1
+	}
 	return textFieldsValid && value.SchemaVersion == ManifestSchemaVersion && value.Profile == expectedProfile && canonicalSHA256(value.DocumentHash) &&
 		value.NativePNG.DocumentHash == value.DocumentHash && value.Expression.DocumentHash == value.DocumentHash &&
 		value.ExpressionHandleProfile == expressionlayer.TransitionHandleProfileV2 &&
@@ -1083,7 +1108,7 @@ func validCombinedManifestMode(value SourceManifest, config Config, v2 bool) boo
 }
 
 func equalSourceManifest(left, right SourceManifest) bool {
-	if left.SchemaVersion != right.SchemaVersion || left.Profile != right.Profile || left.DocumentHash != right.DocumentHash ||
+	if !equalScopeBindings(left.DomainScope, right.DomainScope) || left.SchemaVersion != right.SchemaVersion || left.Profile != right.Profile || left.DocumentHash != right.DocumentHash ||
 		left.ExpressionHandleProfile != right.ExpressionHandleProfile || left.ExpressionHandleContractVersion != right.ExpressionHandleContractVersion ||
 		left.VectorTransitionScopeProfile != right.VectorTransitionScopeProfile || left.NativeRetainedSurfaceBytes != right.NativeRetainedSurfaceBytes ||
 		left.ExpressionRetainedSurfaceBytes != right.ExpressionRetainedSurfaceBytes || left.TextProviderProfile != right.TextProviderProfile ||

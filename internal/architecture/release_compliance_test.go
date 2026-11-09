@@ -19,12 +19,26 @@ func TestCommandArchivesIncludeDependencyRecords(t *testing.T) {
 		t.Error("release verification must run the package-local dry-run script")
 	}
 	for _, line := range []string{
-		`mkdir -p "${output}/deps/licenses"`,
-		`cp deps/THIRD_PARTY_NOTICES.md deps/sbom.spdx.json deps/dependency-lock.json "${output}/deps/"`,
-		`cp deps/licenses/* "${output}/deps/licenses/"`,
+		`run: go mod download`,
+		`go run ./internal/cmd/release-archive`,
+		`--target "${TARGET_GOOS}/${TARGET_GOARCH}"`,
+		`--output "${RUNNER_TEMP}"`,
+		`--version "${version}"`,
+		`smoke=(--smoke)`,
 	} {
 		if !strings.Contains(workflow, line) {
-			t.Errorf("command archive omits dependency packaging step %q", line)
+			t.Errorf("command archive omits shared build/inspection step %q", line)
+		}
+	}
+	for _, line := range []string{`          GOOS:`, `          GOARCH:`, `zip -q -r`, `tar -C`} {
+		if strings.Contains(workflow, line) {
+			t.Errorf("workflow bypasses host archive builder with %q", line)
+		}
+	}
+	for _, name := range []string{"LICENSE", "go.sum", "cmd/cutlyd/README.md"} {
+		info, err := os.Stat(filepath.Join(root, name))
+		if err != nil || !info.Mode().IsRegular() || info.Size() == 0 {
+			t.Fatalf("missing archive source %s: %v", name, err)
 		}
 	}
 	for _, name := range []string{"THIRD_PARTY_NOTICES.md", "sbom.spdx.json", "dependency-lock.json"} {
