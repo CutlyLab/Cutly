@@ -8,15 +8,11 @@
 A Chrome-free video editing SDK built on versioned documents, exact time,
 typed edits, and verifiable renders.
 
-[![Cutly native rendering demo: three scenes showing native image, vector, text, transition, and audio composition](videos/cutly-native-demo/cover.png)](videos/cutly-native-demo/cutly-native-demo.mp4)
+<!-- CUTLY_LAUNCH_FILM -->
+https://github.com/user-attachments/assets/dddd4cf1-ead7-4894-86bd-3c5ed1ac3346
+<!-- /CUTLY_LAUNCH_FILM -->
 
-**[Play the 6-second native Cutly demo](videos/cutly-native-demo/cutly-native-demo.mp4)** —
-three image assets, vector composition, pinned-font text, keyframed opacity,
-two dissolves, an audio bus and limiter, H.264/AAC output, and Evidence v2.
-
-[Evidence](videos/cutly-native-demo/cutly-native-demo.mp4.evidence.json) ·
-[Render metadata](videos/cutly-native-demo/cutly-native-demo.metadata.json) ·
-[21-second launch film](videos/cutly-launch/renders/cutly-launch.mp4)
+**[Watch the 21-second Cutly launch film](videos/cutly-launch/renders/cutly-launch.mp4)**
 
 [Quick Start](#quick-start) · [Architecture](#how-it-works) ·
 [SDKs](#sdks-and-tools) · [CLI](#cli-and-daemon) · [Status](#current-status) ·
@@ -67,6 +63,17 @@ runtime and the release acceptance described in [RELEASING.md](RELEASING.md).
 Cutly deliberately does **not** bundle an arbitrary FFmpeg build, expose
 filesystem authority to an Agent, or treat a successful encoder exit as proof
 that the requested media was produced.
+
+## Native Rendering Proof
+
+[![Cutly native rendering demo: three scenes showing native image, vector, text, transition, and audio composition](videos/cutly-native-demo/cover.png)](videos/cutly-native-demo/cutly-native-demo.mp4)
+
+**[Play the 6-second demo rendered by Cutly](videos/cutly-native-demo/cutly-native-demo.mp4)** —
+three image assets, vector composition, pinned-font text, keyframed opacity,
+two dissolves, an audio bus and limiter, H.264/AAC output, and Evidence v2.
+
+[Evidence](videos/cutly-native-demo/cutly-native-demo.mp4.evidence.json) ·
+[Render metadata](videos/cutly-native-demo/cutly-native-demo.metadata.json)
 
 ## Quick Start
 
