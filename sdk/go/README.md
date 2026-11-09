@@ -3,10 +3,41 @@
 Import `github.com/CutlyLab/Cutly/sdk/go/cutly` for the release-candidate
 public façade. It exposes:
 
+- code-first Motion composition authoring compiled to Document v2;
 - strict Document v2 decode/hash/validation and immutable evaluator compile;
 - explicitly versioned v1 transaction and RenderPlan helpers;
 - RenderJob/ExecutionManifest protocol types;
 - a transport-neutral Agent client and bounded HTTP transport.
+
+An agent or developer authors ordinary Go values; `BuildMotionCompositionV2`
+produces the deterministic renderer document:
+
+```go
+composition := cutly.MotionCompositionV2{
+    ID: "launch", Revision: 1, TimelineID: "main",
+    Width: 1920, Height: 1080, FramesPerSecond: 30, DurationFrames: 150,
+    Assets: []cutly.Asset{
+        cutly.MotionRectangleAssetV2(
+            "panel", 1920, 1080,
+            cutly.ColorRGBA16{R: 1200, G: 1600, B: 2200, A: 65535},
+        ),
+    },
+    Layers: []cutly.MotionLayerV2{{
+        ID: "panel-layer", TrackKind: "vector", AssetID: "panel",
+        DurationFrames: 150,
+        Animation: cutly.MotionAnimationV2{Scale: []cutly.MotionPointKeyframeV2{
+            {Frame: 0, Value: cutly.MotionPointV2(96, 100, 96, 100), Easing: cutly.MotionEasePower2InOutV2()},
+            {Frame: 150, Value: cutly.MotionPointV2(104, 100, 104, 100)},
+        }},
+    }},
+}
+
+document, err := cutly.BuildMotionCompositionV2(composition)
+```
+
+The returned value is an ordinary validated Document v2. It can be stored as a
+durable project, edited through transactions, or compiled into a native render
+plan.
 
 ```go
 transport, err := cutly.NewHTTPTransport("http://127.0.0.1:9817/v1/agent", nil)

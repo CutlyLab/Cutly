@@ -27,11 +27,11 @@ https://github.com/user-attachments/assets/dddd4cf1-ead7-4894-86bd-3c5ed1ac3346
 </div>
 
 Cutly is an open-source toolkit for building AI video editors, embedded
-editing products, and automated media pipelines. Instead of treating React,
-HTML, or a browser page as the project database, Cutly uses a typed,
-versioned Document IR. Agents edit that document through reviewable
-transactions; renderers consume frozen plans and emit evidence-bound
-artifacts.
+editing products, and automated media pipelines. An agent or developer writes
+video composition code in TypeScript or Go. The Motion SDK compiles that source
+to a typed, versioned Document IR; the native renderer consumes frozen plans
+and emits evidence-bound artifacts. Existing projects remain safely editable
+through reviewable transactions.
 
 The current `0.1.0-rc.1` source includes the frozen restricted hard-cut path
 and the standalone Document v2 SDK: typed durable edits, native mixed-media
@@ -52,8 +52,8 @@ runtime and the release acceptance described in [RELEASING.md](RELEASING.md).
 | --- | --- |
 | Maturity | `0.1.0-rc.1`; M4 standalone SDK source complete, tagged production release pending |
 | License | Apache-2.0 |
-| Primary API | Document v2 over Go, TypeScript/JavaScript, CLI, or `/v2/agent` HTTP |
-| Project model | Durable versioned Document IR plus atomic Plan → Apply → Revert transactions |
+| Primary API | Code-first Motion SDK in Go or TypeScript, plus CLI and `/v2/agent` HTTP |
+| Project model | Composition source → compiled Document v2, with atomic Plan → Apply → Revert edits |
 | Rendering | Native, Chrome-free video/image/vector/static-text/audio pipeline |
 | Output | H.264/AAC MP4 plus independently verifiable Evidence v2 |
 | Time model | Exact rational frame and sample clocks; no floating-point timeline identity |
@@ -131,7 +131,44 @@ npm install ./cutly-sdk-0.1.0-rc.1.tgz
 See the [Go SDK guide](sdk/go/README.md) and
 [TypeScript SDK guide](sdk/typescript/README.md) for complete client examples.
 
-### 4. Render through the public RC path
+### 4. Write a video as code
+
+Agents and developers author composition source; Cutly generates Document v2:
+
+```js
+import { createMotionCompositionV2 } from "@cutly/sdk";
+
+const film = createMotionCompositionV2({
+  id: "launch", width: 1920, height: 1080, fps: 30, durationFrames: 150,
+});
+
+film.rectangleAsset({
+  id: "panel", width: 1920, height: 1080,
+  fill: { r: 1200, g: 1600, b: 2200, a: 65535 },
+});
+
+film.scene("hook", { durationFrames: 150 }, (scene) => {
+  scene.shape("panel", "panel")
+    .animateScale([
+      { frame: 0, value: ["0.96", "0.96"], easing: "power2.inOut" },
+      { frame: 150, value: ["1.04", "1.04"] },
+    ]);
+});
+
+const document = film.build();
+```
+
+Run the repository example and produce canonical Document v2 JSON:
+
+```bash
+node ./examples/typescript-motion-composition.mjs > ./launch.document.json
+```
+
+See the [TypeScript Motion guide](sdk/typescript/README.md) and
+[Go Motion guide](sdk/go/README.md) for text, images, audio, exact keyframes
+and easing.
+
+### 5. Render through the public RC path
 
 The runnable Go and TypeScript examples exercise the complete supported flow:
 
@@ -177,8 +214,16 @@ The exact daemon flags and development-runtime boundary are documented in
 
 ## With an AI Agent
 
-Cutly is designed so an agent never needs to rewrite a project file or invent
-renderer state. The safe loop is explicit:
+For a new video, the agent writes normal Motion SDK source. Cutly compiles that
+source into Document v2 and keeps renderer state out of the authored program:
+
+```text
+agent-written composition.ts / composition.go
+        → Motion SDK compiler → Document v2
+        → native render plan → MP4 + Evidence v2
+```
+
+For later edits to a durable project, the safe loop is explicit:
 
 ```text
 inspect → plan typed transaction → review diff → apply by transaction ID
@@ -212,8 +257,9 @@ digests, runtime fingerprints, and publication policy.
 
 ```mermaid
 flowchart LR
-    A[Agent / Go / TypeScript / CLI] --> B[Project + typed transactions]
-    B --> C[Versioned Document IR]
+    A[Agent-written Go / TypeScript composition] --> B[Motion SDK compiler]
+    B --> C[Versioned Document v2 IR]
+    J[Typed project edits] --> C
     C --> D[Exact RenderPlan]
     D --> E[Frozen Execution Manifest]
     E --> F[Scheduler + workers + cache]
@@ -309,10 +355,10 @@ web-native motion-graphics tools such as
 
 | | Cutly | Browser-first frameworks |
 | --- | --- | --- |
-| Canonical project | Versioned typed Document IR | React/HTML/code composition |
-| Primary use | Media editing, automation, embedded products | Web-native motion graphics and programmable scenes |
+| Canonical project | Code-authored composition compiled to typed Document IR | React/HTML/code composition |
+| Primary use | Native programmable video, media editing, automation, embedded products | Web-native motion graphics and programmable scenes |
 | Default pixel path | Native evaluator/compositor | Headless browser capture |
-| Agent writes | Typed transactions and reviewed plans | Source code or markup |
+| Agent writes | Go/TypeScript video code; typed transactions for later edits | Source code or markup |
 | Time | Exact rational frame/sample clocks | Frame or seconds-based runtime APIs |
 | Browser | Optional future isolated layer | Core rendering dependency |
 | Verification | Protocol fixtures, decoded roots, evidence | Controlled runtime and frame regression |
@@ -325,8 +371,8 @@ media engine.
 
 | Surface | Path | What it provides |
 | --- | --- | --- |
-| Go SDK | [`sdk/go/cutly`](sdk/go/cutly/) | Public models, strict decoders, Agent client, HTTP transport, render/job validation |
-| TypeScript SDK | [`sdk/typescript`](sdk/typescript/) | Dependency-free client, canonical integer JSON, receipts, HeadlessPlayer, timeline/UI primitives |
+| Go SDK | [`sdk/go/cutly`](sdk/go/cutly/) | Motion composition authoring, public models, strict decoders, Agent client, HTTP transport, render/job validation |
+| TypeScript SDK | [`sdk/typescript`](sdk/typescript/) | Motion composition authoring, dependency-free client, receipts, HeadlessPlayer, timeline/UI primitives |
 | CLI | [`cmd/cutly`](cmd/cutly/) | Project, edit, render, canonicalize, doctor, and generic Agent calls |
 | Local daemon | [`cmd/cutlyd`](cmd/cutlyd/) | Host policy, durable projects/jobs, media preparation, FFmpeg execution, artifact recovery |
 | Core | [`core`](core/) | Documents, exact time, transactions, evaluator, Document v2 semantic plans |
@@ -485,11 +531,13 @@ No. Cutly is an SDK and local Agent/render workbench: it ships headless player
 and timeline primitives, not a finished DOM UI. Product applications provide
 their own interface, authentication and deployment policy.
 
-### Can an Agent directly edit files or choose executables?
+### Can an Agent write the video code directly?
 
-No. Agents propose typed transactions and render requests. The host owns
-filesystem roots, media observations, runtime identity, worker admission and
-publication policy.
+Yes. For creation, the agent writes a TypeScript or Go composition using the
+Motion SDK. Cutly compiles it to Document v2 before planning and native render.
+For an existing durable project, the agent uses typed, reviewable transactions.
+The host still owns filesystem roots, executable selection, media observations,
+runtime identity, worker admission and publication policy.
 
 ## Development
 

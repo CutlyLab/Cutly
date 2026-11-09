@@ -1,4 +1,21 @@
-# Cutly public render examples
+# Cutly public examples
+
+## Code-first composition
+
+[`typescript-motion-composition.mjs`](typescript-motion-composition.mjs) is a
+small launch-card video authored as ordinary JavaScript. It demonstrates the
+intended agent workflow: source code first, generated Document v2 second.
+
+```sh
+node ./examples/typescript-motion-composition.mjs > /tmp/cutly-launch.document.json
+./bin/cutly init --project-dir /tmp/cutly/project --document /tmp/cutly-launch.document.json
+```
+
+Set `CUTLY_FONT_URI` and `CUTLY_FONT_SHA256` to a real host-approved font before
+rendering. The default placeholder is sufficient only for compiling and
+inspecting the generated document.
+
+## Durable render clients
 
 The Go and TypeScript examples run the complete public hard-cut flow:
 

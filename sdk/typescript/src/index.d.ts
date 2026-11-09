@@ -108,6 +108,141 @@ export declare function digestNumberPreservingJSONWithoutRootMember(
   limits?: CanonicalJSONLimits,
 ): Promise<NumberPreservingJSONDigest>;
 
+export declare const MOTION_COMPOSITION_V2_PROFILE: "cutly.motion-composition.document-v2.v1";
+
+export declare class MotionCompositionV2Error extends Error {
+  readonly code: string;
+  constructor(code: string, detail: string);
+}
+
+export type MotionIntegerV2 = string | number | bigint;
+export type MotionExactV2 = MotionIntegerV2 | Readonly<{ numerator: MotionIntegerV2; denominator: MotionIntegerV2 }>;
+export interface MotionRationalV2 { readonly numerator: bigint; readonly denominator: bigint; }
+export interface MotionPointV2 { readonly x: MotionRationalV2; readonly y: MotionRationalV2; }
+export interface MotionColorV2 { r?: MotionIntegerV2; g?: MotionIntegerV2; b?: MotionIntegerV2; a?: MotionIntegerV2; }
+export interface MotionCubicBezierV2 { readonly x1: MotionRationalV2; readonly y1: MotionRationalV2; readonly x2: MotionRationalV2; readonly y2: MotionRationalV2; }
+
+export declare function motionRationalV2(value: MotionExactV2, denominator?: MotionIntegerV2): MotionRationalV2;
+export declare function motionPointV2(x: MotionExactV2, y: MotionExactV2): MotionPointV2;
+export declare function motionEaseV2(name: "expo.out" | "power3.out" | "power2.inOut"): MotionCubicBezierV2;
+
+export interface MotionCompositionV2Config {
+  id: string;
+  timelineId?: string;
+  name?: string;
+  width: MotionIntegerV2;
+  height: MotionIntegerV2;
+  fps: MotionIntegerV2;
+  durationFrames: MotionIntegerV2;
+  revision?: MotionIntegerV2;
+}
+
+export interface MotionResourceAssetV2 {
+  id: string;
+  uri: string;
+  contentHash: `sha256:${string}`;
+}
+
+export interface MotionTextAssetV2 {
+  id: string;
+  text: string;
+  fontAssetId: string;
+  fontSize: MotionExactV2;
+  lineHeight: MotionExactV2;
+  width: MotionIntegerV2;
+  height: MotionIntegerV2;
+  fill: MotionColorV2;
+  language?: string;
+  script?: string;
+  direction?: "ltr" | "rtl";
+  alignment?: "start" | "center" | "end";
+}
+
+export interface MotionRectangleAssetV2 {
+  id: string;
+  width: MotionIntegerV2;
+  height: MotionIntegerV2;
+  fill: MotionColorV2;
+}
+
+export interface MotionAudioBusV2 {
+  id: string;
+  kind: "group" | "master";
+  name?: string;
+  parentBusId?: string;
+  gain?: MotionExactV2;
+  pan?: MotionExactV2;
+  limiter?: MotionExactV2;
+}
+
+export interface MotionLayerOptionsV2 {
+  name?: string;
+  startFrame?: MotionIntegerV2;
+  durationFrames?: MotionIntegerV2;
+  sourceStartFrame?: MotionIntegerV2;
+  audioBusId?: string;
+  disabled?: boolean;
+}
+
+export interface MotionLayerSpecV2 extends MotionLayerOptionsV2 {
+  id: string;
+  trackKind: "video" | "audio" | "text" | "vector";
+  assetId: string;
+  durationFrames: MotionIntegerV2;
+}
+
+export interface MotionPointAnimationKeyframeV2 {
+  frame: MotionIntegerV2;
+  value: readonly [MotionExactV2, MotionExactV2];
+  interpolation?: "linear" | "hold";
+  easing?: "linear" | "expo.out" | "power3.out" | "power2.inOut" | Readonly<{ x1: MotionExactV2; y1: MotionExactV2; x2: MotionExactV2; y2: MotionExactV2 }>;
+}
+
+export interface MotionScalarAnimationKeyframeV2 {
+  frame: MotionIntegerV2;
+  value: MotionExactV2;
+  interpolation?: "linear" | "hold";
+  easing?: MotionPointAnimationKeyframeV2["easing"];
+}
+
+export declare class MotionLayerV2 {
+  position(x: MotionExactV2, y: MotionExactV2): this;
+  scale(x: MotionExactV2, y?: MotionExactV2): this;
+  rotate(degrees: MotionExactV2): this;
+  anchor(x: MotionExactV2, y: MotionExactV2): this;
+  opacity(value: MotionExactV2): this;
+  crop(value: { x: MotionExactV2; y: MotionExactV2; width: MotionExactV2; height: MotionExactV2 }): this;
+  animatePosition(frames: readonly MotionPointAnimationKeyframeV2[]): this;
+  animateScale(frames: readonly MotionPointAnimationKeyframeV2[]): this;
+  animateRotation(frames: readonly MotionScalarAnimationKeyframeV2[]): this;
+  animateOpacity(frames: readonly MotionScalarAnimationKeyframeV2[]): this;
+}
+
+export declare class MotionSceneV2 {
+  image(id: string, assetId: string, options?: MotionLayerOptionsV2): MotionLayerV2;
+  text(id: string, assetId: string, options?: MotionLayerOptionsV2): MotionLayerV2;
+  shape(id: string, assetId: string, options?: MotionLayerOptionsV2): MotionLayerV2;
+  audio(id: string, assetId: string, options?: MotionLayerOptionsV2): MotionLayerV2;
+}
+
+export declare class MotionCompositionV2 {
+  constructor(config: MotionCompositionV2Config);
+  imageAsset(spec: MotionResourceAssetV2): this;
+  fontAsset(spec: MotionResourceAssetV2): this;
+  audioAsset(spec: MotionResourceAssetV2 & { durationFrames: MotionIntegerV2 }): this;
+  textAsset(spec: MotionTextAssetV2): this;
+  rectangleAsset(spec: MotionRectangleAssetV2): this;
+  audioBus(spec: MotionAudioBusV2): this;
+  scene(id: string, range: { startFrame?: MotionIntegerV2; durationFrames: MotionIntegerV2 }, author?: (scene: MotionSceneV2) => void): MotionSceneV2;
+  layer(spec: MotionLayerSpecV2): MotionLayerV2;
+  dissolve(spec: { id: string; outgoingLayerId: string; incomingLayerId: string; preFrames?: MotionIntegerV2; postFrames?: MotionIntegerV2 }): this;
+  build(): Readonly<Record<string, unknown>>;
+  readonly durationFrames: bigint;
+  readonly fps: bigint;
+}
+
+export declare function createMotionCompositionV2(config: MotionCompositionV2Config): MotionCompositionV2;
+
 export declare const TRANSACTION_V2_PROFILE: "cutly.transaction.document-v2.number-preserving.v2";
 export declare const TRANSACTION_V2_SCHEMA_VERSION: 2;
 export declare const MAX_TRANSACTION_V2_BYTES: number;

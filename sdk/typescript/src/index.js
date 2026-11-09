@@ -115,3 +115,15 @@ export {
   DocumentV2PreviewAdapter,
   DocumentV2PreviewError,
 } from "./preview-v2.js";
+
+export {
+  MOTION_COMPOSITION_V2_PROFILE,
+  MotionCompositionV2,
+  MotionCompositionV2Error,
+  MotionLayerV2,
+  MotionSceneV2,
+  createMotionCompositionV2,
+  motionEaseV2,
+  motionPointV2,
+  motionRationalV2,
+} from "./motion-v2.js";

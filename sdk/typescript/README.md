@@ -1,7 +1,43 @@
 # `@cutly/sdk`
 
-This package is the dependency-free TypeScript/JavaScript protocol surface for
-Cutly. The first frozen component is the cross-language canonical integer JSON
+This package is Cutly's dependency-free TypeScript/JavaScript authoring and
+protocol surface. An agent or developer writes ordinary composition code;
+`MotionCompositionV2` compiles it into the exact Document v2 consumed by the
+native renderer. Document v2 is the deterministic intermediate representation,
+not the interface authors are expected to write by hand.
+
+```js
+import { createMotionCompositionV2 } from "@cutly/sdk";
+
+const film = createMotionCompositionV2({
+  id: "launch", width: 1920, height: 1080, fps: 30, durationFrames: 150,
+});
+
+film
+  .fontAsset({ id: "font", uri: "file:///fonts/Inter.ttf", contentHash: "sha256:…" })
+  .rectangleAsset({ id: "panel", width: 900, height: 420, fill: { r: 800, g: 1200, b: 1800 } })
+  .textAsset({
+    id: "title", text: "VIDEO, WRITTEN AS CODE.", fontAssetId: "font",
+    fontSize: 112, lineHeight: 124, width: 1500, height: 180,
+    fill: { r: 65535, g: 65535, b: 65535 },
+  });
+
+film.scene("hook", { durationFrames: 150 }, (scene) => {
+  scene.shape("panel-layer", "panel");
+  scene.text("title-layer", "title", { startFrame: 12 })
+    .position(210, 410)
+    .animateOpacity([{ frame: 0, value: 0 }, { frame: 14, value: 1 }]);
+});
+
+const document = film.build();
+```
+
+The complete runnable example is
+[`typescript-motion-composition.mjs`](../../examples/typescript-motion-composition.mjs).
+It emits canonical Document v2 JSON which can be initialized as a project and
+rendered through the native pipeline.
+
+The protocol layer also includes the cross-language canonical integer JSON
 profile. It preserves arbitrary-size wire integers as tokens instead of
 rounding them through JavaScript `Number`.
 
