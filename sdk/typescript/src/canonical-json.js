@@ -1,4 +1,5 @@
 export const CANONICAL_JSON_PROFILE = "cutly.json.canonical-integer.v1";
+export const NUMBER_PRESERVING_JSON_PROFILE = "cutly.json.number-preserving.v1";
 
 const DEFAULT_LIMITS = Object.freeze({
   maxInputBytes: 64 << 20,
@@ -29,6 +30,32 @@ export function canonicalizeJSONString(input, requestedLimits = {}) {
 
 export function canonicalizeJSON(input, limits) {
   return encoder.encode(canonicalizeJSONString(input, limits));
+}
+
+export function canonicalizeNumberPreservingJSONString(input, requestedLimits = {}) {
+  const limits = normalizeLimits(requestedLimits);
+  const text = decodeInput(input, limits.maxInputBytes);
+  const parser = new Parser(text, limits, true);
+  return writeCanonical(parser.parse());
+}
+
+export function canonicalizeNumberPreservingJSON(input, limits) {
+  return encoder.encode(canonicalizeNumberPreservingJSONString(input, limits));
+}
+
+// extractNumberPreservingRootMember returns one root member as its own exact
+// canonical JSON value. It lets protocol clients inspect safe envelope fields
+// while retaining arbitrary-precision receipt and payload bytes.
+export function extractNumberPreservingRootMember(input, member, requestedLimits = {}) {
+  if (typeof member !== "string" || member === "") throw new TypeError("@cutly/sdk: root member must be non-empty");
+  const limits = normalizeLimits(requestedLimits);
+  const text = decodeInput(input, limits.maxInputBytes);
+  const parser = new Parser(text, limits, true);
+  const root = parser.parse();
+  if (root.kind !== "object") throw new TypeError("@cutly/sdk: root value must be an object");
+  const entry = root.members.find((candidate) => candidate.name === member);
+  if (entry === undefined) throw new TypeError(`@cutly/sdk: root member ${JSON.stringify(member)} is missing`);
+  return encoder.encode(writeCanonical(entry.value));
 }
 
 // encodeCanonicalValue is the safe object-model boundary for TypeScript
@@ -68,6 +95,31 @@ export async function digestCanonicalValue(value, limits) {
   return digestCanonicalJSON(encodeCanonicalValue(value, limits), limits);
 }
 
+export async function digestNumberPreservingJSON(input, limits) {
+  const canonical = canonicalizeNumberPreservingJSON(input, limits);
+  return { profile: NUMBER_PRESERVING_JSON_PROFILE, digest: await sha256(canonical), canonical };
+}
+
+export async function digestNumberPreservingJSONWithoutRootMember(input, member, requestedLimits = {}) {
+  if (typeof member !== "string" || member === "") throw new TypeError("@cutly/sdk: omitted root member must be non-empty");
+  const limits = normalizeLimits(requestedLimits);
+  const text = decodeInput(input, limits.maxInputBytes);
+  const parser = new Parser(text, limits, true);
+  const root = parser.parse();
+  if (root.kind !== "object") throw new TypeError("@cutly/sdk: number-preserving digest root must be an object");
+  const canonical = encoder.encode(writeCanonical({ kind: "object", members: root.members.filter((entry) => entry.name !== member) }));
+  return { profile: NUMBER_PRESERVING_JSON_PROFILE, digest: await sha256(canonical), canonical };
+}
+
+async function sha256(bytes) {
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle) throw new Error("@cutly/sdk: Web Crypto SHA-256 is unavailable");
+  const digestBytes = new Uint8Array(await subtle.digest("SHA-256", bytes));
+  let hex = "";
+  for (const value of digestBytes) hex += value.toString(16).padStart(2, "0");
+  return `sha256:${hex}`;
+}
+
 function decodeInput(input, maxInputBytes) {
   if (typeof input === "string") {
     validateScalarString(input, 0);
@@ -87,12 +139,13 @@ function decodeInput(input, maxInputBytes) {
 }
 
 class Parser {
-  constructor(text, limits) {
+  constructor(text, limits, preserveNumbers = false) {
     this.text = text;
     this.limits = limits;
     this.offset = 0;
     this.values = 0;
     this.stringBytes = 0;
+    this.preserveNumbers = preserveNumbers;
   }
 
   parse() {
@@ -176,12 +229,29 @@ class Parser {
     } else {
       this.syntax("invalid integer");
     }
-    const next = this.text[this.offset];
-    if (next === "." || next === "e" || next === "E") {
-      fail("CANONICAL_JSON.UNSUPPORTED_NUMBER", start, "only integer number syntax is supported");
+    if (this.text[this.offset] === ".") {
+      if (!this.preserveNumbers) fail("CANONICAL_JSON.UNSUPPORTED_NUMBER", start, "only integer number syntax is supported");
+      this.offset += 1;
+      if (!isDigit(this.text[this.offset])) this.syntax("fraction requires a digit");
+      while (isDigit(this.text[this.offset])) {
+        this.offset += 1;
+        digits += 1;
+        if (digits > this.limits.maxIntegerDigits) resource(start, "number exceeds maxIntegerDigits");
+      }
+    }
+    if (this.text[this.offset] === "e" || this.text[this.offset] === "E") {
+      if (!this.preserveNumbers) fail("CANONICAL_JSON.UNSUPPORTED_NUMBER", start, "only integer number syntax is supported");
+      this.offset += 1;
+      if (this.text[this.offset] === "+" || this.text[this.offset] === "-") this.offset += 1;
+      if (!isDigit(this.text[this.offset])) this.syntax("exponent requires a digit");
+      while (isDigit(this.text[this.offset])) {
+        this.offset += 1;
+        digits += 1;
+        if (digits > this.limits.maxIntegerDigits) resource(start, "number exceeds maxIntegerDigits");
+      }
     }
     let text = this.text.slice(start, this.offset);
-    if (text === "-0") text = "0";
+    if (!this.preserveNumbers && text === "-0") text = "0";
     return { kind: "number", text };
   }
 

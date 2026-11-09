@@ -68,20 +68,6 @@ func New(ctx context.Context, config Config) (result *Authority, err error) {
 			err = denied("host construction panic: %v", r)
 		}
 	}()
-	if err = checkContext(ctx); err != nil {
-		return nil, err
-	}
-	if !digest(config.CompilerBuild) || !digest(config.EvaluatorBuild) {
-		return nil, denied("compiler and evaluator builds must be canonical digests")
-	}
-	pins := hostPins{config.CompilerBuild, config.EvaluatorBuild, config.Backend, config.MediaRuntime}
-	if err = admitPins(pins); err != nil {
-		return nil, err
-	}
-	raw, err := canonical(pins)
-	if err != nil {
-		return nil, err
-	}
 	policy, err := buildidentity.ResolveProviderPolicy()
 	if err != nil {
 		return nil, denied("provider policy: %v", err)
@@ -103,6 +89,42 @@ func New(ctx context.Context, config Config) (result *Authority, err error) {
 	}
 	if !identity.Valid() {
 		return nil, denied("invalid provider identity")
+	}
+	return newWithProviderIdentity(ctx, config, identity)
+}
+
+// NewWithProviderBinding constructs authority inside an already-launched
+// provider process. The binding proves only which executable bytes are running;
+// the parent remains responsible for packaged-policy authorization before exec.
+// Keeping this constructor typed around an opaque measured identity prevents a
+// request or manifest digest string from becoming executable authority.
+func NewWithProviderBinding(ctx context.Context, config Config, identity buildidentity.ProviderExecutableIdentity) (*Authority, error) {
+	return newWithProviderIdentity(ctx, config, identity)
+}
+
+func newWithProviderIdentity(ctx context.Context, config Config, identity buildidentity.ProviderExecutableIdentity) (result *Authority, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			result = nil
+			err = denied("host construction panic: %v", r)
+		}
+	}()
+	if err = checkContext(ctx); err != nil {
+		return nil, err
+	}
+	if !identity.Valid() {
+		return nil, denied("invalid provider identity")
+	}
+	if !digest(config.CompilerBuild) || !digest(config.EvaluatorBuild) {
+		return nil, denied("compiler and evaluator builds must be canonical digests")
+	}
+	pins := hostPins{config.CompilerBuild, config.EvaluatorBuild, config.Backend, config.MediaRuntime}
+	if err = admitPins(pins); err != nil {
+		return nil, err
+	}
+	raw, err := canonical(pins)
+	if err != nil {
+		return nil, err
 	}
 	if err = checkContext(ctx); err != nil {
 		return nil, err

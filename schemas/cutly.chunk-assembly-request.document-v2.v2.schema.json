@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cutly.dev/schemas/cutly.chunk-assembly-request.document-v2.v2.schema.json",
+  "title": "Document v2 Chunk Assembly Request v2",
+  "description": "Standalone identity contract, not authorization, executable provenance or proof of chunk bytes. The strict native verifier additionally enforces canonical JSON, exact document/plan/manifest/provider binding, clocks, intermediate layout, deterministic partitions, ordered coverage, checked sizes and decoded-sequence roots. Fingerprint is SHA-256 of canonical request with fingerprint omitted. V1 requests/profiles are not reinterpreted.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "profile", "canonical_json_profile", "job_id", "artifact_uri", "document_hash", "plan_fingerprint", "execution_manifest_fingerprint", "timeline_range", "frame_range", "sample_range", "target", "media_runtime", "output", "deterministic_seed", "provider_executable_digest", "aggregate", "audio", "video", "fingerprint"],
+  "properties": {
+    "schema_version": {"const": 2},
+    "profile": {"const": "cutly.render.reference-chunk-assembly.document-v2.v2"},
+    "canonical_json_profile": {"const": "cutly.json.canonical-integer.v1"},
+    "job_id": {"type": "string", "minLength": 1, "maxLength": 1024, "pattern": "\\S"},
+    "artifact_uri": {"type": "string", "maxLength": 1048576, "pattern": "^file:///[^?#]+$", "not": {"pattern": "(^|/)\\.\\.?(/|$)"}},
+    "document_hash": {"$ref": "#/$defs/hash"},
+    "plan_fingerprint": {"$ref": "#/$defs/hash"},
+    "execution_manifest_fingerprint": {"$ref": "#/$defs/hash"},
+    "timeline_range": {"$ref": "https://cutly.dev/schemas/cutly.document-v2-render-plan.v1.schema.json#/$defs/range"},
+    "frame_range": {"$ref": "#/$defs/ticks"},
+    "sample_range": {"$ref": "#/$defs/ticks"},
+    "target": {"$ref": "https://cutly.dev/schemas/cutly.document-v2-render-plan.v1.schema.json#/$defs/target"},
+    "media_runtime": {"$ref": "https://cutly.dev/schemas/cutly.document-v2-execution-manifest.v2.schema.json#/$defs/mediaRuntime"},
+    "output": {"$ref": "https://cutly.dev/schemas/cutly.document-v2-execution-manifest.v2.schema.json#/$defs/output"},
+    "deterministic_seed": {"type": "integer", "minimum": 0, "maximum": 0},
+    "provider_executable_digest": {"$ref": "#/$defs/hash"},
+    "aggregate": {"$ref": "#/$defs/aggregate"},
+    "audio": {"type": "array", "maxItems": 16384, "uniqueItems": true, "items": {"allOf": [{"$ref": "#/$defs/descriptor"}], "properties": {"domain": {"const": "cutly.decoded-audio.pcm-s16le.interleaved.v1"}, "task_id": {"pattern": "^audio-[0-9]{5}$"}}}},
+    "video": {"type": "array", "maxItems": 16384, "uniqueItems": true, "items": {"allOf": [{"$ref": "#/$defs/descriptor"}], "properties": {"domain": {"const": "cutly.surface.linear-bt709-premultiplied-rgba16.v1"}, "task_id": {"pattern": "^video-[0-9]{5}$"}}}},
+    "fingerprint": {"$ref": "#/$defs/hash"}
+  },
+  "$defs": {
+    "hash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "positiveInt64": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807},
+    "ticks": {"$ref": "https://cutly.dev/schemas/cutly.document-v2-render-plan.v1.schema.json#/$defs/ticks"},
+    "positiveTicks": {"allOf": [{"$ref": "#/$defs/ticks"}], "properties": {"count": {"$ref": "#/$defs/positiveInt64"}}},
+    "key": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_version", "profile", "namespace", "artifact_kind", "digest"],
+      "properties": {
+        "schema_version": {"const": 1}, "profile": {"const": "cutly.cache.stage-key.v1"},
+        "namespace": {"type": "string", "minLength": 1, "maxLength": 192, "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*\\.v[1-9][0-9]*$"},
+        "artifact_kind": {"type": "string", "minLength": 1, "maxLength": 192, "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*\\.v[1-9][0-9]*$"},
+        "digest": {"$ref": "#/$defs/hash"}
+      }
+    },
+    "descriptor": {
+      "type": "object", "additionalProperties": false,
+      "required": ["task_id", "domain", "cache_key", "range", "content_hash", "size_bytes", "unit_bytes"],
+      "properties": {
+        "task_id": {"type": "string", "pattern": "^(audio|video)-[0-9]{5}$"},
+        "domain": {"enum": ["cutly.surface.linear-bt709-premultiplied-rgba16.v1", "cutly.decoded-audio.pcm-s16le.interleaved.v1"]},
+        "cache_key": {"$ref": "#/$defs/key"}, "range": {"$ref": "#/$defs/positiveTicks"},
+        "content_hash": {"$ref": "#/$defs/hash"}, "size_bytes": {"$ref": "#/$defs/positiveInt64"}, "unit_bytes": {"$ref": "#/$defs/positiveInt64"}
+      }
+    },
+    "root": {
+      "type": "object", "additionalProperties": false,
+      "required": ["domain", "unit_bytes", "range", "chunk_count", "root_hash"],
+      "properties": {
+        "domain": {"enum": ["cutly.surface.linear-bt709-premultiplied-rgba16.v1", "cutly.decoded-audio.pcm-s16le.interleaved.v1"]},
+        "unit_bytes": {"$ref": "#/$defs/positiveInt64"}, "range": {"$ref": "#/$defs/positiveTicks"},
+        "chunk_count": {"type": "integer", "minimum": 1, "maximum": 16384}, "root_hash": {"$ref": "#/$defs/hash"}
+      }
+    },
+    "aggregate": {
+      "type": "object", "additionalProperties": false, "required": ["profile", "resume_mode"],
+      "properties": {
+        "profile": {"const": "cutly.render.reference-chunk-aggregate-binding.document-v2.v2"},
+        "resume_mode": {"const": "pre-codec-chunks-resume-final-codec-restarts.document-v2.v2"},
+        "video": {"allOf": [{"$ref": "#/$defs/root"}], "properties": {"domain": {"const": "cutly.surface.linear-bt709-premultiplied-rgba16.v1"}}},
+        "audio": {"allOf": [{"$ref": "#/$defs/root"}], "properties": {"domain": {"const": "cutly.decoded-audio.pcm-s16le.interleaved.v1"}}}
+      }
+    }
+  }
+}

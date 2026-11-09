@@ -196,6 +196,19 @@ func (store *Store) Load(ctx context.Context, scope stagedag.Scope, task stageda
 }
 
 func (store *Store) Commit(ctx context.Context, checkpoint stagedag.Checkpoint) (returnErr error) {
+	return store.commit(ctx, checkpoint, false)
+}
+
+// CommitOutputEquivalent is an additive checkpoint-store extension used by
+// restart-safe, content-addressed stages. It preserves an existing checkpoint
+// when its complete task binding and output are identical and only historical
+// attempt telemetry differs. Other stages retain Commit's strict collision
+// behavior.
+func (store *Store) CommitOutputEquivalent(ctx context.Context, checkpoint stagedag.Checkpoint) error {
+	return store.commit(ctx, checkpoint, true)
+}
+
+func (store *Store) commit(ctx context.Context, checkpoint stagedag.Checkpoint, allowOutputEquivalent bool) (returnErr error) {
 	if store == nil || store.artifacts == nil || ctx == nil {
 		return fmt.Errorf("%w: initialized store and context are required", ErrInvalidRequest)
 	}
@@ -241,6 +254,16 @@ func (store *Store) Commit(ctx context.Context, checkpoint stagedag.Checkpoint) 
 					// A previous attempt may have renamed successfully and failed
 					// before syncing either rename parent. Re-establish durability on
 					// every exact idempotent retry instead of reporting a false success.
+					if err := store.syncPublished(path); err != nil {
+						return err
+					}
+					return store.refreshArtifactLease(ctx, reader)
+				}
+				if allowOutputEquivalent && existing.Output.ContentHash == frozen.Output.ContentHash &&
+					existing.Output.SizeBytes == frozen.Output.SizeBytes && bytes.Equal(existing.Output.Receipt, frozen.Output.Receipt) {
+					// AttemptCount is execution telemetry, not content identity. Keep
+					// the already durable historical checkpoint and re-establish its
+					// directory/CAS durability before accepting this convergence.
 					if err := store.syncPublished(path); err != nil {
 						return err
 					}

@@ -20,6 +20,7 @@ import (
 const helperExecutableName = "cutly-ffprobe-test-helper"
 
 type ffprobeHelperConfig struct {
+	Stderr         string `json:"stderr,omitempty"`
 	Fixture        string `json:"fixture"`
 	FrameFixture   string `json:"frame_fixture"`
 	Capture        string `json:"capture,omitempty"`
@@ -136,6 +137,9 @@ func runFFprobeHelper() int {
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "read fixture: %v\n", err)
 		return 11
+	}
+	if config.Stderr != "" {
+		_, _ = fmt.Fprint(os.Stderr, config.Stderr)
 	}
 	if _, err := os.Stdout.Write(raw); err != nil {
 		return 12

@@ -1,0 +1,26 @@
+{
+  "schema_version": 2,
+  "profile": "cutly.agent-request.document-v2.v2",
+  "request_id": "agent-v2-request",
+  "tool": "cutly_edit",
+  "action": "plan",
+  "project_id": "document-v2-project",
+  "payload_profile": "cutly.agent-payload.edit.plan.document-v2.v2",
+  "payload": {
+    "transaction": {
+      "schema_version": 2,
+      "profile": "cutly.transaction.document-v2.number-preserving.v2",
+      "id": "agent-v2-transaction",
+      "idempotency_key": "agent-v2-key",
+      "document_id": "fixture-document-v2",
+      "expected_revision": 8,
+      "expected_document_hash": "sha256:5b042ecdaa782010bbbfc78ad5a6101fa329c5e3c33e2b711c5531eea793dd3f",
+      "operations": [{
+        "id": "remove-metadata",
+        "op": "metadata_remove",
+        "metadata": {"scope": {"kind": "document", "id": "fixture-document-v2"}, "key": "obsolete"}
+      }],
+      "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  }
+}

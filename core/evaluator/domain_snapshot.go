@@ -99,6 +99,17 @@ func CompileDomainSnapshot(
 	scope DomainScope,
 	offered videoedit.BackendCapabilities,
 	limits SnapshotLimits,
+) (*DomainProgram, *FrozenSnapshot, []documentv2.Diagnostic) {
+	return compileDomainSnapshot(ctx, document, scope, offered, limits, validateDomainScope)
+}
+
+func compileDomainSnapshot(
+	ctx context.Context,
+	document documentv2.Document,
+	scope DomainScope,
+	offered videoedit.BackendCapabilities,
+	limits SnapshotLimits,
+	validateScope func(context.Context, documentv2.Document, DomainScope) *documentv2.Diagnostic,
 ) (program *DomainProgram, snapshot *FrozenSnapshot, diagnostics []documentv2.Diagnostic) {
 	defer func() {
 		if recover() != nil {
@@ -138,13 +149,14 @@ func CompileDomainSnapshot(
 	if frozenSnapshot == nil || documentv2.HasErrorDiagnostics(diagnostics) {
 		return nil, nil, diagnostics
 	}
-	if diagnostic := validateDomainScope(ctx, frozen, scope); diagnostic != nil {
+	if diagnostic := validateScope(ctx, frozen, scope); diagnostic != nil {
 		return nil, nil, append(diagnostics, *diagnostic)
 	}
 	// Clone only after admission and independent shape/closure checks; canonicalize set order for
 	// stable owned scope discovery without changing exact requested rational representations.
 	scope = cloneDomainScope(scope)
 	sort.Slice(scope.Selection.ClipIDs, func(i, j int) bool { return scope.Selection.ClipIDs[i] < scope.Selection.ClipIDs[j] })
+	sort.Slice(scope.Selection.TransitionIDs, func(i, j int) bool { return scope.Selection.TransitionIDs[i] < scope.Selection.TransitionIDs[j] })
 	required, selectionDiagnostics := documentv2.RequiredCapabilitiesForSelection(ctx, frozen, scope.Selection)
 	diagnostics = append(diagnostics, selectionDiagnostics...)
 	if documentv2.HasErrorDiagnostics(diagnostics) {

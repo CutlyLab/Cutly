@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cutly.dev/schemas/cutly.evidence-manifest.document-v2.v2.schema.json",
+  "title": "Document v2 Evidence Manifest v2",
+  "description": "Additive Evidence v2. Full assembly request authenticates document/plan/manifest/provider, exact runtime/output/ranges/seed and ordered intermediate RGBA16/PCM chunks. Worker is the independently measured assembler executable digest, not provider provenance: hosts must separately verify the S6 provider worker measured hash equals ProviderBuild/provider_executable_digest before accepting chunk receipts. The production FFmpeg backend currently narrows this generic protocol to a same-provider-worker deployment (worker digest equals provider digest); this equality does not replace the S6 parent's executable measurement. Decoded RGBA8/PCM roots measure repeatability, not equality to pre-codec roots or bit-exact encoded containers. Native verification additionally checks request binding, checked layout/coverage/root arithmetic and fingerprint (SHA-256 of canonical manifest with fingerprint omitted). Identity is not authorization or executable provenance.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "profile", "canonical_json_profile", "assembly", "worker_executable_digest", "artifact", "fingerprint"],
+  "properties": {
+    "schema_version": {"const": 2},
+    "profile": {"const": "cutly.evidence-manifest.document-v2.v2"},
+    "canonical_json_profile": {"const": "cutly.json.canonical-integer.v1"},
+    "assembly": {"$ref": "https://cutly.dev/schemas/cutly.chunk-assembly-request.document-v2.v2.schema.json"},
+    "worker_executable_digest": {"$ref": "#/$defs/hash"},
+    "artifact": {
+      "type": "object", "additionalProperties": false,
+      "required": ["uri", "content_hash", "size_bytes"],
+      "properties": {
+        "uri": {"type": "string", "maxLength": 1048576, "pattern": "^file:///[^?#]+$", "not": {"pattern": "(^|/)\\.\\.?(/|$)"}},
+        "content_hash": {"$ref": "#/$defs/hash"},
+        "size_bytes": {"$ref": "#/$defs/positiveInt64"}
+      }
+    },
+    "decoded_video": {"allOf": [{"$ref": "#/$defs/sequence"}], "properties": {"unit": {"const": "frames"}, "domain": {"const": "cutly.decoded-video.rgba8.interleaved.top-down.tight.v1"}}},
+    "decoded_audio": {"allOf": [{"$ref": "#/$defs/sequence"}], "properties": {"unit": {"const": "samples"}, "domain": {"const": "cutly.decoded-audio.pcm-s16le.interleaved.v1"}}},
+    "fingerprint": {"$ref": "#/$defs/hash"}
+  },
+  "allOf": [
+    {"if": {"properties": {"assembly": {"properties": {"frame_range": {"properties": {"count": {"minimum": 1}}}}}}}, "then": {"required": ["decoded_video"]}, "else": {"not": {"required": ["decoded_video"]}}},
+    {"if": {"properties": {"assembly": {"properties": {"sample_range": {"properties": {"count": {"minimum": 1}}}}}}}, "then": {"required": ["decoded_audio"]}, "else": {"not": {"required": ["decoded_audio"]}}}
+  ],
+  "$defs": {
+    "hash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "positiveInt64": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807},
+    "positiveTicks": {"allOf": [{"$ref": "https://cutly.dev/schemas/cutly.document-v2-render-plan.v1.schema.json#/$defs/ticks"}], "properties": {"count": {"$ref": "#/$defs/positiveInt64"}}},
+    "chunk": {
+      "type": "object", "additionalProperties": false,
+      "required": ["first", "count", "content_hash"],
+      "properties": {
+        "first": {"type": "integer", "minimum": -9223372036854775808, "maximum": 9223372036854775807},
+        "count": {"$ref": "#/$defs/positiveInt64"},
+        "content_hash": {"$ref": "#/$defs/hash"}
+      }
+    },
+    "sequence": {
+      "type": "object", "additionalProperties": false,
+      "required": ["domain", "unit", "unit_bytes", "range", "chunks", "root_hash"],
+      "properties": {
+        "domain": {"enum": ["cutly.decoded-video.rgba8.interleaved.top-down.tight.v1", "cutly.decoded-audio.pcm-s16le.interleaved.v1"]},
+        "unit": {"enum": ["frames", "samples"]},
+        "unit_bytes": {"$ref": "#/$defs/positiveInt64"},
+        "range": {"$ref": "#/$defs/positiveTicks"},
+        "chunks": {"type": "array", "minItems": 1, "maxItems": 16384, "uniqueItems": true, "items": {"$ref": "#/$defs/chunk"}},
+        "root_hash": {"$ref": "#/$defs/hash"}
+      }
+    }
+  }
+}

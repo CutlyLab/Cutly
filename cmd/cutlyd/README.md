@@ -48,11 +48,12 @@ github.com/CutlyLab/Cutly/internal/buildidentity.stampedMediaRuntimeTrustedKeys=
 github.com/CutlyLab/Cutly/internal/buildidentity.stampedMediaRuntimeBundleFingerprint=sha256:<64-lowercase-hex>
 ```
 
-The current tagged-release workflow does not yet have owner-provided platform
-bundles, public keys, or fingerprints, so it deliberately remains an unstamped
-development build. Signed-runtime wiring is complete, but default packaged
-rollout is still blocked on those release artifacts; no test key is promoted as
-a production trust root.
+The tagged-release workflow requires an owner-provided fingerprint for every
+target and a canonical trusted-public-key set. The archive builder first builds
+and measures `cutly-worker-v2`, then stamps `cutlyd` with that target-specific
+worker digest and the runtime trust policy. A tag build fails when these
+repository variables are absent or malformed. No test key is promoted as a
+production trust root.
 
 For explicit local testing only, an unstamped development build may use direct
 tools and caller-declared closure identities. This mode is deliberately noisy

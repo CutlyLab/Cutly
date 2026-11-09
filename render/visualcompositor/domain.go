@@ -59,6 +59,9 @@ func (program *Program) DomainScopeHash() string {
 }
 
 func (program *Program) profile() string {
+	if program.domainV2 {
+		return DomainProfileV2
+	}
 	if program.domainScope != nil {
 		return DomainProfileV1
 	}

@@ -1,0 +1,12 @@
+{
+  "schema_version": 2,
+  "profile": "cutly.agent-result.document-v2.v2",
+  "ok": true,
+  "request_id": "agent-v2-request",
+  "tool": "cutly_edit",
+  "action": "plan",
+  "project_id": "document-v2-project",
+  "state": "planned",
+  "diagnostics": [],
+  "receipt": {"profile": "cutly.project-plan.document-v2.v2", "transaction_id": "agent-v2-transaction"}
+}

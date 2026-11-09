@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/CutlyLab/Cutly/agent/httpapi"
+	"github.com/CutlyLab/Cutly/agent/httpapiv2"
 	"github.com/CutlyLab/Cutly/agent/router"
 	cutly "github.com/CutlyLab/Cutly/sdk/go/cutly"
 )
@@ -28,6 +29,7 @@ type config struct {
 	projectID       string
 	projectDir      string
 	render          renderConfig
+	nativeV2        nativeConfigV2
 	version         bool
 }
 
@@ -139,6 +141,7 @@ func parseConfig(args []string) (config, error) {
 	flags.Uint64Var(&configuration.render.stageDiskBytes, "render-stage-disk-bytes", 4<<30, "per-render disk admission estimate")
 	flags.IntVar(&configuration.render.maxConcurrentJobs, "render-max-concurrent-jobs", 1, "maximum in-process render jobs")
 	flags.DurationVar(&configuration.render.workerPollInterval, "render-worker-poll-interval", defaultWorkerPollInterval, "durable queue polling fallback interval")
+	registerNativeFlagsV2(flags, &configuration.nativeV2)
 	flags.BoolVar(&configuration.version, "version", false, "print version")
 	if err := flags.Parse(args); err != nil {
 		return config{}, err
@@ -168,6 +171,9 @@ func parseConfig(args []string) (config, error) {
 	}
 	if configuration.version {
 		return configuration, nil
+	}
+	if err := validateNativeFlagsV2(configuration); err != nil {
+		return config{}, err
 	}
 	if configuration.render.mediaRuntimeBundleRoot == "" {
 		if configuration.render.ffmpegExecutable == "" {
@@ -457,6 +463,9 @@ func (handler *trackedHTTPHandler) wait(ctx context.Context) bool {
 func newMux(handler httpapi.Handler) http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("POST /v1/agent", httpapi.Server{Handler: handler})
+	if v2, ok := handler.(httpapiv2.Handler); ok {
+		mux.Handle("POST /v2/agent", httpapiv2.Server{Handler: v2})
+	}
 	mux.HandleFunc("GET /healthz", func(writer http.ResponseWriter, _ *http.Request) {
 		writer.Header().Set("Content-Type", "application/json")
 		writer.Header().Set("Cache-Control", "no-store")

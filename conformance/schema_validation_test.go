@@ -76,6 +76,8 @@ func TestSchemasCompileAndValidateInstances(t *testing.T) {
 	}
 
 	validInstances := map[string]string{
+		"cutly.agent-request.document-v2.v2.schema.json":        "conformance/fixtures/agent-request-document-v2.valid.json",
+		"cutly.agent-result.document-v2.v2.schema.json":         "conformance/fixtures/agent-result-document-v2.valid.json",
 		"cutly.agent-request.v1.schema.json":                    "agent/protocol/testdata/agent-request-v1.canonical.json",
 		"cutly.agent-result.v1.schema.json":                     "agent/protocol/testdata/agent-result-v1.canonical.json",
 		"cutly.document.v1.schema.json":                         "conformance/fixtures/document-v1.valid.json",
@@ -100,6 +102,8 @@ func TestSchemasCompileAndValidateInstances(t *testing.T) {
 		"cutly.exact-frame-request.v1.schema.json":              "render/api/testdata/exact-frame-request-v1.valid.json",
 		"cutly.evidence-manifest.v1.schema.json":                "render/evidence/testdata/evidence-manifest-v1.valid.json",
 	}
+	validInstances[assemblySchemaV2] = "conformance/fixtures/document-v2-chunk-assembly-mixed.valid.json"
+	validInstances["cutly.evidence-manifest.document-v2.v2.schema.json"] = "conformance/fixtures/evidence-document-v2-mixed.valid.json"
 	if len(validInstances) != len(resolved) {
 		t.Fatalf("schema fixture inventory mismatch: %d schemas, %d valid instances", len(resolved), len(validInstances))
 	}
@@ -457,6 +461,8 @@ func mutateCriticalSchemaInvalid(t *testing.T, name string, value map[string]any
 		value["schema_version"] = int64(999)
 	case "cutly.document-v2-execution-manifest.v2.schema.json":
 		value["visual"].(map[string]any)["enabled"] = false
+	case "cutly.chunk-assembly-request.document-v2.v2.schema.json":
+		value["output"].(map[string]any)["intermediate"].(map[string]any)["video_surface_profile"] = "rgba8"
 	case "cutly.document-v2-render-request.v2.schema.json":
 		value["execution_manifest"].(map[string]any)["output"].(map[string]any)["frame_clock"] = nil
 	case "cutly.prepared-environment.document-v2.v2.schema.json":
@@ -475,12 +481,18 @@ func mutateCriticalSchemaInvalid(t *testing.T, name string, value map[string]any
 		value["events"].([]any)[0].(map[string]any)["state"] = "complete"
 	case "cutly.exact-frame-request.v1.schema.json":
 		value["artifact_uri"] = "https://example.invalid/frame.png"
+	case "cutly.evidence-manifest.document-v2.v2.schema.json":
+		value["schema_version"] = int64(999)
 	case "cutly.evidence-manifest.v1.schema.json":
 		value["decoded_video"].(map[string]any)["chunks"].([]any)[0].(map[string]any)["count"] = int64(0)
 	case "cutly.agent-request.v1.schema.json":
 		value["action"] = "unknown"
 	case "cutly.agent-result.v1.schema.json":
 		value["action"] = "unknown"
+	case "cutly.agent-request.document-v2.v2.schema.json":
+		value["payload_profile"] = "cutly.agent-payload.edit.apply.document-v2.v2"
+	case "cutly.agent-result.document-v2.v2.schema.json":
+		value["schema_version"] = int64(1)
 	default:
 		t.Fatalf("no critical invalid case for schema %s", name)
 	}

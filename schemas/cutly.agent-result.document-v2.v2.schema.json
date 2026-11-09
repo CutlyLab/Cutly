@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.cutly.dev/cutly.agent-result.document-v2.v2.schema.json",
+  "title": "Cutly Document v2 Agent Result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "profile", "ok", "request_id", "tool", "action", "project_id", "state", "diagnostics", "receipt"],
+  "properties": {
+    "schema_version": {"const": 2},
+    "profile": {"const": "cutly.agent-result.document-v2.v2"},
+    "ok": {"type": "boolean"},
+    "request_id": {"$ref": "#/$defs/identity"},
+    "tool": {"enum": ["cutly_project", "cutly_edit", "cutly_render"]},
+    "action": {"$ref": "#/$defs/identity"},
+    "project_id": {"$ref": "#/$defs/identity"},
+    "state": {"$ref": "#/$defs/identity"},
+    "diagnostics": {"type": "array", "maxItems": 4096, "items": {"$ref": "#/$defs/diagnostic"}},
+    "receipt": {"type": "object"}
+  },
+  "allOf": [
+    {"oneOf": [
+      {"properties": {"tool": {"const": "cutly_project"}, "action": {"enum": ["inspect", "status", "history", "capabilities"]}}},
+      {"properties": {"tool": {"const": "cutly_edit"}, "action": {"enum": ["plan", "apply", "discard", "revert"]}}},
+      {"properties": {"tool": {"const": "cutly_render"}, "action": {"enum": ["plan", "prepare", "preflight", "frame", "submit", "status", "history", "cancel"]}}}
+    ]},
+    {
+      "if": {"properties": {"ok": {"const": true}}, "required": ["ok"]},
+      "then": {"properties": {"diagnostics": {"not": {"contains": {"properties": {"severity": {"const": "error"}}, "required": ["severity"]}}}}},
+      "else": {"properties": {"diagnostics": {"contains": {"properties": {"severity": {"const": "error"}}, "required": ["severity"]}}}}
+    }
+  ],
+  "$defs": {
+    "identity": {"type": "string", "minLength": 1, "maxLength": 4096, "pattern": "^\\S(?:[\\s\\S]*\\S)?$"},
+    "diagnostic": {
+      "type": "object", "additionalProperties": false,
+      "required": ["code", "severity", "path", "message"],
+      "properties": {
+        "code": {"$ref": "#/$defs/identity"},
+        "severity": {"enum": ["info", "warning", "error"]},
+        "path": {"type": "string", "maxLength": 4096},
+        "message": {"type": "string", "minLength": 1, "maxLength": 65536},
+        "fixes": {"type": "array", "maxItems": 4096}
+      }
+    }
+  }
+}

@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  DOCUMENT_V2_PLAYER_PROFILE,
+  DocumentV2Player,
   HeadlessPlayer,
   PlayerStateError,
   frameIndexAtSample,
@@ -36,6 +38,15 @@ test("uses the exact audio master clock for NTSC frame selection", () => {
   const state = player.advanceAudioSample("1602");
   assert.equal(state.frameIndex, "1");
   assert.equal(state.sampleIndex, "1602");
+});
+
+test("Document v2 player uses an explicit profile with the same deterministic clock", () => {
+  const player = new DocumentV2Player(config());
+  assert.equal(player.snapshot().profile, DOCUMENT_V2_PLAYER_PROFILE);
+  assert.equal(player.requestFrame().profile, DOCUMENT_V2_PLAYER_PROFILE);
+  player.load(config("8"));
+  assert.equal(player.snapshot().profile, DOCUMENT_V2_PLAYER_PROFILE);
+  assert.equal(player.advanceAudioSample("1602").frameIndex, "1");
 });
 
 test("rejects stale async frames across seek and revision changes", () => {

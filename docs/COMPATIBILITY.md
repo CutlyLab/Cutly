@@ -4,6 +4,20 @@ Cutly versions wire protocols independently from package releases. A published
 schema/profile string is immutable: behavior changes require a new schema or
 profile, not a silent reinterpretation.
 
+## Supported profile matrix
+
+| Surface | Legacy restricted RC | Document v2 |
+| --- | --- | --- |
+| Project store | `project/local` | `project/localv2` |
+| Transactions | v1 typed operations | number-preserving `transactionv2` |
+| Agent HTTP | `/v1/agent` | `/v2/agent` |
+| Go client | `Client` | `AgentClientV2` |
+| TypeScript client | `CutlyClient` | `CutlyAgentV2Client` |
+| Render identity | RenderPlan v3 / Manifest v1 / Evidence v1 | semantic plan / Manifest v2 / Prepared v2 / Evidence v2 |
+| Player | `HeadlessPlayer` / `AgentPreviewAdapter` | `DocumentV2Player` / `DocumentV2PreviewAdapter` |
+
+There is no cross-decoding or fallback between columns.
+
 ## Release candidate guarantees
 
 - `cutly.json.canonical-integer.v1`, Agent envelope v1, Document v1/v2,
@@ -13,14 +27,13 @@ profile, not a silent reinterpretation.
   tool/action pairs fail closed.
 - Business rejection is `ok:false` plus an error diagnostic. Connectivity,
   malformed results and correlation mismatches are transport errors.
-- V1 transactions are not implicitly applied to Document v2. A future v2 edit
-  protocol will be additive.
+- V1 transactions are not implicitly applied to Document v2. The v2 edit and
+  Agent protocols are independent additive profiles.
 
 During `0.x`, source APIs may change only with a release note and migration
 entry. Frozen wire fixtures and profile identities do not change in place.
-Deprecated source APIs remain for at least one minor release after their
-replacement ships. A decoder removal requires both an explicit migration path
-and a major wire-version transition.
+The normative notice and removal rules are in
+[`SEMVER_AND_DEPRECATION.md`](SEMVER_AND_DEPRECATION.md).
 
 ## Capability truthfulness
 

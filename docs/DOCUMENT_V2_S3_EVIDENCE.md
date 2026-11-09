@@ -462,3 +462,123 @@ compile-only checks plus the documented js/wasm protocol/core subset with the ne
 These are current-worktree integration results, including preserved deferred archive changes and the
 not-yet-audited evaluator slice, not fixed-clean-revision release or S3 exit evidence. No real 32-bit,
 Windows or wasm execution is claimed. The accepted resource slice is committed at `1f33036`.
+
+## 2026-11-08 continuation: baseline passed, codec review still blocked
+
+The owner explicitly authorized a new S3 codec independent read-only review attempt through normal
+permission handling, with instructions to stop on another refusal rather than bypass it. Reviewer
+`af482c324b7d3b74c` stopped when the worktree guard refused a compound read-only git/history command
+because it could not verify that the command stayed inside the worktree. The refused operation was
+not split, rerouted or retried, and no permission configuration was changed. The reviewer did not
+complete source inspection or focused verification; no zero-finding or codec acceptance is claimed.
+This is a new worktree-guard interruption, not closure of the earlier service security-filter event.
+
+Separately, the continuation parent reran the following at HEAD
+`5a186be790bf9f70326e9779fd76356dd7fe716c`, with the pre-existing deferred release-archive working
+changes still present:
+
+- `go test -count=1 ./render/prepared ./render/preparev2 ./render/reconstructv2 ./render/resourceidentityv2 ./conformance/...`: passed;
+- `go test -race -count=1 ./render/prepared ./render/preparev2 ./render/reconstructv2 ./render/resourceidentityv2`: passed;
+- `go vet ./render/prepared ./render/preparev2 ./render/reconstructv2 ./render/resourceidentityv2`: passed;
+- `go test -count=1 ./...` and `go test -race -count=1 ./...`: passed;
+- `go vet ./...`, `go mod tidy -diff` and `git diff --check`: passed;
+- `CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go test -exec=true ./...`: passed;
+- `CGO_ENABLED=0 GOOS=linux GOARCH=386 go test -exec=true ./...`: passed;
+- `CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go test -exec=true ./...`: passed;
+- `CGO_ENABLED=0 GOOS=js GOARCH=wasm go test -exec=true ./core/... ./protocol/... ./render/api/... ./render/resourceidentityv2/... ./conformance/...`: passed.
+
+Cross-target checks are compile-only, not target-runtime acceptance. Full-suite results include the
+preserved archive work and are not fixed-clean-revision release evidence. No S4-S6 implementation
+was started, no stage exit was accepted, and no commit, push, tag, publication or daemon default
+change was made. S3 codec independent closure remained the prerequisite for S4 at that checkpoint;
+the later independent closure below supersedes that pending status, not the historical results.
+
+## 2026-11-08 independent codec repair closure
+
+After explicit owner authorization to continue under normal permission checks, independent reviewer
+`aae239a969fd78bab` completed direct source inspection and supplemental tests without delegation,
+permission changes, sandbox bypass, service timeout or refused calls. No verified P0/P1/P2 remains
+in the assigned prepared-v2 codec/schema slice. This closes the historical RawMessage early-admission
+P2 for the inspected source and representative inputs; it is not a new audit of all S3 components.
+Earlier interrupted reviews remain incomplete historical attempts, not acceptance evidence.
+
+### Independent allocation and boundary evidence
+
+The reviewer created only temporary files, using Go's overlay mechanism; repository code and fixtures
+were unchanged. Reproduction: `/tmp/cutly-codec-independent.3uwDsj/overlay.json`, with test source
+`/tmp/cutly-codec-independent.3uwDsj/independent_test.go`. The final test source SHA-256 is
+`ce0460c7d2e619dbaf23f28e18763e15034612c1943c31237e0dca89df3cfecd`; overlay SHA-256 is
+`8c18003e34a52bd1cda80ff550731eca48489a4a997af20f0a5f6eb448635cbb`.
+These are local reproduction files, not committed regression coverage.
+
+Inputs were allocated outside measurement. Each path was warmed once, followed by GC and ten-call
+`runtime.MemStats.TotalAlloc` measurement; allocation counts used `testing.AllocsPerRun(5, run)`.
+The normal-mode Go 1.27.3 Darwin/arm64 measurements were:
+
+| Input | Preflight bytes/op | Full Decode bytes/op | Allocs/op |
+| --- | ---: | ---: | ---: |
+| Historical-size 20,978,893-byte record, metadata array of 20 individually bounded strings | 1,177.6 | 1,177.6 | 33 |
+| Nested extension raw value, 20,971,600 bytes | 1,976 | 1,976 | 62 |
+| Nested annotation raw value, 20,971,583 bytes | 1,817.6 | 1,816 | 56 |
+| Visual configuration, 18,067 bytes | 1,232 | 1,232 | 40 |
+| Audio configuration, 18,066 bytes | 1,248 | 1,248 | 41 |
+| Wrong Document container, about 20 MiB | 680 | 680 | 12 |
+| Unknown root / Document case alias, about 20 MiB | 776 | 776 | 18 |
+
+Each hostile input checked the expected error class and a zero Environment from full Decode, as
+well as direct preflight rejection. Independent exact-boundary tests admitted a complete raw leaf
+at 1 MiB and rejected N+1, including nested annotation values; visual/audio configuration spans
+admitted 16 KiB and rejected N+1. These local boundary objects prove preflight limits, not complete
+Document/manifest semantic validity. Source inspection confirmed scanning occurs before typed shape
+allocation, propagates concrete envelope types into nested raw leaves, and applies S2's stricter
+program configuration limit before reading its JSON tokens.
+
+These are warmed allocation increments, not peak RSS, cold-start costs or cross-platform bounds.
+Lexical validation still scans input bytes and consumes input-proportional CPU. The old implementation
+was not checked out to remeasure its historical approximately 445 MB allocation. The current independent
+measurement is distinct from the implementer's earlier 1,184-byte observation.
+
+### Strictness, identity and failure-zero review
+
+Inspection and supplemental tests covered duplicate members, unknown/case-aliased nested fields,
+wrong containers, and cancellation returning zero values from Decode/Canonical/New/Verify. Document
+raw numeric lexemes `1.2300`, `1e+009`, `9007199254740993`, integers above 64-bit range and `-0`
+are intentionally preserved; their acceptance is not a canonical-profile defect. Plan/manifest typed
+integer profiles remain strict. Joint verification rechecks canonical Document hash, plan/manifest
+identities, S1 re-resolution and S2 plan-derived selections. Existing hostile wire, resigned mismatch,
+limits, late cancellation and unformattable panic tests passed. Schema validates structure; byte-level
+duplicate detection, resource admission and semantic/hash consistency remain codec responsibilities.
+
+Independent commands, all passed:
+
+```sh
+go test ./render/prepared ./core/renderplanv2 ./render/api ./conformance -count=1
+go test -race ./render/prepared ./core/renderplanv2 ./render/api ./conformance -count=1
+go vet ./render/prepared ./core/renderplanv2 ./render/api ./conformance
+go test -overlay /tmp/cutly-codec-independent.3uwDsj/overlay.json ./render/prepared -run '^TestIndependent' -count=1 -v
+go test -race -overlay /tmp/cutly-codec-independent.3uwDsj/overlay.json ./render/prepared -run '^TestIndependent' -count=1
+go vet -overlay /tmp/cutly-codec-independent.3uwDsj/overlay.json ./render/prepared
+```
+
+Audited SHA-256 values, independently rechecked unchanged after review:
+
+| File | SHA-256 |
+| --- | --- |
+| `render/prepared/codec_v2.go` | `b96ac3856316da17b4974d2159b8f7780fe3635764b4f8c31f1dcab52bcec431` |
+| `render/prepared/scan_v2.go` | `e7a659aa8823d2e71b96539b277b26501307ba931d02e9c05ac6dd1944f62030` |
+| `render/prepared/model_v2.go` | `972c5b150e8ec49925570db6cfb05122b0179e223eaf6319f7b2d5cb8b5269c0` |
+| `render/prepared/codec_v2_test.go` | `8e6309e9389014ae1ca3a01e199094a4555e21f484f9f092ff11d4080a797fe3` |
+| `conformance/prepared_documentv2_test.go` | `dfb59b868f634c1c5760605be6edf720610f7f315a9981ba57a3bad19ec6e24f` |
+| `schemas/cutly.prepared-environment.document-v2.v2.schema.json` | `5d64a77c0397ee6cc58ee2e889208eb3ffc9033dec1254c0e448423c731b9852` |
+
+The continuation parent also verified that font adapter, preflight and mixed restart test hashes still
+match their prior reviewed identities. FontAdapter race tests passed ten repetitions; S3-related
+package normal/race/vet, full repository vet/tidy, TypeScript SDK tests and both legacy daemon real
+media acceptance tests passed. The mixed fresh-process restart parent test passed; its helper's
+standalone skip is intentional because the parent launches it with the durable-environment key.
+Full repository `go test -count=1 ./...` (`b70l4gi00`) and `go test -race -count=1 ./...`
+(`b5js1q47s`) also passed after this review attempt began. Source state still includes the preserved
+deferred archive work; none of this is fixed-clean-revision release acceptance, cross-platform runtime
+acceptance, or delivery of S4-S6. The codec independent-review blocker is closed; stage-level exit
+evidence must consolidate the separately reviewed S3 boundaries rather than treat this codec-only
+review as a new whole-stage audit.

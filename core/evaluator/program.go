@@ -95,11 +95,15 @@ func compileFrozenSelection(
 	diagnostics []documentv2.Diagnostic,
 	scope *DomainScope,
 ) (*Program, []documentv2.Diagnostic) {
-	var selected map[documentv2.ID]struct{}
+	var selected, selectedTransitions map[documentv2.ID]struct{}
 	if scope != nil {
 		selected = make(map[documentv2.ID]struct{}, len(scope.Selection.ClipIDs))
 		for _, id := range scope.Selection.ClipIDs {
 			selected[id] = struct{}{}
+		}
+		selectedTransitions = make(map[documentv2.ID]struct{}, len(scope.Selection.TransitionIDs))
+		for _, id := range scope.Selection.TransitionIDs {
+			selectedTransitions[id] = struct{}{}
 		}
 	}
 	assets := make(map[documentv2.ID]documentv2.Asset, len(frozen.Assets))
@@ -188,8 +192,16 @@ func compileFrozenSelection(
 			if err := checkpoint(); err != nil {
 				return nil, append(diagnostics, compileDiagnostic(err))
 			}
+			if scope != nil {
+				if _, authorized := selectedTransitions[transition.ID]; !authorized {
+					continue
+				}
+			}
 			outgoing := clipIndex[transition.OutgoingClipID]
 			incoming := clipIndex[transition.IncomingClipID]
+			if outgoing == nil || incoming == nil {
+				return nil, append(diagnostics, compileDiagnostic(ErrProgramLookup))
+			}
 			cut, cutErr := outgoing.timelineRange.End()
 			if cutErr != nil {
 				return nil, append(diagnostics, compileDiagnostic(cutErr))

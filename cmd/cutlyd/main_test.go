@@ -21,7 +21,9 @@ import (
 
 	"github.com/CutlyLab/Cutly/agent/httpapi"
 	agentprotocol "github.com/CutlyLab/Cutly/agent/protocol"
+	"github.com/CutlyLab/Cutly/agent/protocolv2"
 	"github.com/CutlyLab/Cutly/agent/router"
+	"github.com/CutlyLab/Cutly/agent/routerv2"
 	"github.com/CutlyLab/Cutly/core/videoedit"
 	renderapi "github.com/CutlyLab/Cutly/render/api"
 )
@@ -131,6 +133,37 @@ func TestMuxHealthAndCapabilities(t *testing.T) {
 	var receipt map[string]any
 	if err := json.Unmarshal(result.Receipt, &receipt); err != nil || receipt["profile"] != "cutly.agent-capabilities.v1" {
 		t.Fatalf("receipt = %s, err = %v", result.Receipt, err)
+	}
+}
+
+func TestMuxExposesIndependentDocumentV2Agent(t *testing.T) {
+	legacy, err := router.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	v2, err := routerv2.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	mux := newMux(&applicationHandler{legacy: legacy, v2: v2})
+	raw, err := protocolv2.CanonicalRequest(context.Background(), protocolv2.Request{
+		SchemaVersion: protocolv2.SchemaVersion, Profile: protocolv2.RequestProfile,
+		RequestID: "doctor-v2", Tool: protocolv2.ToolProject, Action: "capabilities", ProjectID: "project",
+		PayloadProfile: protocolv2.PayloadProfile(protocolv2.ToolProject, "capabilities"), Payload: json.RawMessage(`{}`),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(http.MethodPost, "http://cutly.invalid/v2/agent", strings.NewReader(string(raw)))
+	request.Header.Set("Content-Type", protocolv2.MediaType)
+	response := httptest.NewRecorder()
+	mux.ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("v2 agent=%d %s", response.Code, response.Body.String())
+	}
+	result, err := protocolv2.DecodeResult(context.Background(), response.Body.Bytes())
+	if err != nil || !result.OK || result.Profile != protocolv2.ResultProfile {
+		t.Fatalf("result=%+v err=%v", result, err)
 	}
 }
 

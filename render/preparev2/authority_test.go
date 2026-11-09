@@ -16,6 +16,7 @@ import (
 	"github.com/CutlyLab/Cutly/core/documentv2"
 	"github.com/CutlyLab/Cutly/core/renderplanv2"
 	"github.com/CutlyLab/Cutly/core/videoedit"
+	"github.com/CutlyLab/Cutly/internal/buildidentity"
 	"github.com/CutlyLab/Cutly/protocol/canonicaljson"
 	renderapi "github.com/CutlyLab/Cutly/render/api"
 )
@@ -196,6 +197,36 @@ func TestHostConstructionFailureZero(t *testing.T) {
 	}
 	if got, err := host.Authorize(ctx, doc, renderapi.RenderRequestV2{}); err == nil || got.Valid() {
 		t.Fatal("panic published request")
+	}
+}
+
+func TestProviderBindingDoesNotRequireSelfReferentialReleasePin(t *testing.T) {
+	if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
+		t.Skip("native provider measurement supported only on macOS/Linux")
+	}
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	executable := filepath.Join(root, "already-launched-provider")
+	if err = os.WriteFile(executable, []byte("measured child bytes\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	identity, err := buildidentity.MeasureProviderExecutableBinding(context.Background(), executable)
+	if err != nil {
+		t.Fatal(err)
+	}
+	config := Config{
+		ProviderExecutable:    executable,
+		AllowLocalDevelopment: false,
+		CompilerBuild:         hash("1"),
+		EvaluatorBuild:        hash("2"),
+	}
+	if authority, err := NewWithProviderBinding(context.Background(), config, identity); err != nil || authority == nil || authority.provider != identity.Digest() {
+		t.Fatalf("measured child binding rejected: authority=%v err=%v", authority, err)
+	}
+	if authority, err := New(context.Background(), config); err == nil || authority != nil {
+		t.Fatal("development host policy unexpectedly authorized packaged launch configuration")
 	}
 }
 

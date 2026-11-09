@@ -1,0 +1,162 @@
+{
+  "aggregate": {
+    "audio": {
+      "chunk_count": 1,
+      "domain": "cutly.decoded-audio.pcm-s16le.interleaved.v1",
+      "range": {
+        "count": 24000,
+        "first": 240000
+      },
+      "root_hash": "sha256:28b641f276366f08a817e589ae7c20158b3ae9fac1cf10001407a45c9035331a",
+      "unit_bytes": 4
+    },
+    "profile": "cutly.render.reference-chunk-aggregate-binding.document-v2.v2",
+    "resume_mode": "pre-codec-chunks-resume-final-codec-restarts.document-v2.v2",
+    "video": {
+      "chunk_count": 1,
+      "domain": "cutly.surface.linear-bt709-premultiplied-rgba16.v1",
+      "range": {
+        "count": 12,
+        "first": 120
+      },
+      "root_hash": "sha256:2edeb61a649c4a628ddbf404ca2d146f05d0c29aeba3c3ca5da1e9460fb64f51",
+      "unit_bytes": 16588800
+    }
+  },
+  "artifact_uri": "file:///controlled/document-v2.mp4",
+  "audio": [
+    {
+      "cache_key": {
+        "artifact_kind": "cutly.chunk.audio.v2",
+        "digest": "sha256:555a474a0f1c4315991bd44988d3fb234798700e94af6b38d396d395a0dc0f3c",
+        "namespace": "cutly.conformance.document-v2.v2",
+        "profile": "cutly.cache.stage-key.v1",
+        "schema_version": 1
+      },
+      "content_hash": "sha256:aa813922d39c90cc19980e85d3b69dfb4fe137c6747bb581814e8011577ad9c2",
+      "domain": "cutly.decoded-audio.pcm-s16le.interleaved.v1",
+      "range": {
+        "count": 24000,
+        "first": 240000
+      },
+      "size_bytes": 96000,
+      "task_id": "audio-00000",
+      "unit_bytes": 4
+    }
+  ],
+  "canonical_json_profile": "cutly.json.canonical-integer.v1",
+  "deterministic_seed": 0,
+  "document_hash": "sha256:7db1e055bfff8d389fa78ba9c05edc1fdcedbe00d48741e246eded6decddbc20",
+  "execution_manifest_fingerprint": "sha256:907c821c0c6014f06841c5ed927aaea2ad3b4c1ed5fffedd579fe7fe147c06ac",
+  "fingerprint": "sha256:239b17fb5485ef378bd652f599f6e52dff9dec73564f05a6ba119fa0aa93eaac",
+  "frame_range": {
+    "count": 12,
+    "first": 120
+  },
+  "job_id": "document-v2-conformance",
+  "media_runtime": {
+    "color_profile": "conformance.color.v1",
+    "decoder_profile": "conformance.decoder.v1",
+    "encoder_profile": "conformance.encoder.v1",
+    "ffmpeg_build": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+    "text_shaper_build": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "output": {
+    "audio_codec": "conformance-audio",
+    "channels": 2,
+    "color_space": "linear-srgb",
+    "decoded_audio_profile": "cutly.decoded-audio.pcm-s16le.interleaved.v1",
+    "decoded_video_profile": "cutly.decoded-video.rgba8.interleaved.top-down.tight.v1",
+    "format": "mp4",
+    "frame_clock": {
+      "frames_per_second": {
+        "rate": 1,
+        "value": 24
+      },
+      "origin": {
+        "rate": 1,
+        "value": -1
+      }
+    },
+    "height": 1080,
+    "intermediate": {
+      "audio_block_profile": "cutly.decoded-audio.pcm-s16le.interleaved.v1",
+      "video_surface_profile": "cutly.surface.linear-bt709-premultiplied-rgba16.v1"
+    },
+    "pixel_format": "rgba16",
+    "reference_profile": "cutly.output.document-v2.v2",
+    "sample_clock": {
+      "origin": {
+        "rate": 1,
+        "value": -1
+      },
+      "samples_per_second": 48000
+    },
+    "sample_rate": 48000,
+    "video_codec": "conformance-video",
+    "width": 1920
+  },
+  "plan_fingerprint": "sha256:58781a1dc5e1c615bee3880816c0b147d84f85eb10f69ce4939f6b406f6e5ea4",
+  "profile": "cutly.render.reference-chunk-assembly.document-v2.v2",
+  "provider_executable_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+  "sample_range": {
+    "count": 24000,
+    "first": 240000
+  },
+  "schema_version": 2,
+  "target": {
+    "channels": 2,
+    "color_space": "linear-srgb",
+    "frame_clock": {
+      "frames_per_second": {
+        "rate": 1,
+        "value": 24
+      },
+      "origin": {
+        "rate": 1,
+        "value": -1
+      }
+    },
+    "height": 1080,
+    "pixel_format": "rgba16",
+    "sample_clock": {
+      "origin": {
+        "rate": 1,
+        "value": -1
+      },
+      "samples_per_second": 48000
+    },
+    "timeline_id": "main",
+    "width": 1920
+  },
+  "timeline_range": {
+    "duration": {
+      "rate": 2,
+      "value": 1
+    },
+    "start": {
+      "rate": 1,
+      "value": 4
+    }
+  },
+  "video": [
+    {
+      "cache_key": {
+        "artifact_kind": "cutly.chunk.video.v2",
+        "digest": "sha256:02a863b2c12aee6674b5af23508b7e552372ab44545451b7cb5f0f73ae1118c3",
+        "namespace": "cutly.conformance.document-v2.v2",
+        "profile": "cutly.cache.stage-key.v1",
+        "schema_version": 1
+      },
+      "content_hash": "sha256:6d33f451f7b24c880de767592d41cdc49bffe745150e80c926ba8857a85309bf",
+      "domain": "cutly.surface.linear-bt709-premultiplied-rgba16.v1",
+      "range": {
+        "count": 12,
+        "first": 120
+      },
+      "size_bytes": 199065600,
+      "task_id": "video-00000",
+      "unit_bytes": 16588800
+    }
+  ]
+}

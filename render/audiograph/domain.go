@@ -151,11 +151,21 @@ func PreflightDomain(ctx context.Context, original documentv2.Document, scope ev
 }
 
 func preflightDomain(ctx context.Context, original documentv2.Document, scope evaluator.DomainScope, offered videoedit.BackendCapabilities, requested Limits) (*evaluator.DomainProgram, *evaluator.FrozenSnapshot, Limits, []documentv2.Diagnostic) {
+	return preflightDomainVersion(ctx, original, scope, offered, requested, false)
+}
+
+func preflightDomainVersion(ctx context.Context, original documentv2.Document, scope evaluator.DomainScope, offered videoedit.BackendCapabilities, requested Limits, v2 bool) (*evaluator.DomainProgram, *evaluator.FrozenSnapshot, Limits, []documentv2.Diagnostic) {
+	invalid := domainInvalid
+	compileSnapshot := evaluator.CompileDomainSnapshot
+	if v2 {
+		invalid = domainInvalidV2
+		compileSnapshot = evaluator.CompileDomainSnapshotV2
+	}
 	fail := func(d []documentv2.Diagnostic) (*evaluator.DomainProgram, *evaluator.FrozenSnapshot, Limits, []documentv2.Diagnostic) {
 		return nil, nil, Limits{}, d
 	}
 	if ctx == nil {
-		return fail(domainInvalid("non-nil context is required"))
+		return fail(invalid("non-nil context is required"))
 	}
 	if ctx.Err() != nil {
 		return fail([]documentv2.Diagnostic{domainCanceledDiagnostic()})
@@ -169,14 +179,14 @@ func preflightDomain(ctx context.Context, original documentv2.Document, scope ev
 		return fail(diagnostics)
 	}
 	if scope.Domain != evaluator.DomainAudio {
-		return fail(domainInvalid("audio domain is required"))
+		return fail(invalid("audio domain is required"))
 	}
-	authority, snapshot, diagnostics := evaluator.CompileDomainSnapshot(ctx, original, scope, offered, evaluator.SnapshotLimits{MaxCanonicalDocumentBytes: limits.MaxCanonicalDocumentBytes, MaxDocumentNodes: uint64(limits.MaxDocumentNodes)})
+	authority, snapshot, diagnostics := compileSnapshot(ctx, original, scope, offered, evaluator.SnapshotLimits{MaxCanonicalDocumentBytes: limits.MaxCanonicalDocumentBytes, MaxDocumentNodes: uint64(limits.MaxDocumentNodes)})
 	if authority == nil || snapshot == nil || documentv2.HasErrorDiagnostics(diagnostics) {
 		return fail(diagnostics)
 	}
-	if len(original.AudioBuses) != 0 {
-		return fail(domainInvalid("audio domain v1 does not support AudioBuses"))
+	if !v2 && len(original.AudioBuses) != 0 {
+		return fail(invalid("audio domain v1 does not support AudioBuses"))
 	}
 	selected := make(map[documentv2.ID]bool, len(scope.Selection.ClipIDs))
 	for _, id := range scope.Selection.ClipIDs {
@@ -202,7 +212,11 @@ func preflightDomain(ctx context.Context, original documentv2.Document, scope ev
 				}
 				equal, err := cl.SourceRange.Duration.Compare(cl.TimelineRange.Duration)
 				if err != nil || equal != 0 {
-					return fail(domainInvalid("audio domain v1 requires unit speed"))
+					message := "audio domain v1 requires unit speed"
+					if v2 {
+						message = "audio domain v2 requires unit speed"
+					}
+					return fail(invalid(message))
 				}
 				if cl.PropertySet != nil {
 					for _, x := range cl.PropertySet.Extensions {
@@ -210,7 +224,11 @@ func preflightDomain(ctx context.Context, original documentv2.Document, scope ev
 							return fail([]documentv2.Diagnostic{domainCanceledDiagnostic()})
 						}
 						if x.AffectsRendering {
-							return fail(domainInvalid("audio domain v1 has no rendering extension consumer"))
+							message := "audio domain v1 has no rendering extension consumer"
+							if v2 {
+								message = "audio domain v2 has no rendering extension consumer"
+							}
+							return fail(invalid(message))
 						}
 					}
 				}
@@ -225,15 +243,23 @@ func preflightDomain(ctx context.Context, original documentv2.Document, scope ev
 
 // CompileDomain uses the independently checked full-document evaluator snapshot. Inputs must not
 // be mutated concurrently with compilation; after return no caller mutable storage is retained.
-func CompileDomain(ctx context.Context, original documentv2.Document, scope evaluator.DomainScope, options CompileOptions) (result *DomainProgram, diagnostics []documentv2.Diagnostic) {
+func CompileDomain(ctx context.Context, original documentv2.Document, scope evaluator.DomainScope, options CompileOptions) (*DomainProgram, []documentv2.Diagnostic) {
+	return compileDomainVersion(ctx, original, scope, options, false)
+}
+
+func compileDomainVersion(ctx context.Context, original documentv2.Document, scope evaluator.DomainScope, options CompileOptions, v2 bool) (result *DomainProgram, diagnostics []documentv2.Diagnostic) {
+	invalid, panicCode := domainInvalid, CodeDomainPanic
+	if v2 {
+		invalid, panicCode = domainInvalidV2, CodeDomainPanicV2
+	}
 	defer func() {
 		if recover() != nil {
 			result = nil
-			diagnostics = []documentv2.Diagnostic{compileDiagnostic(CodeDomainPanic, "/", "audio domain compilation panicked")}
+			diagnostics = []documentv2.Diagnostic{compileDiagnostic(panicCode, "/", "audio domain compilation panicked")}
 		}
 	}()
 	if ctx == nil {
-		return nil, domainInvalid("non-nil context is required")
+		return nil, invalid("non-nil context is required")
 	}
 	if ctx.Err() != nil {
 		return nil, []documentv2.Diagnostic{domainCanceledDiagnostic()}
@@ -252,10 +278,10 @@ func CompileDomain(ctx context.Context, original documentv2.Document, scope eval
 	// Admit complete binding strings as well as manifests before freeze, hashing or copying.
 	for _, b := range options.Bindings {
 		if _, err := preflightValueLimitsContext(ctx, b, uint64(limits.MaxProbeStreamsPerBinding)*16+128, limits.MaxCanonicalManifestBytes); err != nil {
-			return nil, domainInvalid("binding admission failed")
+			return nil, invalid("binding admission failed")
 		}
 	}
-	authority, snapshot, limits, diagnostics := preflightDomain(ctx, original, scope, options.Offered, limits)
+	authority, snapshot, limits, diagnostics := preflightDomainVersion(ctx, original, scope, options.Offered, limits, v2)
 	if authority == nil || snapshot == nil || documentv2.HasErrorDiagnostics(diagnostics) {
 		return nil, diagnostics
 	}
@@ -278,6 +304,19 @@ func CompileDomain(ctx context.Context, original documentv2.Document, scope eval
 		indexes[a.ID] = i
 	}
 	needed := make(map[documentv2.ID]bool)
+	var buses []compiledBus
+	masterBus := -1
+	if v2 {
+		var err error
+		buses, masterBus, err = compileDomainBuses(ctx, original, scope, selected)
+		if err != nil {
+			return nil, []documentv2.Diagnostic{domainCanceledDiagnostic()}
+		}
+	}
+	busIndexes := make(map[documentv2.ID]int, len(buses))
+	for i, bus := range buses {
+		busIndexes[bus.id] = i
+	}
 	compiled := compiledTimeline{}
 	for ti, tl := range original.Timelines {
 		if ctx.Err() != nil {
@@ -295,6 +334,9 @@ func CompileDomain(ctx context.Context, original documentv2.Document, scope eval
 				continue
 			}
 			track := compiledTrack{id: tr.ID, index: tri, busIndex: -1}
+			if index, exists := busIndexes[tr.AudioBusID]; exists {
+				track.busIndex = index
+			}
 			for ci, cl := range tr.Clips {
 				if ctx.Err() != nil {
 					return nil, []documentv2.Diagnostic{domainCanceledDiagnostic()}
@@ -324,7 +366,7 @@ func CompileDomain(ctx context.Context, original documentv2.Document, scope eval
 			return nil, []documentv2.Diagnostic{domainCanceledDiagnostic()}
 		}
 		if !needed[b.AssetID] {
-			return nil, domainInvalid("binding does not belong to a selected audio asset")
+			return nil, invalid("binding does not belong to a selected audio asset")
 		}
 	}
 	bindings := compileBindingsContext(ctx, options.Bindings, assets, limits, &diagnostics)
@@ -359,17 +401,22 @@ func CompileDomain(ctx context.Context, original documentv2.Document, scope eval
 	if documentv2.HasErrorDiagnostics(diagnostics) {
 		return nil, diagnostics
 	}
-	graph := &Program{documentHash: snapshot.DocumentHash(), evaluator: authority, bindings: bindings, timelines: map[documentv2.ID]compiledTimeline{compiled.id: compiled}, masterBus: -1, limits: limits}
+	graph := &Program{documentHash: snapshot.DocumentHash(), evaluator: authority, bindings: bindings, timelines: map[documentv2.ID]compiledTimeline{compiled.id: compiled}, buses: buses, masterBus: masterBus, limits: limits}
 	receipt := DomainCompileReceipt{SchemaVersion: 1, Profile: DomainCompileProfileV1, DocumentHash: graph.documentHash, Scope: scope, Limits: limits, Offered: options.Offered}
-	var err error
-	if receipt.DomainDescriptorHash, err = domainHash(DomainDescriptor()); err != nil {
-		return nil, domainInvalid("descriptor identity failed")
+	domainDescriptor, evaluatorDescriptor := DomainDescriptor(), evaluator.DomainSnapshotDescriptor()
+	if v2 {
+		receipt.SchemaVersion, receipt.Profile = 2, DomainCompileProfileV2
+		domainDescriptor, evaluatorDescriptor = DomainDescriptorV2(), evaluator.DomainSnapshotDescriptorV2()
 	}
-	if receipt.EvaluatorDescriptorHash, err = domainHash(evaluator.DomainSnapshotDescriptor()); err != nil {
-		return nil, domainInvalid("descriptor identity failed")
+	var err error
+	if receipt.DomainDescriptorHash, err = domainHash(domainDescriptor); err != nil {
+		return nil, invalid("descriptor identity failed")
+	}
+	if receipt.EvaluatorDescriptorHash, err = domainHash(evaluatorDescriptor); err != nil {
+		return nil, invalid("descriptor identity failed")
 	}
 	if receipt.DSPDescriptorHash, err = domainHash(Descriptor()); err != nil {
-		return nil, domainInvalid("descriptor identity failed")
+		return nil, invalid("descriptor identity failed")
 	}
 	ids := make([]documentv2.ID, 0, len(bindings))
 	for id := range bindings {
@@ -389,15 +436,15 @@ func CompileDomain(ctx context.Context, original documentv2.Document, scope eval
 		Sources []DomainSourceReceipt         `json:"sources,omitempty"`
 	}{limits, options.Offered, receipt.Sources})
 	if err != nil {
-		return nil, domainInvalid("config identity failed")
+		return nil, invalid("config identity failed")
 	}
 	receipt.ReceiptHash, err = domainHash(receipt)
 	if err != nil {
-		return nil, domainInvalid("receipt identity failed")
+		return nil, invalid("receipt identity failed")
 	}
 	encoded, err := videoedit.CanonicalJSON(receipt)
 	if err != nil {
-		return nil, domainInvalid("receipt freeze failed")
+		return nil, invalid("receipt freeze failed")
 	}
 	if ctx.Err() != nil {
 		return nil, []documentv2.Diagnostic{domainCanceledDiagnostic()}

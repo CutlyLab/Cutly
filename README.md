@@ -32,11 +32,12 @@ versioned Document IR. Agents edit that document through reviewable
 transactions; renderers consume frozen plans and emit evidence-bound
 artifacts.
 
-The current `0.1.0-rc.1` source includes a production-tested **restricted
-hard-cut path** plus deterministic native reference renderers for images,
-vectors, static text, and audio. The broader Document v2 mixed-media runtime
-is being delivered in audited stages. See [Current Status](#current-status)
-before choosing a production profile.
+The current `0.1.0-rc.1` source includes the frozen restricted hard-cut path
+and the standalone Document v2 SDK: typed durable edits, native mixed-media
+providers, isolated workers, chunk cache/recovery, H.264/AAC assembly,
+Evidence v2, Go/TypeScript clients, CLI, Agent v2, and headless Player/UI
+primitives. Production use still requires an owner-approved signed media
+runtime and the release acceptance described in [RELEASING.md](RELEASING.md).
 
 > [!IMPORTANT]
 > Cutly is not yet a general nonlinear editor. Unsupported semantics fail
@@ -65,7 +66,7 @@ go build -o ./bin/cutlyd ./cmd/cutlyd
 Expected version output:
 
 ```text
-cutly 0.1.0-rc.1 (agent protocol v1)
+cutly 0.1.0-rc.1 (Document v2 Agent schema 2; legacy Agent protocol v1)
 ```
 
 ### Verify the SDK
@@ -104,7 +105,8 @@ inspect → plan typed transaction → review diff → apply by transaction ID
 ```
 
 Once `cutlyd` is running, Go, TypeScript, CLI, or any HTTP-capable agent can
-use the same bounded Agent protocol at `/v1/agent`.
+use the Document v2 Agent protocol at `/v2/agent`. The frozen restricted
+profile remains available explicitly at `/v1/agent`.
 
 Try a request like:
 
@@ -169,8 +171,9 @@ canonical integer JSON.
 | Reference audio | **Available as deterministic reference stages** | Exact AudioGraph, WAV source, PCM16LE quantization, deterministic WAV |
 | Document v2 semantic RenderPlan | **Implemented and audited** | Additive `core/renderplanv2`; fixed schemas, fixtures, hostile corpus, cross-target gates |
 | Document v2 ExecutionManifest/RenderRequest | **Implemented; final independent audit pending** | Portable identity and host authorization exist; do not enter restart reconstruction yet |
-| General mixed video/audio Document v2 export | **In progress** | Native temporal video providers, Prepared v2, chunk assembly, and Evidence v2 remain roadmap stages |
-| Public Document v2 edit/render SDKs | **Planned** | Current public edit/render lifecycle is the restricted RC profile |
+| General mixed video/audio Document v2 export | **Implemented; release trust pending** | Temporal video/image/vector/text/audio providers, Prepared v2, chunk workers, H.264/AAC assembly and Evidence v2 |
+| Public Document v2 edit/render SDKs | **Implemented** | Go/TypeScript APIs, default-v2 CLI, `/v2/agent`, strict fixtures and durable project edits |
+| Document v2 Player/UI | **Implemented headlessly** | Exact audio-master player, bound frame/audio preview adapters and immutable mixed-media timeline primitives |
 | Optional browser/WebLayer | **Deferred** | Native rendering remains the default; browser layers are a later isolated capability |
 
 Stage evidence is recorded in
@@ -243,15 +246,15 @@ import (
 )
 
 func main() {
-    transport, err := cutly.NewHTTPTransport(
-        "http://127.0.0.1:9817/v1/agent",
+    transport, err := cutly.NewAgentHTTPTransportV2(
+        "http://127.0.0.1:9817/v2/agent",
         nil,
     )
     if err != nil {
         log.Fatal(err)
     }
 
-    client, err := cutly.NewClient(transport)
+    client, err := cutly.NewAgentClientV2(transport)
     if err != nil {
         log.Fatal(err)
     }
@@ -274,10 +277,10 @@ frame, render, status, and receipt-validation examples.
 ## TypeScript SDK
 
 ```js
-import { CutlyClient, HTTPAgentTransport } from "@cutly/sdk";
+import { CutlyAgentV2Client, HTTPAgentV2Transport } from "@cutly/sdk";
 
-const client = new CutlyClient(
-  new HTTPAgentTransport("http://127.0.0.1:9817/v1/agent"),
+const client = new CutlyAgentV2Client(
+  new HTTPAgentV2Transport("http://127.0.0.1:9817/v2/agent"),
 );
 
 const result = await client.inspectProject({
@@ -299,6 +302,9 @@ published yet. See the [TypeScript SDK guide](sdk/typescript/README.md) and
 | [Examples](examples/README.md) | Complete Go and TypeScript RC render flows |
 | [Known limitations](KNOWN_LIMITATIONS.md) | Exact supported and rejected media semantics |
 | [Compatibility](docs/COMPATIBILITY.md) | Wire-version, SemVer, and deprecation policy |
+| [Document v2 API](docs/API_DOCUMENT_V2.md) | Go, TypeScript, CLI and Agent v2 public surface |
+| [Migration](docs/MIGRATING_TO_DOCUMENT_V2.md) | Explicit v1-to-v2 project, edit, render and client migration |
+| [Codec/runtime policy](docs/CODEC_AND_RUNTIME_POLICY.md) | Signed runtime, codec and redistribution boundary |
 | [Document v2 roadmap](docs/DOCUMENT_V2_NATIVE_SDK_ROADMAP.md) | Dependency-ordered path to the broad native SDK |
 | [M4 release readiness](docs/M4_RELEASE_READINESS.md) | Restricted RC acceptance evidence and external release gates |
 | [Schema catalog](schemas/README.md) | Public JSON Schemas and conformance inventory |

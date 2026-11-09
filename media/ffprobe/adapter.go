@@ -277,6 +277,12 @@ func (adapter *Adapter) Probe(ctx context.Context, request Request) (
 type argumentBuilder func(Options, string) []string
 
 func (adapter *Adapter) runProbeCommand(ctx context.Context, input *materializedInput, arguments argumentBuilder) ([]byte, error) {
+	return adapter.runProbeCommandChecked(ctx, input, arguments, false)
+}
+
+// A complete semantic scan cannot publish evidence after a decoder reports an
+// error, even when FFprobe exits zero. Legacy Probe retains its existing policy.
+func (adapter *Adapter) runProbeCommandChecked(ctx context.Context, input *materializedInput, arguments argumentBuilder, rejectDiagnostics bool) ([]byte, error) {
 	inputArgument, extraFiles, err := inheritedInputBinding(input)
 	if err != nil {
 		return nil, err
@@ -295,7 +301,7 @@ func (adapter *Adapter) runProbeCommand(ctx context.Context, input *materialized
 	if stdout.exceeded || stderr.exceeded {
 		return nil, fmt.Errorf("%w: stdout=%t stderr=%t", ErrOutputLimit, stdout.exceeded, stderr.exceeded)
 	}
-	if runErr != nil {
+	if runErr != nil || (rejectDiagnostics && stderr.buffer.Len() != 0) {
 		return nil, fmt.Errorf("%w: %v: %s", ErrCommand, runErr, strings.TrimSpace(stderr.String()))
 	}
 	return append([]byte(nil), stdout.Bytes()...), nil
