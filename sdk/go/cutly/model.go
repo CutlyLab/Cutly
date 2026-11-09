@@ -26,6 +26,15 @@ type FrameClock = videoedit.FrameClock
 type SampleClock = videoedit.SampleClock
 type RationalTime = videoedit.RationalTime
 type TimeRange = videoedit.TimeRange
+type Rational = documentv2.Rational
+type Point = documentv2.Point
+type Rect = documentv2.Rect
+type ColorRGBA16 = documentv2.ColorRGBA16
+type Asset = documentv2.Asset
+type Track = documentv2.Track
+type Clip = documentv2.Clip
+type Transition = documentv2.Transition
+type AudioBus = documentv2.AudioBus
 
 const DocumentSchemaVersion = documentv2.SchemaVersion
 
