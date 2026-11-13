@@ -451,7 +451,7 @@ func roundRatioUint16Even(numerator, denominator uint64) (uint16, error) {
 	return uint16(quotient), nil
 }
 
-// WipeLeft produces the wipe transition: the incoming surface reveals from right to left
+// WipeLeft produces the wipe transition: the incoming surface reveals from left to right
 // with a hard edge at the given exact progress (0 = all outgoing, 1 = all incoming).
 func WipeLeft(outgoing, incoming *Surface, progress evaluator.ExactRational) (*Surface, error) {
 	if err := matchingSurfaces(outgoing, incoming); err != nil {
@@ -465,18 +465,8 @@ func WipeLeft(outgoing, incoming *Surface, progress evaluator.ExactRational) (*S
 	if err != nil {
 		return nil, err
 	}
-	width := outgoing.width
-	boundary := int64(width)
-	if fraction.numerator.IsInt64() && fraction.denominator.IsInt64() && fraction.denominator.Int64() > 0 {
-		boundary = int64(width) * fraction.numerator.Int64() / fraction.denominator.Int64()
-	}
-	for index := range outgoing.pixels {
-		x := index % width
-		if int64(x) < boundary {
-			output.pixels[index] = incoming.pixels[index]
-		} else {
-			output.pixels[index] = outgoing.pixels[index]
-		}
+	if err := wipeLeftPixels(output, outgoing, incoming, fraction); err != nil {
+		return nil, err
 	}
 	return output, nil
 }
@@ -495,54 +485,90 @@ func FadeThroughBlack(outgoing, incoming *Surface, progress evaluator.ExactRatio
 	if err != nil {
 		return nil, err
 	}
-	black := Pixel{}
-	// Determine which half of the fade we're in
-	half := new(big.Int).Rsh(&fraction.denominator, 1)
-	incomingSide := fraction.numerator.Cmp(half) > 0
-	if !incomingSide {
-		// Fading outgoing to black
-		weight := new(big.Int).Lsh(&fraction.numerator, 1) // 0..denominator
-		scale := exactWeight{numerator: *new(big.Int).Sub(&fraction.denominator, weight), denominator: fraction.denominator}
-		for index := range outgoing.pixels {
-			pixel, err := scalePixel(outgoing.pixels[index], scale)
-			if err != nil {
-				return nil, kernelError(CodeInvalidWeight, fmt.Sprintf("fade/pixels/%d", index), err)
-			}
-			output.pixels[index] = pixel
-		}
-	} else {
-		// Fading in from black
-		weight := new(big.Int).Lsh(&fraction.numerator, 1)
-		weight.Sub(weight, &fraction.denominator) // 0..denominator
-		scale := exactWeight{numerator: *weight, denominator: fraction.denominator}
-		for index := range incoming.pixels {
-			pixel, err := scalePixel(incoming.pixels[index], scale)
-			if err != nil {
-				return nil, kernelError(CodeInvalidWeight, fmt.Sprintf("fade/pixels/%d", index), err)
-			}
-			output.pixels[index] = pixel
-		}
+	if err := fadeThroughBlackPixels(output, outgoing, incoming, fraction); err != nil {
+		return nil, err
 	}
-	_ = black
 	return output, nil
 }
 
-// WipeLeftInto is WipeLeft in place into target.
+// WipeLeftInto is the allocation-free form of WipeLeft. Target may alias either input.
 func WipeLeftInto(target, outgoing, incoming *Surface, progress evaluator.ExactRational) error {
-	result, err := WipeLeft(outgoing, incoming, progress)
+	if err := matchingSurfaces(outgoing, incoming); err != nil {
+		return err
+	}
+	if err := matchingSurfaces(target, outgoing); err != nil {
+		return err
+	}
+	fraction, err := readWeight(progress, "wipe.progress")
 	if err != nil {
 		return err
 	}
-	copy(target.pixels, result.pixels)
+	return wipeLeftPixels(target, outgoing, incoming, fraction)
+}
+
+// FadeThroughBlackInto is the allocation-free form of FadeThroughBlack. Target may alias either
+// input because every output pixel depends only on the corresponding input pixels.
+func FadeThroughBlackInto(target, outgoing, incoming *Surface, progress evaluator.ExactRational) error {
+	if err := matchingSurfaces(outgoing, incoming); err != nil {
+		return err
+	}
+	if err := matchingSurfaces(target, outgoing); err != nil {
+		return err
+	}
+	fraction, err := readWeight(progress, "fade.progress")
+	if err != nil {
+		return err
+	}
+	return fadeThroughBlackPixels(target, outgoing, incoming, fraction)
+}
+
+func wipeLeftPixels(target, outgoing, incoming *Surface, progress exactWeight) error {
+	boundaryValue := new(big.Int).Mul(big.NewInt(int64(outgoing.width)), &progress.numerator)
+	boundaryValue.Quo(boundaryValue, &progress.denominator)
+	if !boundaryValue.IsInt64() {
+		return kernelError(CodeInvalidWeight, "wipe.progress", ErrInvalidWeight)
+	}
+	boundary := int(boundaryValue.Int64())
+	for index := range outgoing.pixels {
+		if index%outgoing.width < boundary {
+			target.pixels[index] = incoming.pixels[index]
+		} else {
+			target.pixels[index] = outgoing.pixels[index]
+		}
+	}
 	return nil
 }
 
-// FadeThroughBlackInto is FadeThroughBlack in place into target.
-func FadeThroughBlackInto(target, outgoing, incoming *Surface, progress evaluator.ExactRational) error {
-	result, err := FadeThroughBlack(outgoing, incoming, progress)
-	if err != nil {
-		return err
+func fadeThroughBlackPixels(target, outgoing, incoming *Surface, progress exactWeight) error {
+	twiceNumerator := new(big.Int).Lsh(new(big.Int).Set(&progress.numerator), 1)
+	black := Pixel{A: uint16(mathMaxUint16)}
+	var source *Surface
+	var sourceWeight, blackWeight exactWeight
+	if twiceNumerator.Cmp(&progress.denominator) <= 0 {
+		source = outgoing
+		sourceWeight.numerator.Sub(&progress.denominator, twiceNumerator)
+		blackWeight.numerator.Set(twiceNumerator)
+	} else {
+		source = incoming
+		sourceWeight.numerator.Sub(twiceNumerator, &progress.denominator)
+		blackWeight.numerator.Sub(new(big.Int).Lsh(new(big.Int).Set(&progress.denominator), 1), twiceNumerator)
 	}
-	copy(target.pixels, result.pixels)
+	sourceWeight.denominator.Set(&progress.denominator)
+	blackWeight.denominator.Set(&progress.denominator)
+	if fastSource, sourceOK := resolveFastWeight(sourceWeight); sourceOK {
+		if fastBlack, blackOK := resolveFastWeight(blackWeight); blackOK {
+			for index := range source.pixels {
+				target.pixels[index] = dissolvePixelFast(source.pixels[index], black, fastSource, fastBlack)
+			}
+			return nil
+		}
+	}
+	for index := range source.pixels {
+		pixel, err := dissolvePixel(source.pixels[index], black, sourceWeight, blackWeight)
+		if err != nil {
+			return kernelError(CodeInvalidWeight, fmt.Sprintf("fade/pixels/%d", index), err)
+		}
+		target.pixels[index] = pixel
+	}
 	return nil
 }

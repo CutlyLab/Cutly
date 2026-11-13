@@ -86,11 +86,13 @@ and the matching `v0.1.0-rc.1` tag; see [`RELEASING.md`](RELEASING.md).
 - a capability-gated, immutable Document v2 evaluator with exact clip/source mapping, precompiled
   hold/linear/Q0.32 cubic keyframes, transition handle sampling, and indexed active visual layers;
 - a deterministic CPU working-surface/blend kernel for linear-light BT.709 premultiplied RGBA16,
-  exact opacity/dissolve, Porter-Duff source-over, stable layer order, and canonical pixel hashes;
+  exact opacity, dissolve, left-to-right wipe and opaque-black fade, Porter-Duff source-over,
+  stable layer order, and canonical pixel hashes;
 - strict PNG ingest and a document/content-bound native image provider that normalize RGBA8 sRGB
   into immutable native-size linear BT.709 premultiplied RGBA16 surfaces;
 - a native raster compositor that connects exact source requests to crop, affine transform,
-  opacity, dissolve, stable multi-track composition, transparent gaps, cancellation, and frame parity;
+  opacity, capability-gated transitions, stable multi-track composition, transparent gaps,
+  cancellation, and frame parity;
 - a visual-only mixed reference compositor that dispatches native image/video surfaces and intrinsic
   viewport-vector expression surfaces through that same evaluator/raster/kernel path, with strict
   clip/transition and native/expression receipt unions plus live result self-consistency validation;

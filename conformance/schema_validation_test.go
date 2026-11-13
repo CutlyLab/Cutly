@@ -130,6 +130,42 @@ func TestSchemasCompileAndValidateInstances(t *testing.T) {
 		}
 	}
 
+	for _, schemaCase := range []struct {
+		name    string
+		fixture string
+		profile func(map[string]any) map[string]any
+	}{
+		{
+			name: "cutly.document.v2.schema.json", fixture: "conformance/fixtures/document-v2.valid.json",
+			profile: func(root map[string]any) map[string]any {
+				return root["timelines"].([]any)[0].(map[string]any)["transitions"].([]any)[0].(map[string]any)
+			},
+		},
+		{
+			name: "cutly.document-v2-render-plan.v1.schema.json", fixture: "conformance/fixtures/document-v2-render-plan-v1.valid.json",
+			profile: func(root map[string]any) map[string]any {
+				return root["transitions"].([]any)[0].(map[string]any)
+			},
+		},
+	} {
+		raw, err := os.ReadFile(filepath.Join(moduleRoot, filepath.FromSlash(schemaCase.fixture)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, profile := range []string{documentv2.TransitionDissolveV1, documentv2.TransitionFadeV1, documentv2.TransitionWipeV1} {
+			candidate := decodeSchemaInstance(t, raw).(map[string]any)
+			schemaCase.profile(candidate)["profile"] = profile
+			if err := resolved[schemaCase.name].Validate(candidate); err != nil {
+				t.Fatalf("schema %s rejected transition profile %q: %v", schemaCase.name, profile, err)
+			}
+		}
+		candidate := decodeSchemaInstance(t, raw).(map[string]any)
+		schemaCase.profile(candidate)["profile"] = "cutly.transition.unknown.v1"
+		if err := resolved[schemaCase.name].Validate(candidate); err == nil {
+			t.Fatalf("schema %s accepted unknown transition profile", schemaCase.name)
+		}
+	}
+
 	prepareRequest := decodeSchemaInstance(t, []byte(`{"protocol_version":1,"request_id":"prepare-1","tool":"cutly_render","action":"prepare","project_id":"project","payload":{"plan":{},"resources":[]}}`))
 	if err := resolved["cutly.agent-request.v1.schema.json"].Validate(prepareRequest); err != nil {
 		t.Fatalf("render prepare request rejected by published Agent schema: %v", err)

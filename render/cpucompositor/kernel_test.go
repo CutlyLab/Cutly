@@ -144,6 +144,58 @@ func TestOperationsAreAliasSafeAndFailBeforePublishing(t *testing.T) {
 	}
 }
 
+func TestWipeLeftExactBoundaryAndAliasParity(t *testing.T) {
+	outgoing := mustSurface(t, 4, 1, []Pixel{
+		{R: 1, A: 1}, {R: 2, A: 2}, {R: 3, A: 3}, {R: 4, A: 4},
+	})
+	incoming := mustSurface(t, 4, 1, []Pixel{
+		{B: 11, A: 11}, {B: 12, A: 12}, {B: 13, A: 13}, {B: 14, A: 14},
+	})
+	progress := mustWeight(t, weightWire{Numerator: 2, Denominator: 3})
+	want := []Pixel{{B: 11, A: 11}, {B: 12, A: 12}, {R: 3, A: 3}, {R: 4, A: 4}}
+	got, err := WipeLeft(outgoing, incoming, progress)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertPixels(t, got, want)
+	alias := mustSurface(t, 4, 1, []Pixel{
+		{R: 1, A: 1}, {R: 2, A: 2}, {R: 3, A: 3}, {R: 4, A: 4},
+	})
+	if err := WipeLeftInto(alias, alias, incoming, progress); err != nil {
+		t.Fatal(err)
+	}
+	assertPixels(t, alias, want)
+}
+
+func TestFadeThroughBlackUsesOpaqueMatteAndAliasParity(t *testing.T) {
+	outgoing := mustSurface(t, 1, 1, []Pixel{{R: 60_000, G: 30_000, A: 60_000}})
+	incoming := mustSurface(t, 1, 1, []Pixel{{B: 50_000, A: 50_000}})
+	for _, test := range []struct {
+		name     string
+		progress evaluator.ExactRational
+		want     Pixel
+	}{
+		{"start", mustWeight(t, weightWire{0, 1}), Pixel{R: 60_000, G: 30_000, A: 60_000}},
+		{"quarter", mustWeight(t, weightWire{1, 4}), Pixel{R: 30_000, G: 15_000, A: 62_768}},
+		{"midpoint", mustWeight(t, weightWire{1, 2}), Pixel{A: 65_535}},
+		{"three quarters", mustWeight(t, weightWire{3, 4}), Pixel{B: 25_000, A: 57_768}},
+		{"end", mustWeight(t, weightWire{1, 1}), Pixel{B: 50_000, A: 50_000}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := FadeThroughBlack(outgoing, incoming, test.progress)
+			if err != nil {
+				t.Fatal(err)
+			}
+			assertPixels(t, got, []Pixel{test.want})
+			alias := mustSurface(t, 1, 1, []Pixel{{R: 60_000, G: 30_000, A: 60_000}})
+			if err := FadeThroughBlackInto(alias, alias, incoming, test.progress); err != nil {
+				t.Fatal(err)
+			}
+			assertPixels(t, alias, []Pixel{test.want})
+		})
+	}
+}
+
 func TestEvaluatorArbitraryPrecisionWeightFeedsKernelWithoutFloat(t *testing.T) {
 	one := documentv2.Rational{Numerator: 1, Denominator: 1}
 	zero := documentv2.Rational{Numerator: 0, Denominator: 1}

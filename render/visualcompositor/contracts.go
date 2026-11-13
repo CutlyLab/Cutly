@@ -95,7 +95,8 @@ func (value SourceReceipt) Validate() error {
 		return fmt.Errorf("%w: evaluation branch", ErrSourceInvalid)
 	}
 	if transition := value.Evaluation.Transition; transition != nil {
-		if transition.TransitionID == "" || transition.TransitionIndex < 0 || transition.TransitionProfile != documentv2.TransitionDissolveV1 ||
+		_, supported := documentv2.LookupTransitionDescriptor(transition.TransitionProfile)
+		if transition.TransitionID == "" || transition.TransitionIndex < 0 || !supported ||
 			(transition.Role != expressionlayer.TransitionHandleOutgoing && transition.Role != expressionlayer.TransitionHandleIncoming) {
 			return fmt.Errorf("%w: transition binding", ErrSourceInvalid)
 		}

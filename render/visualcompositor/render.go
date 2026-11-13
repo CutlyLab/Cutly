@@ -401,7 +401,7 @@ func (program *Program) renderTransition(
 	if err != nil {
 		return nil, nil, err
 	}
-	if err := contextError(ctx, path+"/dissolve"); err != nil {
+	if err := contextError(ctx, path+"/kernel"); err != nil {
 		return nil, nil, err
 	}
 	var result *cpucompositor.Surface
@@ -412,7 +412,7 @@ func (program *Program) renderTransition(
 		}
 		return nil, nil, compositorError(CodeKernelFailed, path+"/transition", errors.Join(ErrKernelFailed, kernelErr))
 	}
-	if err := contextError(ctx, path+"/dissolve"); err != nil {
+	if err := contextError(ctx, path+"/kernel"); err != nil {
 		return nil, nil, err
 	}
 	return result, []SourceReceipt{outgoingReceipt, incomingReceipt}, nil

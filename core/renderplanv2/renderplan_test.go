@@ -387,6 +387,29 @@ func TestResolveRejectsPortableTargetAndDocumentLimits(t *testing.T) {
 	}
 }
 
+func TestResolvePreservesAdditiveTransitionProfilesAndCapabilities(t *testing.T) {
+	for _, profile := range []string{documentv2.TransitionFadeV1, documentv2.TransitionWipeV1} {
+		t.Run(profile, func(t *testing.T) {
+			document := fixtureDocument(t, "document-v2.valid.json")
+			document.Timelines[0].Transitions[0].Profile = profile
+			plan, diagnostics := Resolve(context.Background(), document, secondRange(4, 2), fixtureTarget("timeline-main"))
+			if documentv2.HasErrorDiagnostics(diagnostics) || len(plan.Transitions) != 1 || plan.Transitions[0].Profile != profile {
+				t.Fatalf("plan=%+v diagnostics=%+v", plan, diagnostics)
+			}
+			if !slices.Contains(plan.RequiredCapabilities.Features, videoedit.CapabilityID(profile)) {
+				t.Fatalf("required capabilities %v omit %q", plan.RequiredCapabilities.Features, profile)
+			}
+			encoded, err := Canonical(plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := Decode(encoded); err != nil {
+				t.Fatalf("resolved plan rejected: %v", err)
+			}
+		})
+	}
+}
+
 func fixtureDocument(t *testing.T, name string) documentv2.Document {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join("..", "..", "conformance", "fixtures", name))

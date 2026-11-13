@@ -361,7 +361,7 @@ func validateTransitions(values []PlannedTransition, requested documentv2.TimeRa
 			return fmt.Errorf("%w: duplicate transition", ErrPlanInvalid)
 		}
 		ids[value.TransitionID] = struct{}{}
-		if value.Profile != documentv2.TransitionDissolveV1 || (value.PreDuration.Value == 0 && value.PostDuration.Value == 0) {
+		if _, supported := documentv2.LookupTransitionDescriptor(value.Profile); !supported || (value.PreDuration.Value == 0 && value.PostDuration.Value == 0) {
 			return fmt.Errorf("%w: inactive/unsupported transition", ErrPlanInvalid)
 		}
 		selected, ok, err := intersectRanges(value.Window, requested)

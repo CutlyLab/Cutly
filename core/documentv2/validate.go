@@ -794,7 +794,7 @@ func (validator *documentValidator) validateTransitions(timeline Timeline, path 
 	for index, transition := range timeline.Transitions {
 		transitionPath := fmt.Sprintf("%s/transitions/%d", path, index)
 		validator.registerID(transition.ID, transitionPath+"/id")
-		if transition.Profile != TransitionDissolveV1 {
+		if _, supported := LookupTransitionDescriptor(transition.Profile); !supported {
 			validator.add(CodeTransitionInvalid, transitionPath+"/profile", fmt.Sprintf("unsupported transition profile %q", transition.Profile))
 		}
 		preValid := transition.PreDuration.Validate() == nil && transition.PreDuration.Value >= 0
@@ -813,6 +813,10 @@ func (validator *documentValidator) validateTransitions(timeline Timeline, path 
 		}
 		if !validator.validTransitionPair(outgoing, incoming) || outgoing.track.ID != incoming.track.ID || incoming.clipIndex != outgoing.clipIndex+1 {
 			validator.add(CodeTransitionInvalid, transitionPath, "transition must connect adjacent clips on one video track, one pinned viewport-px text track, or one viewport-px vector track")
+			continue
+		}
+		if transition.Profile != TransitionDissolveV1 && outgoing.track.Kind != TrackKindVideo && !transitionIsHardCut(transition) {
+			validator.add(CodeTransitionInvalid, transitionPath+"/profile", "fade and wipe transitions require a video track with video or image assets")
 			continue
 		}
 		if outgoing.clip.Disabled || incoming.clip.Disabled {

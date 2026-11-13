@@ -120,7 +120,7 @@
       ],
       "properties": {
         "transition_id": {"$ref": "#/$defs/id"},
-        "profile": {"const": "cutly.transition.dissolve.v1"},
+        "profile": {"enum": ["cutly.transition.dissolve.v1", "cutly.transition.fade.v1", "cutly.transition.wipe.v1"]},
         "transition_index": {"type": "integer", "minimum": 0, "maximum": 2147483647},
         "pre_duration": {"$ref": "https://schemas.cutly.dev/document/v1#/$defs/rationalTime"},
         "post_duration": {"$ref": "https://schemas.cutly.dev/document/v1#/$defs/rationalTime"},

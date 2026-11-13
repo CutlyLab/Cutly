@@ -226,6 +226,38 @@ func TestTransitionDescriptorMatchesCapabilityAndHardCutContract(t *testing.T) {
 	}
 }
 
+func TestTransitionDescriptorsV2AddsFadeAndWipeWithoutMutatingV1(t *testing.T) {
+	if got := TransitionDescriptors(); len(got) != 1 || got[0].Profile != TransitionDissolveV1 {
+		t.Fatalf("frozen v1 transition descriptors = %+v", got)
+	}
+	descriptors := TransitionDescriptorsV2()
+	want := []struct {
+		profile   string
+		evaluator string
+	}{
+		{TransitionDissolveV1, EvaluatorDissolveV1},
+		{TransitionFadeV1, EvaluatorFadeV1},
+		{TransitionWipeV1, EvaluatorWipeV1},
+	}
+	if len(descriptors) != len(want) {
+		t.Fatalf("v2 transition descriptors = %+v", descriptors)
+	}
+	for index, expected := range want {
+		descriptor := descriptors[index]
+		if descriptor.Profile != expected.profile || descriptor.EvaluatorProfile != expected.evaluator ||
+			descriptor.RequiredCapability != videoedit.CapabilityID(expected.profile) || descriptor.CompositingSemantics == "" {
+			t.Fatalf("descriptor %d = %+v", index, descriptor)
+		}
+		if lookup, ok := LookupTransitionDescriptor(expected.profile); !ok || lookup != descriptor {
+			t.Fatalf("lookup %q = %+v, %v", expected.profile, lookup, ok)
+		}
+	}
+	descriptors[0].Profile = "mutated"
+	if TransitionDescriptorsV2()[0].Profile != TransitionDissolveV1 {
+		t.Fatal("v2 transition descriptor registry aliases caller storage")
+	}
+}
+
 func TestAudioGraphDescriptorCentralizesTopologyMixAndPanLaw(t *testing.T) {
 	descriptors := AudioGraphDescriptors()
 	if len(descriptors) != 1 {

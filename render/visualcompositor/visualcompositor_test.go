@@ -193,6 +193,73 @@ func TestVectorDissolveUsesActualHandleContractAndOrderedReceipts(t *testing.T) 
 	}
 }
 
+func TestImageWipeAndFadeRenderEndToEndWithScratchParity(t *testing.T) {
+	outgoing := testSurface(t, 4, 1, []cpucompositor.Pixel{
+		{R: 65_535, A: 65_535}, {R: 65_535, A: 65_535}, {R: 65_535, A: 65_535}, {R: 65_535, A: 65_535},
+	})
+	incoming := testSurface(t, 4, 1, []cpucompositor.Pixel{
+		{B: 65_535, A: 65_535}, {B: 65_535, A: 65_535}, {B: 65_535, A: 65_535}, {B: 65_535, A: 65_535},
+	})
+	provider := rastercompositor.NativeSourceProviderFunc(func(_ context.Context, request rastercompositor.NativeSourceRequest) (rastercompositor.NativeSourceFrame, error) {
+		surface := outgoing
+		if request.AssetID == "image-b" {
+			surface = incoming
+		}
+		hash, err := surface.CanonicalHash()
+		if err != nil {
+			return rastercompositor.NativeSourceFrame{}, err
+		}
+		return rastercompositor.NativeSourceFrame{
+			ContractVersion: request.ContractVersion, Request: request,
+			Width: surface.Width(), Height: surface.Height(), AssetContentHash: request.AssetContentHash,
+			PixelHash: hash, DecodeProfile: request.DecodeProfile, SelectionProfile: request.SelectionProfile,
+			ColorProfile: request.ColorProfile, NormalizationProfile: request.NormalizationProfile,
+			SourceProfile: request.SourceProfile, SurfaceProfile: request.SurfaceProfile, Surface: surface,
+		}, nil
+	})
+	for _, test := range []struct {
+		profile string
+		want    []cpucompositor.Pixel
+	}{
+		{documentv2.TransitionWipeV1, []cpucompositor.Pixel{
+			{B: 65_535, A: 65_535}, {B: 65_535, A: 65_535}, {R: 65_535, A: 65_535}, {R: 65_535, A: 65_535},
+		}},
+		{documentv2.TransitionFadeV1, []cpucompositor.Pixel{
+			{A: 65_535}, {A: 65_535}, {A: 65_535}, {A: 65_535},
+		}},
+	} {
+		t.Run(test.profile, func(t *testing.T) {
+			document := imageTransitionDocument()
+			document.Timelines[0].Transitions[0].ID = "transition"
+			document.Timelines[0].Transitions[0].Profile = test.profile
+			program, diagnostics := Compile(context.Background(), document, DefaultConfig(4, 1))
+			if program == nil || documentv2.HasErrorDiagnostics(diagnostics) {
+				t.Fatalf("program=%v diagnostics=%+v", program, diagnostics)
+			}
+			if !slices.Contains(program.Capabilities().Features, videoedit.CapabilityID(test.profile)) {
+				t.Fatalf("capabilities omit %q: %+v", test.profile, program.Capabilities())
+			}
+			got, err := program.RenderAt(context.Background(), "timeline", rt(2, 1), Providers{Native: provider})
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := testSurface(t, 4, 1, test.want)
+			wantHash, _ := want.CanonicalHash()
+			if got.PixelHash != wantHash || len(got.Sources) != 2 {
+				t.Fatalf("result hash=%s sources=%+v want=%s", got.PixelHash, got.Sources, wantHash)
+			}
+			scratch, err := cpucompositor.NewScratch(cpucompositor.DefaultLimits(), 4)
+			if err != nil {
+				t.Fatal(err)
+			}
+			withScratch, err := program.RenderAtWithScratch(context.Background(), "timeline", rt(2, 1), Providers{Native: provider}, scratch)
+			if err != nil || withScratch.PixelHash != got.PixelHash {
+				t.Fatalf("scratch result=%+v err=%v want hash=%s", withScratch, err, got.PixelHash)
+			}
+		})
+	}
+}
+
 func TestMaliciousProviderEchoHashAndScopeFailClosed(t *testing.T) {
 	document := imageDocument(false)
 	surface := testSurface(t, 2, 2, []cpucompositor.Pixel{{A: 1}, {A: 1}, {A: 1}, {A: 1}})

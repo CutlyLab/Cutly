@@ -132,7 +132,13 @@ func Capabilities(config Config) (videoedit.BackendCapabilities, error) {
 			documentv2.CapabilityInterpolationCubicV1,
 		)
 	}
-	if normalized.Source.Video || normalized.Source.Image || normalized.Source.VectorExpression {
+	if normalized.Source.Video || normalized.Source.Image {
+		result.Features = append(result.Features,
+			videoedit.CapabilityID(documentv2.TransitionDissolveV1),
+			videoedit.CapabilityID(documentv2.TransitionFadeV1),
+			videoedit.CapabilityID(documentv2.TransitionWipeV1),
+		)
+	} else if normalized.Source.VectorExpression {
 		result.Features = append(result.Features, videoedit.CapabilityID(documentv2.TransitionDissolveV1))
 	}
 	if normalized.Source.LinearVideoRetime {
