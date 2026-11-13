@@ -245,7 +245,8 @@ func verifyStructure(p Plan) error {
 	incomingWindowEnd := map[documentv2.ID]documentv2.RationalTime{}
 	outgoingWindowStart := map[documentv2.ID]documentv2.RationalTime{}
 	for i, tr := range p.Transitions {
-		if !validID(tr.TransitionID) || tr.Profile != documentv2.TransitionDissolveV1 || (i > 0 && p.Transitions[i-1].TransitionIndex >= tr.TransitionIndex) || tr.PreDuration.Validate() != nil || tr.PostDuration.Validate() != nil || tr.PreDuration.Value < 0 || tr.PostDuration.Value < 0 {
+		_, supportedProfile := documentv2.LookupTransitionDescriptor(tr.Profile)
+		if !validID(tr.TransitionID) || !supportedProfile || (i > 0 && p.Transitions[i-1].TransitionIndex >= tr.TransitionIndex) || tr.PreDuration.Validate() != nil || tr.PostDuration.Validate() != nil || tr.PreDuration.Value < 0 || tr.PostDuration.Value < 0 {
 			return invalid("transition identity/order")
 		}
 		if transitionIDs[tr.TransitionID] {
@@ -258,6 +259,9 @@ func verifyStructure(p Plan) error {
 		out, in := tr.Outgoing.Binding, tr.Incoming.Binding
 		if out.TrackID != in.TrackID || out.TrackIndex != in.TrackIndex || out.TrackKind != in.TrackKind || uint64(out.ClipIndex)+1 != uint64(in.ClipIndex) || out.ClipID == in.ClipID || out.TrackKind == documentv2.TrackKindAudio {
 			return invalid("transition participants")
+		}
+		if tr.Profile != documentv2.TransitionDissolveV1 && out.TrackKind != documentv2.TrackKindVideo {
+			return invalid("transition profile participants")
 		}
 		if transitionOut[out.ClipID] || transitionIn[in.ClipID] {
 			return invalid("duplicate transition edge")
