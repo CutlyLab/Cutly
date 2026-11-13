@@ -455,7 +455,7 @@
       "required": ["id", "profile", "outgoing_clip_id", "incoming_clip_id", "pre_duration", "post_duration"],
       "properties": {
         "id": {"$ref": "#/$defs/id"},
-        "profile": {"const": "cutly.transition.dissolve.v1"},
+        "profile": {"enum": ["cutly.transition.dissolve.v1", "cutly.transition.fade.v1", "cutly.transition.wipe.v1"]},
         "outgoing_clip_id": {"$ref": "#/$defs/id"},
         "incoming_clip_id": {"$ref": "#/$defs/id"},
         "pre_duration": {"$ref": "#/$defs/rationalTime"},

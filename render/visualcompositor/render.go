@@ -278,7 +278,7 @@ func (program *Program) renderTransition(
 	providers Providers,
 	path string,
 ) (*cpucompositor.Surface, []SourceReceipt, error) {
-	if transition.Profile != documentv2.TransitionDissolveV1 || transition.Phase != documentv2.TransitionPhaseActive ||
+	if _, supported := documentv2.LookupTransitionDescriptor(transition.Profile); !supported || transition.Phase != documentv2.TransitionPhaseActive ||
 		transition.Outgoing == nil || transition.Incoming == nil || transition.Progress == nil {
 		return nil, nil, compositorError(CodeUnsupportedLayer, path, ErrUnsupportedLayer)
 	}
@@ -309,17 +309,30 @@ func (program *Program) renderTransition(
 	if err != nil {
 		return nil, nil, err
 	}
-	if err := contextError(ctx, path+"/dissolve"); err != nil {
+	if err := contextError(ctx, path+"/kernel"); err != nil {
 		return nil, nil, err
 	}
-	result, err := cpucompositor.Dissolve(outgoing, incoming, transition.OutgoingWeight, transition.IncomingWeight)
+	var result *cpucompositor.Surface
+	kernelPath := path + "/kernel"
+	switch transition.Profile {
+	case documentv2.TransitionDissolveV1:
+		result, err = cpucompositor.Dissolve(outgoing, incoming, transition.OutgoingWeight, transition.IncomingWeight)
+	case documentv2.TransitionFadeV1:
+		kernelPath = path + "/fade"
+		result, err = cpucompositor.FadeThroughBlack(outgoing, incoming, *transition.Progress)
+	case documentv2.TransitionWipeV1:
+		kernelPath = path + "/wipe"
+		result, err = cpucompositor.WipeLeft(outgoing, incoming, *transition.Progress)
+	default:
+		return nil, nil, compositorError(CodeUnsupportedLayer, path+"/profile", ErrUnsupportedLayer)
+	}
 	if err != nil {
-		if canceled := contextError(ctx, path+"/dissolve"); canceled != nil {
+		if canceled := contextError(ctx, kernelPath); canceled != nil {
 			return nil, nil, canceled
 		}
-		return nil, nil, compositorError(CodeKernelFailed, path+"/dissolve", errors.Join(ErrKernelFailed, err))
+		return nil, nil, compositorError(CodeKernelFailed, kernelPath, errors.Join(ErrKernelFailed, err))
 	}
-	if err := contextError(ctx, path+"/dissolve"); err != nil {
+	if err := contextError(ctx, path+"/kernel"); err != nil {
 		return nil, nil, err
 	}
 	return result, []SourceReceipt{outgoingReceipt, incomingReceipt}, nil

@@ -48,7 +48,7 @@
   "handle":{"type":"object","additionalProperties":false,"required":["kind","timeline_range","source_range"],"properties":{"kind":{"enum":["head","tail"]},"timeline_range":{"$ref":"#/$defs/range"},"source_range":{"$ref":"#/$defs/range"}}},
   "participant":{"type":"object","additionalProperties":false,"required":["binding","sampled_timeline_range","sampled_source_range","handles"],"properties":{"binding":{"$ref":"#/$defs/binding"},"sampled_timeline_range":{"$ref":"#/$defs/range"},"sampled_source_range":{"$ref":"#/$defs/range"},"handles":{"type":"array","maxItems":2,"items":{"$ref":"#/$defs/handle"}}}},
   "transition":{"type":"object","additionalProperties":false,"required":["transition_id","transition_index","profile","cut","pre_duration","post_duration","timeline_range","active_timeline_range","outgoing","incoming"],"properties":{
-   "transition_id":{"$ref":"#/$defs/id"},"transition_index":{"$ref":"#/$defs/index"},"profile":{"const":"cutly.transition.dissolve.v1"},"cut":{"$ref":"#/$defs/time"},
+   "transition_id":{"$ref":"#/$defs/id"},"transition_index":{"$ref":"#/$defs/index"},"profile":{"enum":["cutly.transition.dissolve.v1","cutly.transition.fade.v1","cutly.transition.wipe.v1"]},"cut":{"$ref":"#/$defs/time"},
    "pre_duration":{"allOf":[{"$ref":"#/$defs/time"},{"properties":{"value":{"type":"integer","minimum":0,"maximum":9223372036854775807}}}]},
    "post_duration":{"allOf":[{"$ref":"#/$defs/time"},{"properties":{"value":{"type":"integer","minimum":0,"maximum":9223372036854775807}}}]},
    "timeline_range":{"$ref":"#/$defs/range"},"active_timeline_range":{"$ref":"#/$defs/range"},"outgoing":{"$ref":"#/$defs/participant"},"incoming":{"$ref":"#/$defs/participant"}

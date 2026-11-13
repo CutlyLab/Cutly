@@ -129,8 +129,10 @@ func (program *Program) expectedResultSources(evaluated evaluator.TimelineEvalua
 			}
 		case evaluator.VisualLayerTransition:
 			transition := layer.Transition
-			if transition == nil || layer.Clip != nil || transition.Outgoing == nil || transition.Incoming == nil ||
-				transition.Profile != documentv2.TransitionDissolveV1 || transition.Phase != documentv2.TransitionPhaseActive {
+			if transition == nil || layer.Clip != nil || transition.Outgoing == nil || transition.Incoming == nil {
+				return nil, compositorError(CodeSourceMismatch, path, ErrSourceMismatch)
+			}
+			if _, supported := documentv2.LookupTransitionDescriptor(transition.Profile); !supported || transition.Phase != documentv2.TransitionPhaseActive {
 				return nil, compositorError(CodeSourceMismatch, path, ErrSourceMismatch)
 			}
 			frozen, exists := program.transitions[transitionScopeKey{timeline: transition.TimelineID, transition: transition.TransitionID}]

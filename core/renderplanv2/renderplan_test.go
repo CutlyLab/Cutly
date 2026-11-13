@@ -347,6 +347,30 @@ func TestClockAuthoredTimeAndDocumentProfile(t *testing.T) {
 		t.Fatal("test must exercise noninteger document metadata")
 	}
 }
+
+func TestResolvePreservesAdditiveTransitionProfilesAndCapabilities(t *testing.T) {
+	for _, profile := range []string{documentv2.TransitionFadeV1, documentv2.TransitionWipeV1} {
+		t.Run(profile, func(t *testing.T) {
+			document := transitionDoc()
+			document.Timelines[0].Transitions[0].Profile = profile
+			plan := resolveOK(t, document, tr(4, 2))
+			if len(plan.Transitions) != 1 || plan.Transitions[0].Profile != profile {
+				t.Fatalf("transitions=%+v", plan.Transitions)
+			}
+			if !contains(plan.RequiredCapabilities.Features, videoedit.CapabilityID(profile)) {
+				t.Fatalf("required capabilities %v omit %q", plan.RequiredCapabilities.Features, profile)
+			}
+			encoded, err := Canonical(plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := Decode(encoded); err != nil {
+				t.Fatalf("resolved plan rejected: %v", err)
+			}
+		})
+	}
+}
+
 func TestFailuresCancellationLimitsOverflow(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()

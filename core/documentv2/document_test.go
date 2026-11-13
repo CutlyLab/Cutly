@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 
@@ -113,6 +114,25 @@ func TestValidateNeverPanicsOnInvalidRationalsOrTimes(t *testing.T) {
 }
 
 func TestTransitionAndOverlapContracts(t *testing.T) {
+	for _, profile := range []string{TransitionDissolveV1, TransitionFadeV1, TransitionWipeV1} {
+		t.Run("supported profile "+profile, func(t *testing.T) {
+			document := fixtureDocument(t)
+			document.Timelines[0].Transitions[0].Profile = profile
+			assertNoDiagnostics(t, Validate(document))
+			required, diagnostics := RequiredCapabilities(document)
+			assertNoDiagnostics(t, diagnostics)
+			if !slices.Contains(required.Features, videoedit.CapabilityID(profile)) {
+				t.Fatalf("required capabilities %v omit %q", required.Features, profile)
+			}
+		})
+	}
+	for _, profile := range []string{TransitionFadeV1, TransitionWipeV1} {
+		t.Run("non-video track rejects "+profile, func(t *testing.T) {
+			document := vectorTransitionDocument()
+			document.Timelines[0].Transitions[0].Profile = profile
+			assertDiagnostic(t, Validate(document), CodeTransitionInvalid, "/timelines/0/transitions/0/profile")
+		})
+	}
 	t.Run("zero width is a hard cut", func(t *testing.T) {
 		document := fixtureDocument(t)
 		document.Timelines[0].Transitions[0].PreDuration = RationalTime{Value: 0, Rate: 1}

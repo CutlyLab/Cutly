@@ -127,7 +127,8 @@ func validateDomainScopeV2(ctx context.Context, document documentv2.Document, sc
 		outgoing, incoming := clips[transition.OutgoingClipID], clips[transition.IncomingClipID]
 		// Do not silently grant future schema transition domains/profiles. Today's validator already
 		// rejects audio/annotation transitions, including hard cuts, on the complete Document.
-		if transition.Profile != documentv2.TransitionDissolveV1 || !visualTrackKind(outgoing.kind) || outgoing.kind != incoming.kind {
+		if _, supported := documentv2.LookupTransitionDescriptor(transition.Profile); !supported ||
+			!visualTrackKind(outgoing.kind) || outgoing.kind != incoming.kind {
 			return invalid("/scope/selection/transition_ids", "unsupported domain transition")
 		}
 		cutTime, _ := outgoing.clip.TimelineRange.End()
