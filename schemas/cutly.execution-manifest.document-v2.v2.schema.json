@@ -1,0 +1,251 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.cutly.dev/cutly.execution-manifest.document-v2.v2.schema.json",
+  "title": "Cutly Document v2 ExecutionManifest v2",
+  "description": "Frozen resources, native programs, backend, pipeline, transport and output choices for one document-bound semantic RenderPlan.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "profile",
+    "canonical_json_profile",
+    "hash_profile",
+    "plan_fingerprint",
+    "semantic_profile",
+    "document_hash",
+    "compiler_build",
+    "evaluator_build",
+    "provider_build",
+    "pipeline_profile",
+    "transport_profile",
+    "backend",
+    "media_runtime",
+    "output",
+    "visual",
+    "audio",
+    "deterministic_seed",
+    "fingerprint"
+  ],
+  "properties": {
+    "schema_version": {"const": 2},
+    "profile": {"const": "cutly.execution-manifest.document-v2.v2"},
+    "canonical_json_profile": {"const": "cutly.json.canonical-integer.v1"},
+    "hash_profile": {"const": "cutly.hash.sha256.execution-manifest-document-v2-canonical-json.v2"},
+    "plan_fingerprint": {"$ref": "#/$defs/digest"},
+    "semantic_profile": {"const": "cutly.semantic.document-v2-render-plan.v1"},
+    "document_hash": {"$ref": "#/$defs/digest"},
+    "compiler_build": {"$ref": "#/$defs/digest"},
+    "evaluator_build": {"$ref": "#/$defs/digest"},
+    "provider_build": {"$ref": "#/$defs/digest"},
+    "pipeline_profile": {
+      "enum": ["cutly.pipeline.chunked-restartable.v1", "cutly.pipeline.stream-encode.v1"]
+    },
+    "transport_profile": {
+      "enum": ["cutly.transport.cas-spool.v1", "cutly.transport.bounded-ring.v1"]
+    },
+    "resources": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/materializedResource"},
+      "uniqueItems": true,
+      "maxItems": 16384
+    },
+    "backend": {"$ref": "#/$defs/backendCapabilities"},
+    "media_runtime": {"$ref": "#/$defs/mediaRuntime"},
+    "output": {"$ref": "#/$defs/outputSpec"},
+    "visual": {"$ref": "#/$defs/programSelection"},
+    "audio": {"$ref": "#/$defs/programSelection"},
+    "deterministic_seed": {
+      "type": "integer",
+      "minimum": -9223372036854775808,
+      "maximum": 9223372036854775807
+    },
+    "fingerprint": {"$ref": "#/$defs/digest"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"pipeline_profile": {"const": "cutly.pipeline.chunked-restartable.v1"}}},
+      "then": {"properties": {"transport_profile": {"const": "cutly.transport.cas-spool.v1"}}}
+    },
+    {
+      "if": {"properties": {"pipeline_profile": {"const": "cutly.pipeline.stream-encode.v1"}}},
+      "then": {"properties": {"transport_profile": {"const": "cutly.transport.bounded-ring.v1"}}}
+    }
+  ],
+  "$defs": {
+    "nonBlank": {"type": "string", "pattern": "\\S"},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "versionedID": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]*\\.v[1-9][0-9]*$"
+    },
+    "materializedResource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "asset_id",
+        "kind",
+        "content_hash",
+        "size_bytes",
+        "locator_scheme",
+        "locator",
+        "materialization_profile"
+      ],
+      "properties": {
+        "asset_id": {"$ref": "#/$defs/nonBlank"},
+        "kind": {"enum": ["video", "audio", "image", "font", "data"]},
+        "content_hash": {"$ref": "#/$defs/digest"},
+        "size_bytes": {"type": "integer", "minimum": 1, "maximum": 1125899906842624},
+        "locator_scheme": {"enum": ["cas", "file"]},
+        "locator": {"$ref": "#/$defs/nonBlank"},
+        "materialization_profile": {"$ref": "#/$defs/versionedID"},
+        "inspection_fingerprint": {"$ref": "#/$defs/digest"},
+        "probe_fingerprint": {"$ref": "#/$defs/digest"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"kind": {"enum": ["video", "audio"]}}},
+          "then": {
+            "required": ["probe_fingerprint"],
+            "not": {"required": ["inspection_fingerprint"]}
+          }
+        },
+        {
+          "if": {"properties": {"kind": {"enum": ["image", "font", "data"]}}},
+          "then": {
+            "required": ["inspection_fingerprint"],
+            "not": {"required": ["probe_fingerprint"]}
+          }
+        },
+        {
+          "if": {"properties": {"locator_scheme": {"const": "cas"}}},
+          "then": {"properties": {"locator": {"pattern": "^cas://sha256/[0-9a-f]{64}$"}}}
+        },
+        {
+          "if": {"properties": {"locator_scheme": {"const": "file"}}},
+          "then": {
+            "properties": {
+              "locator": {
+                "pattern": "^file:///",
+                "not": {"pattern": "(^|/)\\.\\.?(/|$)"}
+              }
+            }
+          }
+        }
+      ]
+    },
+    "backendCapabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["backend_id", "build_fingerprint", "max_width", "max_height"],
+      "properties": {
+        "backend_id": {"$ref": "#/$defs/nonBlank"},
+        "build_fingerprint": {"$ref": "#/$defs/digest"},
+        "track_kinds": {
+          "type": "array",
+          "items": {"enum": ["video", "audio", "text", "vector"]},
+          "uniqueItems": true,
+          "maxItems": 4
+        },
+        "asset_kinds": {
+          "type": "array",
+          "items": {"enum": ["video", "audio", "image", "font", "data", "text", "vector"]},
+          "uniqueItems": true,
+          "maxItems": 7
+        },
+        "features": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/versionedID"},
+          "uniqueItems": true,
+          "maxItems": 16384
+        },
+        "max_width": {"type": "integer", "minimum": 1, "maximum": 2147483647},
+        "max_height": {"type": "integer", "minimum": 1, "maximum": 2147483647}
+      }
+    },
+    "mediaRuntime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ffmpeg_build", "decoder_profile", "encoder_profile", "color_profile"],
+      "properties": {
+        "ffmpeg_build": {"$ref": "#/$defs/digest"},
+        "decoder_profile": {"$ref": "#/$defs/nonBlank"},
+        "encoder_profile": {"$ref": "#/$defs/nonBlank"},
+        "text_shaper_build": {"$ref": "#/$defs/digest"},
+        "color_profile": {"$ref": "#/$defs/nonBlank"}
+      }
+    },
+    "intermediateProfiles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["video_surface_profile", "audio_block_profile"],
+      "properties": {
+        "video_surface_profile": {"const": "cutly.surface.linear-bt709-premultiplied-rgba16.v1"},
+        "audio_block_profile": {"const": "cutly.intermediate-audio.pcm-s16le.interleaved.v1"}
+      }
+    },
+    "outputSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reference_profile",
+        "format",
+        "width",
+        "height",
+        "pixel_format",
+        "color_space",
+        "video_codec",
+        "audio_codec",
+        "sample_rate",
+        "channels",
+        "intermediate",
+        "decoded_video_profile",
+        "decoded_audio_profile"
+      ],
+      "properties": {
+        "reference_profile": {"$ref": "#/$defs/nonBlank"},
+        "format": {"$ref": "#/$defs/nonBlank"},
+        "width": {"type": "integer", "minimum": 1, "maximum": 2147483647},
+        "height": {"type": "integer", "minimum": 1, "maximum": 2147483647},
+        "pixel_format": {"$ref": "#/$defs/nonBlank"},
+        "color_space": {"$ref": "#/$defs/nonBlank"},
+        "video_codec": {"$ref": "#/$defs/nonBlank"},
+        "audio_codec": {"$ref": "#/$defs/nonBlank"},
+        "sample_rate": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807},
+        "channels": {"type": "integer", "minimum": 1, "maximum": 2147483647},
+        "intermediate": {"$ref": "#/$defs/intermediateProfiles"},
+        "decoded_video_profile": {"const": "cutly.decoded-video.rgba8.interleaved.top-down.tight.v1"},
+        "decoded_audio_profile": {"const": "cutly.decoded-audio.pcm-s16le.interleaved.v1"}
+      }
+    },
+    "programSelection": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "profile",
+            "descriptor_fingerprint",
+            "configuration",
+            "configuration_fingerprint",
+            "source_manifest_fingerprint"
+          ],
+          "properties": {
+            "enabled": {"const": true},
+            "profile": {"$ref": "#/$defs/versionedID"},
+            "descriptor_fingerprint": {"$ref": "#/$defs/digest"},
+            "configuration": {},
+            "configuration_fingerprint": {"$ref": "#/$defs/digest"},
+            "source_manifest_fingerprint": {"$ref": "#/$defs/digest"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled"],
+          "properties": {"enabled": {"const": false}}
+        }
+      ]
+    }
+  }
+}

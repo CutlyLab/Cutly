@@ -265,6 +265,8 @@ type Clip struct {
 
 const (
 	TransitionDissolveV1 = "cutly.transition.dissolve.v1"
+	TransitionWipeV1     = "cutly.transition.wipe.v1"
+	TransitionFadeV1     = "cutly.transition.fade.v1"
 	PropertyTransformV1  = "cutly.transform.v1"
 	PropertyOpacityV1    = "cutly.opacity.v1"
 	PropertyCropV1       = "cutly.crop.v1"

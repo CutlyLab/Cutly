@@ -1,108 +1,104 @@
-// Package renderplanv2 defines the additive Document v2 semantic render-plan boundary.
-// It does not authorize resources or promise that a backend can execute a plan.
-// Verify proves standalone consistency; only VerifyAgainstDocument proves that the
-// resource, capability, bus and transition closure equals the authored document.
+// Package renderplanv2 freezes the backend-neutral semantic render plan for a
+// committed Cutly Document v2.  It is additive to core/videoedit RenderPlan v3:
+// the legacy RC protocol remains byte-for-byte unchanged.
 package renderplanv2
 
 import (
 	"github.com/CutlyLab/Cutly/core/documentv2"
 	"github.com/CutlyLab/Cutly/core/videoedit"
+	"github.com/CutlyLab/Cutly/protocol/canonicaljson"
 )
 
-const SchemaVersion uint32 = 1
-const ProfileV1 = "cutly.semantic.document-v2-render-plan.v1"
+const (
+	SchemaVersion = 1
+	ProfileV1     = "cutly.semantic.document-v2-render-plan.v1"
+	HashProfileV1 = "cutly.hash.sha256.document-v2-render-plan-canonical-json.v1"
+)
 
-// All collections are required, non-null arrays, including empty arrays. Authored
-// ranges retain their time bases; computed intersections/projections are reduced.
-// Wire indices are uint32, independent of the host's int width.
-type ClipBinding struct {
-	TrackID       documentv2.ID        `json:"track_id"`
-	ClipID        documentv2.ID        `json:"clip_id"`
-	AssetID       documentv2.ID        `json:"asset_id"`
-	TrackKind     documentv2.TrackKind `json:"track_kind"`
-	AssetKind     documentv2.AssetKind `json:"asset_kind"`
-	TrackIndex    uint32               `json:"track_index"`
-	ClipIndex     uint32               `json:"clip_index"`
-	TimelineRange documentv2.TimeRange `json:"timeline_range"`
-	SourceRange   documentv2.TimeRange `json:"source_range"`
-	FontAssetID   documentv2.ID        `json:"font_asset_id"`
-	AudioBusID    documentv2.ID        `json:"audio_bus_id"`
-}
-
+// PlannedClip is one ordinary visible clip intersection. Transition handle
+// access is represented separately by PlannedTransition so a backend never has
+// to overload a clip's authored half-open visible interval.
 type PlannedClip struct {
-	Binding              ClipBinding          `json:"binding"`
+	TrackID              documentv2.ID        `json:"track_id"`
+	ClipID               documentv2.ID        `json:"clip_id"`
+	AssetID              documentv2.ID        `json:"asset_id"`
+	TrackKind            documentv2.TrackKind `json:"track_kind"`
+	AssetKind            documentv2.AssetKind `json:"asset_kind"`
+	TrackIndex           int                  `json:"track_index"`
+	ClipIndex            int                  `json:"clip_index"`
+	TimelineRange        documentv2.TimeRange `json:"timeline_range"`
+	SourceRange          documentv2.TimeRange `json:"source_range"`
 	VisibleTimelineRange documentv2.TimeRange `json:"visible_timeline_range"`
 	VisibleSourceRange   documentv2.TimeRange `json:"visible_source_range"`
 }
 
-type HandleKind string
-
-const (
-	HandleHead HandleKind = "head"
-	HandleTail HandleKind = "tail"
-)
-
-// HandleSpan denotes only temporal source positions outside the authored visible
-// interval. Static sources have no temporal handles. Sampled ranges on a
-// participant include its whole transition contribution, not an extra draw layer.
-type HandleSpan struct {
-	Kind          HandleKind           `json:"kind"`
-	TimelineRange documentv2.TimeRange `json:"timeline_range"`
-	SourceRange   documentv2.TimeRange `json:"source_range"`
+// TransitionSide freezes the exact source interval a transition side may
+// sample over the selected part of its transition window. The interval can lie
+// before or after the clip's ordinary source range: those are explicit handles,
+// validated by Document v2 and later re-probed by media preflight.
+type TransitionSide struct {
+	TrackID             documentv2.ID        `json:"track_id"`
+	ClipID              documentv2.ID        `json:"clip_id"`
+	AssetID             documentv2.ID        `json:"asset_id"`
+	TrackKind           documentv2.TrackKind `json:"track_kind"`
+	AssetKind           documentv2.AssetKind `json:"asset_kind"`
+	TrackIndex          int                  `json:"track_index"`
+	ClipIndex           int                  `json:"clip_index"`
+	SelectedSourceRange documentv2.TimeRange `json:"selected_source_range"`
 }
 
-type TransitionParticipant struct {
-	Binding              ClipBinding          `json:"binding"`
-	SampledTimelineRange documentv2.TimeRange `json:"sampled_timeline_range"`
-	SampledSourceRange   documentv2.TimeRange `json:"sampled_source_range"`
-	Handles              []HandleSpan         `json:"handles"`
-}
-
+// PlannedTransition is an active, non-zero transition whose half-open window
+// intersects RequestedRange. Hard-cut records remain in the Document but do not
+// enter the executable transition closure.
 type PlannedTransition struct {
-	TransitionID        documentv2.ID           `json:"transition_id"`
-	TransitionIndex     uint32                  `json:"transition_index"`
-	Profile             string                  `json:"profile"`
-	Cut                 documentv2.RationalTime `json:"cut"`
-	PreDuration         documentv2.RationalTime `json:"pre_duration"`
-	PostDuration        documentv2.RationalTime `json:"post_duration"`
-	TimelineRange       documentv2.TimeRange    `json:"timeline_range"`
-	ActiveTimelineRange documentv2.TimeRange    `json:"active_timeline_range"`
-	Outgoing            TransitionParticipant   `json:"outgoing"`
-	Incoming            TransitionParticipant   `json:"incoming"`
+	TransitionID    documentv2.ID           `json:"transition_id"`
+	Profile         string                  `json:"profile"`
+	TransitionIndex int                     `json:"transition_index"`
+	PreDuration     documentv2.RationalTime `json:"pre_duration"`
+	PostDuration    documentv2.RationalTime `json:"post_duration"`
+	Window          documentv2.TimeRange    `json:"window"`
+	SelectedWindow  documentv2.TimeRange    `json:"selected_window"`
+	Outgoing        TransitionSide          `json:"outgoing"`
+	Incoming        TransitionSide          `json:"incoming"`
 }
 
-// Resources contain logical identities only, never URIs or machine locators.
-// Empty ContentHash is explicit and means unmaterialized/URI-only, NOT verified
-// content. Execution authorization and content binding belong to a later stage.
+// ResourceRef is a logical external dependency. Locators are deliberately
+// excluded; the host materializes them only in ExecutionManifest v2. Inline
+// text/vector payloads remain authenticated by DocumentHash and do not appear
+// as external resources. Pinned fonts do.
 type ResourceRef struct {
 	AssetID     documentv2.ID        `json:"asset_id"`
 	Kind        documentv2.AssetKind `json:"kind"`
-	ContentHash string               `json:"content_hash"`
+	ContentHash string               `json:"content_hash,omitempty"`
 }
 
-type CapabilityRequirements struct {
-	TrackKinds []documentv2.TrackKind   `json:"track_kinds"`
-	AssetKinds []documentv2.AssetKind   `json:"asset_kinds"`
-	Features   []videoedit.CapabilityID `json:"features"`
-}
-
+// Plan is the immutable semantic closure shared by preview and export.
 type Plan struct {
-	SchemaVersion        uint32                 `json:"schema_version"`
-	Profile              string                 `json:"profile"`
-	CanonicalJSONProfile string                 `json:"canonical_json_profile"`
-	DocumentID           documentv2.ID          `json:"document_id"`
-	Revision             documentv2.Revision    `json:"revision"`
-	DocumentHash         string                 `json:"document_hash"`
-	TimelineID           documentv2.ID          `json:"timeline_id"`
-	RequestedRange       documentv2.TimeRange   `json:"requested_range"`
-	Target               videoedit.RenderTarget `json:"target"`
-	FrameRange           videoedit.TickRange    `json:"frame_range"`
-	SampleRange          videoedit.TickRange    `json:"sample_range"`
-	RequiredCapabilities CapabilityRequirements `json:"required_capabilities"`
-	Visual               []PlannedClip          `json:"visual"`
-	Audio                []PlannedClip          `json:"audio"`
-	Transitions          []PlannedTransition    `json:"transitions"`
-	AudioBusIDs          []documentv2.ID        `json:"audio_bus_ids"`
-	Resources            []ResourceRef          `json:"resources"`
-	Fingerprint          string                 `json:"fingerprint"`
+	SchemaVersion        int                               `json:"schema_version"`
+	Profile              string                            `json:"profile"`
+	CanonicalJSONProfile string                            `json:"canonical_json_profile"`
+	HashProfile          string                            `json:"hash_profile"`
+	DocumentID           documentv2.ID                     `json:"document_id"`
+	Revision             documentv2.Revision               `json:"revision"`
+	DocumentHash         string                            `json:"document_hash"`
+	TimelineID           documentv2.ID                     `json:"timeline_id"`
+	RequestedRange       documentv2.TimeRange              `json:"requested_range"`
+	Target               videoedit.RenderTarget            `json:"target"`
+	FrameRange           videoedit.TickRange               `json:"frame_range"`
+	SampleRange          videoedit.TickRange               `json:"sample_range"`
+	RequiredCapabilities documentv2.CapabilityRequirements `json:"required_capabilities"`
+	Visual               []PlannedClip                     `json:"visual,omitempty"`
+	Audio                []PlannedClip                     `json:"audio,omitempty"`
+	Transitions          []PlannedTransition               `json:"transitions,omitempty"`
+	Resources            []ResourceRef                     `json:"resources,omitempty"`
+	Fingerprint          string                            `json:"fingerprint"`
+}
+
+func newPlan() Plan {
+	return Plan{
+		SchemaVersion:        SchemaVersion,
+		Profile:              ProfileV1,
+		CanonicalJSONProfile: canonicaljson.Profile,
+		HashProfile:          HashProfileV1,
+	}
 }

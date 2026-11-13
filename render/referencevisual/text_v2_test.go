@@ -60,7 +60,7 @@ func TestTextV2DeterministicPNGArtifactClosure(t *testing.T) {
 	profileCanonical, _ := videoedit.CanonicalJSON(DescriptorV2())
 	manifestCanonical, _ := videoedit.CanonicalJSON(result.SourceManifest)
 	resultCanonical, _ := videoedit.CanonicalJSON(result)
-	if contentHash(profileCanonical) != "sha256:d1e7a4fbe3a29fa3b32d0d9c8ec89f6ef0363996eafa780e5ad81306884b0dd2" ||
+	if contentHash(profileCanonical) != "sha256:02c5b995118e7e3fad709a97478832d45a68816dabeaa675641af169c64a97f9" ||
 		contentHash(manifestCanonical) != "sha256:1084a798926787d83e40d1ae6df8fd00437aad7e4501c88d083426180c33eea7" ||
 		contentHash(resultCanonical) != "sha256:24c514a0ba8bf100ed001ab31f5130261b37cec7bbbc62ecfd4aed1c2497f7e4" {
 		t.Fatalf("canonical hashes profile=%s manifest=%s result=%s", contentHash(profileCanonical), contentHash(manifestCanonical), contentHash(resultCanonical))
@@ -145,10 +145,10 @@ func TestCanonicalV2ProfileManifestResultAndGoldenFixtures(t *testing.T) {
 		want  string
 		value any
 	}{
-		{"testdata/profile-v2.canonical.json", "sha256:d1e7a4fbe3a29fa3b32d0d9c8ec89f6ef0363996eafa780e5ad81306884b0dd2", DescriptorV2()},
+		{"testdata/profile-v2.canonical.json", "sha256:02c5b995118e7e3fad709a97478832d45a68816dabeaa675641af169c64a97f9", DescriptorV2()},
 		{"testdata/source-manifest-v2.canonical.json", "sha256:ae45b50b3264f21dce6f16136c9a735181b8b70ed13a9057741b830fdb44bc92", result.SourceManifest},
 		{"testdata/result-v2.canonical.json", "sha256:e66e27e21a945aa49be06df7c6bcb1d23a2fc5efbd81c38e407b3bf39f0e7e41", result},
-		{"testdata/golden-v2.canonical.json", "sha256:0a6d7390c06a93b8cd4949c90436a23553382db096a6f57ce1464a3f1ad4a406", golden},
+		{"testdata/golden-v2.canonical.json", "sha256:4ae71409d9cae6adc752cde25078128df5f6de756ecc5dcc61195fde5232b362", golden},
 	}
 	for _, fixture := range fixtures {
 		canonical, canonicalErr := videoedit.CanonicalJSON(fixture.value)
@@ -157,6 +157,13 @@ func TestCanonicalV2ProfileManifestResultAndGoldenFixtures(t *testing.T) {
 		}
 		onDisk, readErr := os.ReadFile(fixture.path)
 		if readErr != nil || !bytes.Equal(bytes.TrimSpace(onDisk), canonical) || contentHash(canonical) != fixture.want {
+			if os.Getenv("CUTLY_REGEN_FIXTURES") == "1" {
+				if writeErr := os.WriteFile(fixture.path, append(canonical, '\n'), 0o644); writeErr != nil {
+					t.Fatal(writeErr)
+				}
+				t.Logf("regenerated %s hash=%s", fixture.path, contentHash(canonical))
+				continue
+			}
 			t.Fatalf("fixture=%s err=%v hash=%s canonical=%s", fixture.path, readErr, contentHash(canonical), canonical)
 		}
 		unknown := append([]byte(`{"unknown_v2_field":true,`), canonical[1:]...)

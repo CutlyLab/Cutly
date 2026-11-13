@@ -14,6 +14,7 @@ import (
 	"github.com/CutlyLab/Cutly/render/cpucompositor"
 	"github.com/CutlyLab/Cutly/render/expressionlayer"
 	"github.com/CutlyLab/Cutly/render/nativepngsource"
+	"github.com/CutlyLab/Cutly/render/nativevideo"
 	"github.com/CutlyLab/Cutly/render/pngencode"
 	"github.com/CutlyLab/Cutly/render/rastercompositor"
 	"github.com/CutlyLab/Cutly/render/textlayer"
@@ -141,8 +142,32 @@ func (program *Program) RenderSurfaceFrame(ctx context.Context, timelineID docum
 
 func (program *Program) providers() visualcompositor.Providers {
 	return visualcompositor.Providers{
-		Native: program.native, Expression: program.expression, ExpressionHandle: program.expression, Text: program.text,
+		Native: program.nativeProvider(), Expression: program.expression, ExpressionHandle: program.expression, Text: program.text,
 	}
+}
+
+// nativeProvider returns the Native source provider for renders and live replay alike: the
+// video router when temporal video is bound, the PNG source otherwise.
+func (program *Program) nativeProvider() rastercompositor.NativeSourceProvider {
+	if program.video != nil {
+		return nativeVideoRouter{images: program.native, videos: program.video}
+	}
+	return program.native
+}
+
+// nativeVideoRouter serves one combined Native slot for mixed image/video documents: the
+// request's asset kind selects the owning provider, each of which validates its own requests,
+// profiles and identity pins.
+type nativeVideoRouter struct {
+	images *nativepngsource.Provider
+	videos *nativevideo.Provider
+}
+
+func (router nativeVideoRouter) Frame(ctx context.Context, request rastercompositor.NativeSourceRequest) (rastercompositor.NativeSourceFrame, error) {
+	if request.AssetKind == documentv2.AssetKindVideo {
+		return router.videos.Frame(ctx, request)
+	}
+	return router.images.Frame(ctx, request)
 }
 
 func (program *Program) validateRuntime(ctx context.Context) error {
@@ -167,10 +192,17 @@ func (program *Program) validateRuntime(ctx context.Context) error {
 
 func (program *Program) runtimeInvariant() bool {
 	normalized, expectedVisual, err := normalizeConfigMode(program.config, program.v2)
+	if program.video != nil {
+		// Mirror the compile-time capability injection so the invariant comparison stays
+		// exact for video programs.
+		expectedVisual.Source.Video = true
+		expectedVisual.NativeProfiles.Video = nativevideo.Profiles()
+	}
 	if err != nil || !equalConfig(normalized, program.config) || program.visual.DocumentHash() != program.documentHash ||
 		program.visual.Config() != expectedVisual || program.native.DocumentHash() != program.documentHash ||
 		program.expression.DocumentHash() != program.documentHash || program.native.Config().Limits != program.config.NativeLimits ||
-		program.expression.Config().Limits != program.config.ExpressionLimits {
+		program.expression.Config().Limits != program.config.ExpressionLimits ||
+		(program.video != nil && program.video.DocumentHash() != program.documentHash) {
 		return false
 	}
 	nativeManifest := program.native.Manifest()
@@ -190,7 +222,13 @@ func (program *Program) runtimeInvariant() bool {
 }
 
 func (program *Program) profile() string {
-	if program != nil && program.v2 {
+	if program == nil {
+		return ProfileV1
+	}
+	if program.video != nil {
+		return ProfileV2Video
+	}
+	if program.v2 {
 		return ProfileV2
 	}
 	return ProfileV1
@@ -462,7 +500,7 @@ func (program *Program) replaySource(ctx context.Context, receipt visualcomposit
 	}
 	switch receipt.Kind {
 	case visualcompositor.SourceKindNative:
-		frame, err := program.native.Frame(ctx, receipt.Native.Request)
+		frame, err := program.nativeProvider().Frame(ctx, receipt.Native.Request)
 		if err != nil {
 			return classifyReplay(path, err)
 		}

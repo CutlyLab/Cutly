@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/CutlyLab/Cutly/core/documentv2"
+	"github.com/CutlyLab/Cutly/core/renderplanv2"
 	"github.com/CutlyLab/Cutly/core/videoedit"
 )
 
@@ -24,9 +25,12 @@ func TestSchemaDocumentsAreValidJSON(t *testing.T) {
 		"cutly.transaction.v1.schema.json",
 		"cutly.render-plan.v2.schema.json",
 		"cutly.render-plan.v3.schema.json",
+		"cutly.document-v2-render-plan.v1.schema.json",
 		"cutly.probe-manifest.v1.schema.json",
 		"cutly.execution-manifest.v1.schema.json",
+		"cutly.execution-manifest.document-v2.v2.schema.json",
 		"cutly.render-job.v1.schema.json",
+		"cutly.render-request.document-v2.v2.schema.json",
 		"cutly.exact-frame-request.v1.schema.json",
 		"cutly.evidence-manifest.v1.schema.json",
 		"cutly.agent-request.v1.schema.json",
@@ -44,6 +48,36 @@ func TestSchemaDocumentsAreValidJSON(t *testing.T) {
 				t.Fatalf("schema has no stable $id: %v", schema["$id"])
 			}
 		})
+	}
+}
+
+func TestDocumentV2RenderPlanFixtures(t *testing.T) {
+	raw := bytes.TrimSpace(fixture(t, "document-v2-render-plan-v1.valid.json"))
+	plan, err := renderplanv2.Decode(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.SchemaVersion != renderplanv2.SchemaVersion || plan.Profile != renderplanv2.ProfileV1 {
+		t.Fatalf("plan version/profile = %d/%q", plan.SchemaVersion, plan.Profile)
+	}
+	canonical, err := renderplanv2.Canonical(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := bytes.TrimSpace(fixture(t, "document-v2-render-plan-v1.canonical.json"))
+	if !bytes.Equal(canonical, expected) || !bytes.Equal(raw, expected) {
+		t.Fatalf("Document v2 RenderPlan canonical fixture drift\nwant %s\n got %s", expected, canonical)
+	}
+	if _, err := renderplanv2.Decode(bytes.TrimSpace(fixture(t, "document-v2-render-plan-v1.invalid.json"))); !errors.Is(err, renderplanv2.ErrFingerprintMismatch) {
+		t.Fatalf("invalid Document v2 plan error = %v, want ErrFingerprintMismatch", err)
+	}
+	gap, err := renderplanv2.Decode(bytes.TrimSpace(fixture(t, "document-v2-render-plan-v1-gap.canonical.json")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(gap.Visual) != 0 || len(gap.Audio) != 0 || len(gap.Transitions) != 0 || len(gap.Resources) != 0 ||
+		len(gap.RequiredCapabilities.TrackKinds) != 0 || len(gap.RequiredCapabilities.AssetKinds) != 0 || len(gap.RequiredCapabilities.Features) != 0 {
+		t.Fatalf("gap plan has an executable closure: %+v", gap)
 	}
 }
 

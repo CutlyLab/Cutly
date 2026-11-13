@@ -1,57 +1,144 @@
 {
- "$schema":"https://json-schema.org/draft/2020-12/schema",
- "$id":"https://cutly.dev/schemas/cutly.document-v2-render-plan.v1.schema.json",
- "title":"Document v2 Semantic Render Plan v1",
- "description":"Backend-neutral unmaterialized plan. Semantic closure and fingerprint require core verification; schema validation alone proves neither. Arrays are required and non-null. Resource content_hash may explicitly be empty for URI-only sources. No resource locators are carried.",
- "type":"object","additionalProperties":false,
- "required":["schema_version","profile","canonical_json_profile","document_id","revision","document_hash","timeline_id","requested_range","target","frame_range","sample_range","required_capabilities","visual","audio","transitions","audio_bus_ids","resources","fingerprint"],
- "properties":{
-  "schema_version":{"type":"integer","minimum":1,"maximum":1},
-  "profile":{"const":"cutly.semantic.document-v2-render-plan.v1"},
-  "canonical_json_profile":{"const":"cutly.json.canonical-integer.v1"},
-  "document_id":{"$ref":"#/$defs/id"},"revision":{"type":"integer","minimum":0,"maximum":18446744073709551615},
-  "document_hash":{"$ref":"#/$defs/hash"},"timeline_id":{"$ref":"#/$defs/id"},"requested_range":{"$ref":"#/$defs/range"},
-  "target":{"$ref":"#/$defs/target"},"frame_range":{"$ref":"#/$defs/ticks"},"sample_range":{"$ref":"#/$defs/ticks"},
-  "required_capabilities":{"$ref":"#/$defs/capabilities"},
-  "visual":{"type":"array","maxItems":16384,"items":{"$ref":"#/$defs/clip"}},
-  "audio":{"type":"array","maxItems":16384,"items":{"$ref":"#/$defs/clip"}},
-  "transitions":{"type":"array","maxItems":16384,"items":{"$ref":"#/$defs/transition"}},
-  "audio_bus_ids":{"type":"array","maxItems":16384,"uniqueItems":true,"items":{"$ref":"#/$defs/id"}},
-  "resources":{"type":"array","maxItems":16384,"items":{"$ref":"#/$defs/resource"}},"fingerprint":{"$ref":"#/$defs/hash"}
- },
- "$defs":{
-  "id":{"type":"string","minLength":1,"maxLength":1024,"pattern":"\\S"},
-  "hash":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
-  "time":{"type":"object","additionalProperties":false,"required":["value","rate"],"properties":{"value":{"type":"integer","minimum":-9223372036854775808,"maximum":9223372036854775807},"rate":{"type":"integer","minimum":1,"maximum":9223372036854775807}}},
-  "range":{"type":"object","additionalProperties":false,"required":["start","duration"],"properties":{"start":{"$ref":"#/$defs/time"},"duration":{"allOf":[{"$ref":"#/$defs/time"},{"properties":{"value":{"type":"integer","minimum":1,"maximum":9223372036854775807}}}]}}},
-  "ticks":{"type":"object","additionalProperties":false,"required":["first","count"],"properties":{"first":{"type":"integer","minimum":-9223372036854775808,"maximum":9223372036854775807},"count":{"type":"integer","minimum":0,"maximum":9223372036854775807}}},
-  "index":{"type":"integer","minimum":0,"maximum":4294967295},
-  "track_kind":{"enum":["video","audio","text","vector"]},
-  "asset_kind":{"enum":["video","audio","image","font","data","text","vector"]},
-  "feature":{"type":"string","maxLength":1048576,"pattern":"^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*\\.v[1-9][0-9]*$"},
-  "capabilities":{"type":"object","additionalProperties":false,"required":["track_kinds","asset_kinds","features"],"properties":{
-   "track_kinds":{"type":"array","maxItems":16384,"uniqueItems":true,"items":{"$ref":"#/$defs/track_kind"}},
-   "asset_kinds":{"type":"array","maxItems":16384,"uniqueItems":true,"items":{"$ref":"#/$defs/asset_kind"}},
-   "features":{"type":"array","maxItems":16384,"uniqueItems":true,"items":{"$ref":"#/$defs/feature"}}
-  }},
-  "target":{"type":"object","additionalProperties":false,"required":["timeline_id","width","height","frame_clock","sample_clock","channels","pixel_format","color_space"],"properties":{
-   "timeline_id":{"$ref":"#/$defs/id"},"width":{"type":"integer","minimum":1,"maximum":2147483647},"height":{"type":"integer","minimum":1,"maximum":2147483647},"channels":{"type":"integer","minimum":1,"maximum":2147483647},
-   "pixel_format":{"type":"string","minLength":1,"maxLength":1048576,"pattern":"\\S"},"color_space":{"type":"string","minLength":1,"maxLength":1048576,"pattern":"\\S"},
-   "frame_clock":{"type":"object","additionalProperties":false,"required":["origin","frames_per_second"],"properties":{"origin":{"$ref":"#/$defs/time"},"frames_per_second":{"allOf":[{"$ref":"#/$defs/time"},{"properties":{"value":{"type":"integer","minimum":1,"maximum":9223372036854775807}}}]}}},
-   "sample_clock":{"type":"object","additionalProperties":false,"required":["origin","samples_per_second"],"properties":{"origin":{"$ref":"#/$defs/time"},"samples_per_second":{"type":"integer","minimum":1,"maximum":9223372036854775807}}}
-  }},
-  "binding":{"type":"object","additionalProperties":false,"required":["track_id","clip_id","asset_id","track_kind","asset_kind","track_index","clip_index","timeline_range","source_range","font_asset_id","audio_bus_id"],"properties":{
-   "track_id":{"$ref":"#/$defs/id"},"clip_id":{"$ref":"#/$defs/id"},"asset_id":{"$ref":"#/$defs/id"},"track_kind":{"$ref":"#/$defs/track_kind"},"asset_kind":{"$ref":"#/$defs/asset_kind"},"track_index":{"$ref":"#/$defs/index"},"clip_index":{"$ref":"#/$defs/index"},"timeline_range":{"$ref":"#/$defs/range"},"source_range":{"$ref":"#/$defs/range"},"font_asset_id":{"type":"string","maxLength":1024},"audio_bus_id":{"type":"string","maxLength":1024}
-  }},
-  "clip":{"type":"object","additionalProperties":false,"required":["binding","visible_timeline_range","visible_source_range"],"properties":{"binding":{"$ref":"#/$defs/binding"},"visible_timeline_range":{"$ref":"#/$defs/range"},"visible_source_range":{"$ref":"#/$defs/range"}}},
-  "resource":{"type":"object","additionalProperties":false,"required":["asset_id","kind","content_hash"],"properties":{"asset_id":{"$ref":"#/$defs/id"},"kind":{"enum":["video","audio","image","font","data"]},"content_hash":{"anyOf":[{"const":""},{"$ref":"#/$defs/hash"}]}},"if":{"properties":{"kind":{"const":"font"}}},"then":{"properties":{"content_hash":{"$ref":"#/$defs/hash"}}}},
-  "handle":{"type":"object","additionalProperties":false,"required":["kind","timeline_range","source_range"],"properties":{"kind":{"enum":["head","tail"]},"timeline_range":{"$ref":"#/$defs/range"},"source_range":{"$ref":"#/$defs/range"}}},
-  "participant":{"type":"object","additionalProperties":false,"required":["binding","sampled_timeline_range","sampled_source_range","handles"],"properties":{"binding":{"$ref":"#/$defs/binding"},"sampled_timeline_range":{"$ref":"#/$defs/range"},"sampled_source_range":{"$ref":"#/$defs/range"},"handles":{"type":"array","maxItems":2,"items":{"$ref":"#/$defs/handle"}}}},
-  "transition":{"type":"object","additionalProperties":false,"required":["transition_id","transition_index","profile","cut","pre_duration","post_duration","timeline_range","active_timeline_range","outgoing","incoming"],"properties":{
-   "transition_id":{"$ref":"#/$defs/id"},"transition_index":{"$ref":"#/$defs/index"},"profile":{"const":"cutly.transition.dissolve.v1"},"cut":{"$ref":"#/$defs/time"},
-   "pre_duration":{"allOf":[{"$ref":"#/$defs/time"},{"properties":{"value":{"type":"integer","minimum":0,"maximum":9223372036854775807}}}]},
-   "post_duration":{"allOf":[{"$ref":"#/$defs/time"},{"properties":{"value":{"type":"integer","minimum":0,"maximum":9223372036854775807}}}]},
-   "timeline_range":{"$ref":"#/$defs/range"},"active_timeline_range":{"$ref":"#/$defs/range"},"outgoing":{"$ref":"#/$defs/participant"},"incoming":{"$ref":"#/$defs/participant"}
-  }}
- }
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.cutly.dev/document-v2-render-plan/v1",
+  "title": "Cutly Document v2 Semantic RenderPlan v1",
+  "description": "Backend-neutral, URI-free semantic closure for one exact range of a committed Document v2.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "profile",
+    "canonical_json_profile",
+    "hash_profile",
+    "document_id",
+    "revision",
+    "document_hash",
+    "timeline_id",
+    "requested_range",
+    "target",
+    "frame_range",
+    "sample_range",
+    "required_capabilities",
+    "fingerprint"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "profile": {"const": "cutly.semantic.document-v2-render-plan.v1"},
+    "canonical_json_profile": {"const": "cutly.json.canonical-integer.v1"},
+    "hash_profile": {"const": "cutly.hash.sha256.document-v2-render-plan-canonical-json.v1"},
+    "document_id": {"$ref": "#/$defs/id"},
+    "revision": {"type": "integer", "minimum": 0, "maximum": 18446744073709551615},
+    "document_hash": {"$ref": "#/$defs/digest"},
+    "timeline_id": {"$ref": "#/$defs/id"},
+    "requested_range": {"$ref": "https://schemas.cutly.dev/document/v1#/$defs/positiveTimeRange"},
+    "target": {"$ref": "https://schemas.cutly.dev/render-plan/v3#/$defs/renderTarget"},
+    "frame_range": {"$ref": "https://schemas.cutly.dev/render-plan/v3#/$defs/tickRange"},
+    "sample_range": {"$ref": "https://schemas.cutly.dev/render-plan/v3#/$defs/tickRange"},
+    "required_capabilities": {"$ref": "#/$defs/capabilityRequirements"},
+    "visual": {"type": "array", "maxItems": 1048576, "items": {"$ref": "#/$defs/plannedClip"}},
+    "audio": {"type": "array", "maxItems": 1048576, "items": {"$ref": "#/$defs/plannedClip"}},
+    "transitions": {"type": "array", "maxItems": 1048576, "items": {"$ref": "#/$defs/plannedTransition"}},
+    "resources": {"type": "array", "maxItems": 1048576, "items": {"$ref": "#/$defs/resourceRef"}},
+    "fingerprint": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "\\S", "maxLength": 4096},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "trackKind": {"enum": ["video", "audio", "text", "vector"]},
+    "assetKind": {"enum": ["video", "audio", "image", "font", "data", "text", "vector"]},
+    "externalAssetKind": {"enum": ["video", "audio", "image", "font", "data"]},
+    "capabilityRequirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "track_kinds": {
+          "type": "array",
+          "maxItems": 1048576,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/trackKind"}
+        },
+        "asset_kinds": {
+          "type": "array",
+          "maxItems": 1048576,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/assetKind"}
+        },
+        "features": {
+          "type": "array",
+          "maxItems": 1048576,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*\\.v[1-9][0-9]*$", "maxLength": 256}
+        }
+      }
+    },
+    "plannedClip": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "track_id", "clip_id", "asset_id", "track_kind", "asset_kind",
+        "track_index", "clip_index", "timeline_range", "source_range",
+        "visible_timeline_range", "visible_source_range"
+      ],
+      "properties": {
+        "track_id": {"$ref": "#/$defs/id"},
+        "clip_id": {"$ref": "#/$defs/id"},
+        "asset_id": {"$ref": "#/$defs/id"},
+        "track_kind": {"$ref": "#/$defs/trackKind"},
+        "asset_kind": {"$ref": "#/$defs/assetKind"},
+        "track_index": {"type": "integer", "minimum": 0, "maximum": 2147483647},
+        "clip_index": {"type": "integer", "minimum": 0, "maximum": 2147483647},
+        "timeline_range": {"$ref": "https://schemas.cutly.dev/document/v1#/$defs/positiveTimeRange"},
+        "source_range": {"$ref": "https://schemas.cutly.dev/document/v1#/$defs/positiveTimeRange"},
+        "visible_timeline_range": {"$ref": "https://schemas.cutly.dev/document/v1#/$defs/positiveTimeRange"},
+        "visible_source_range": {"$ref": "https://schemas.cutly.dev/document/v1#/$defs/positiveTimeRange"}
+      }
+    },
+    "transitionSide": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "track_id", "clip_id", "asset_id", "track_kind", "asset_kind",
+        "track_index", "clip_index", "selected_source_range"
+      ],
+      "properties": {
+        "track_id": {"$ref": "#/$defs/id"},
+        "clip_id": {"$ref": "#/$defs/id"},
+        "asset_id": {"$ref": "#/$defs/id"},
+        "track_kind": {"$ref": "#/$defs/trackKind"},
+        "asset_kind": {"$ref": "#/$defs/assetKind"},
+        "track_index": {"type": "integer", "minimum": 0, "maximum": 2147483647},
+        "clip_index": {"type": "integer", "minimum": 0, "maximum": 2147483647},
+        "selected_source_range": {"$ref": "https://schemas.cutly.dev/document/v1#/$defs/positiveTimeRange"}
+      }
+    },
+    "plannedTransition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "transition_id", "profile", "transition_index", "pre_duration", "post_duration",
+        "window", "selected_window", "outgoing", "incoming"
+      ],
+      "properties": {
+        "transition_id": {"$ref": "#/$defs/id"},
+        "profile": {"const": "cutly.transition.dissolve.v1"},
+        "transition_index": {"type": "integer", "minimum": 0, "maximum": 2147483647},
+        "pre_duration": {"$ref": "https://schemas.cutly.dev/document/v1#/$defs/rationalTime"},
+        "post_duration": {"$ref": "https://schemas.cutly.dev/document/v1#/$defs/rationalTime"},
+        "window": {"$ref": "https://schemas.cutly.dev/document/v1#/$defs/positiveTimeRange"},
+        "selected_window": {"$ref": "https://schemas.cutly.dev/document/v1#/$defs/positiveTimeRange"},
+        "outgoing": {"$ref": "#/$defs/transitionSide"},
+        "incoming": {"$ref": "#/$defs/transitionSide"}
+      }
+    },
+    "resourceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["asset_id", "kind"],
+      "properties": {
+        "asset_id": {"$ref": "#/$defs/id"},
+        "kind": {"$ref": "#/$defs/externalAssetKind"},
+        "content_hash": {"$ref": "#/$defs/digest"}
+      }
+    }
+  }
 }

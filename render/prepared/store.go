@@ -39,11 +39,21 @@ type Store struct {
 	maxScratchEntries int
 	maxRecordBytes    int
 	fault             func(string) error
+
+	// Document v2 namespaces are separate siblings created lazily on first v2 use so v1
+	// paths, directory shapes and record bytes remain untouched.
+	entriesRootV2    string
+	scratchRootV2    string
+	locksRootV2      string
+	maxRecordBytesV2 int
 }
 
 var (
 	processGatesOnce sync.Once
-	processGates     [258]chan struct{}
+	// 256/257 are the dedicated v1 global buckets, 258/259 the dedicated v2 global buckets.
+	// Digest buckets 0-255 are reserved for entry locks only: a global gate sharing a digest
+	// bucket with a lock acquired beneath it deadlocks the nesting goroutine on itself.
+	processGates [260]chan struct{}
 )
 
 // New opens or creates a registry at a clean absolute path.
@@ -66,9 +76,16 @@ func New(root string, options Options) (*Store, error) {
 	if maximumRecord == 0 {
 		maximumRecord = DefaultMaxRecordBytes
 	}
+	maximumRecordV2 := options.MaxRecordBytesV2
+	if maximumRecordV2 == 0 {
+		maximumRecordV2 = DefaultMaxRecordBytesV2
+	}
 	if maximumEntries < 1 || maximumEntries > MaxEntries || maximumScratch < 1 || maximumScratch > MaxScratchEntries ||
 		maximumRecord < 1024 || maximumRecord > MaxRecordBytes {
 		return nil, fmt.Errorf("%w: invalid entry, scratch or record limit", ErrConfiguration)
+	}
+	if maximumRecordV2 < 1024 || maximumRecordV2 > MaxRecordBytesV2 {
+		return nil, fmt.Errorf("%w: invalid v2 record limit", ErrConfiguration)
 	}
 	parent := filepath.Dir(root)
 	if err := requireDirectory(parent); err != nil {
@@ -84,6 +101,8 @@ func New(root string, options Options) (*Store, error) {
 		root: root, entriesRoot: filepath.Join(root, "entries"), scratchRoot: filepath.Join(root, "scratch"),
 		locksRoot: filepath.Join(root, "locks"), maxEntries: maximumEntries,
 		maxScratchEntries: maximumScratch, maxRecordBytes: maximumRecord,
+		entriesRootV2: filepath.Join(root, "entries-v2"), scratchRootV2: filepath.Join(root, "scratch-v2"),
+		locksRootV2: filepath.Join(root, "locks-v2"), maxRecordBytesV2: maximumRecordV2,
 	}
 	for _, directory := range []string{store.entriesRoot, store.scratchRoot, store.locksRoot} {
 		if err := os.Mkdir(directory, 0o700); err != nil && !errors.Is(err, fs.ErrExist) {
@@ -440,6 +459,10 @@ func processGate(path string) chan struct{} {
 		return processGates[256]
 	case "scratch-global.lock":
 		return processGates[257]
+	case "entries-v2-global.lock":
+		return processGates[258]
+	case "scratch-v2-global.lock":
+		return processGates[259]
 	default:
 		return processGates[int(digest[0])]
 	}

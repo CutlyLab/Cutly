@@ -339,6 +339,37 @@ func buildGeometry(
 					effective++
 				}
 				current = clonePoint(mapped)
+			case documentv2.VectorCubicTo:
+				// Flatten the cubic bezier (current, cp1, cp2, endpoint) into line
+				// segments, then append edges. The segment count adapts to the curve's
+				// bounding-box diagonal so long curves get proportionally more segments.
+				cp1, err := transform.point(command.Points[0], commandPath+"/points/0")
+				if err != nil {
+					return nil, 0, err
+				}
+				cp2, err := transform.point(command.Points[1], commandPath+"/points/1")
+				if err != nil {
+					return nil, 0, err
+				}
+				end, err := transform.point(command.Points[2], commandPath+"/points/2")
+				if err != nil {
+					return nil, 0, err
+				}
+				segments := cubicSegmentCount(exact, current, cp1, cp2, end, DefaultMaxCubicSegments)
+				previous := clonePoint(current)
+				for segment := 1; segment <= segments; segment++ {
+					t := big.NewRat(int64(segment), int64(segments))
+					point := cubicPoint(exact, current, cp1, cp2, end, t)
+					added, err := appendRasterEdge(exact, &path.edges, previous, point, sampleRows, commandPath)
+					if err != nil {
+						return nil, 0, err
+					}
+					if added {
+						effective++
+					}
+					previous = clonePoint(point)
+				}
+				current = clonePoint(end)
 			case documentv2.VectorClose:
 				added, err := appendRasterEdge(exact, &path.edges, current, start, sampleRows, commandPath)
 				if err != nil {
@@ -698,4 +729,83 @@ func hashCanonicalSource(ctx context.Context, canonical []byte) (string, error) 
 		return "", err
 	}
 	return "sha256:" + hex.EncodeToString(hash.Sum(nil)), nil
+}
+
+// cubicSegmentCount returns the number of line segments to approximate the cubic curve,
+// proportional to the bounding-box diagonal, clamped to maxSegments.
+func cubicSegmentCount(exact exactContext, p0, p1, p2, p3 ratPoint, maxSegments int) int {
+	minX, maxX := &p0.x, &p0.x
+	minY, maxY := &p0.y, &p0.y
+	for _, p := range []*ratPoint{&p1, &p2, &p3} {
+		if p.x.Cmp(minX) < 0 {
+			minX = &p.x
+		}
+		if p.x.Cmp(maxX) > 0 {
+			maxX = &p.x
+		}
+		if p.y.Cmp(minY) < 0 {
+			minY = &p.y
+		}
+		if p.y.Cmp(maxY) > 0 {
+			maxY = &p.y
+		}
+	}
+	width := new(big.Rat).Sub(maxX, minX)
+	height := new(big.Rat).Sub(maxY, minY)
+	diagonal := new(big.Rat).Add(width, height)
+	// Scale: at least 4 segments, proportional to diagonal, at most maxSegments.
+	if diagonal.Cmp(big.NewRat(4, 1)) <= 0 {
+		return 4
+	}
+	// Use the diagonal as a rough segment count.
+	num := diagonal.Num()
+	den := diagonal.Denom()
+	estimate := num.Int64() * 8 / den.Int64()
+	if estimate < 4 {
+		estimate = 4
+	}
+	if estimate > int64(maxSegments) {
+		estimate = int64(maxSegments)
+	}
+	return int(estimate)
+}
+
+// cubicPoint evaluates the cubic bezier at parameter t (0..1) using exact rational arithmetic.
+func cubicPoint(exact exactContext, p0, p1, p2, p3 ratPoint, t *big.Rat) ratPoint {
+	// B(t) = (1-t)^3*P0 + 3*(1-t)^2*t*P1 + 3*(1-t)*t^2*P2 + t^3*P3
+	oneMinusT := new(big.Rat).Sub(big.NewRat(1, 1), t)
+	oneMinusT2 := new(big.Rat).Mul(oneMinusT, oneMinusT)
+	oneMinusT3 := new(big.Rat).Mul(oneMinusT2, oneMinusT)
+	t2 := new(big.Rat).Mul(t, t)
+	t3 := new(big.Rat).Mul(t2, t)
+
+	w0 := oneMinusT3                      // (1-t)^3
+	w1 := new(big.Rat).Mul(oneMinusT2, t) // 3*(1-t)^2*t
+	w1.Mul(w1, big.NewRat(3, 1))
+	w2 := new(big.Rat).Mul(oneMinusT, t2) // 3*(1-t)*t^2
+	w2.Mul(w2, big.NewRat(3, 1))
+	w3 := t3 // t^3
+
+	var result ratPoint
+	result.x.Add(
+		new(big.Rat).Mul(w0, &p0.x),
+		new(big.Rat).Add(
+			new(big.Rat).Mul(w1, &p1.x),
+			new(big.Rat).Add(
+				new(big.Rat).Mul(w2, &p2.x),
+				new(big.Rat).Mul(w3, &p3.x),
+			),
+		),
+	)
+	result.y.Add(
+		new(big.Rat).Mul(w0, &p0.y),
+		new(big.Rat).Add(
+			new(big.Rat).Mul(w1, &p1.y),
+			new(big.Rat).Add(
+				new(big.Rat).Mul(w2, &p2.y),
+				new(big.Rat).Mul(w3, &p3.y),
+			),
+		),
+	)
+	return result
 }

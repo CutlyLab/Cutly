@@ -52,44 +52,8 @@ func Rasterize(
 	if err != nil {
 		return nil, err
 	}
-
-	if geometry.isPixelIdentity(view, width, height) {
-		for index := range pixels {
-			if index&63 == 0 {
-				if err := pixelContextFailure(ctx, index); err != nil {
-					return nil, err
-				}
-			}
-			pixel, pixelErr := view.Pixel(index%width, index/width)
-			if pixelErr != nil {
-				return nil, rasterError(CodeSampleFailed, fmt.Sprintf("pixels/%d", index), errors.Join(ErrSampleFailed, pixelErr))
-			}
-			pixels[index] = pixel
-		}
-	} else if geometry.scaleX.Sign() != 0 && geometry.scaleY.Sign() != 0 {
-		sampler, samplerErr := newExactSampler(geometry, view.Width(), view.Height())
-		if samplerErr != nil {
-			return nil, samplerErr
-		}
-		processed := 0
-		for y := 0; y < height; y++ {
-			sampler.beginRow()
-			for x := 0; x < width; x++ {
-				if processed&63 == 0 {
-					if err := pixelContextFailure(ctx, processed); err != nil {
-						return nil, err
-					}
-				}
-				pixel, sampleErr := sampler.sample(view)
-				if sampleErr != nil {
-					return nil, rasterError(CodeSampleFailed, fmt.Sprintf("pixels/%d", processed), errors.Join(ErrSampleFailed, sampleErr))
-				}
-				pixels[processed] = pixel
-				sampler.advanceColumn()
-				processed++
-			}
-			sampler.advanceRow()
-		}
+	if err := rasterPixels(ctx, view, width, height, geometry, pixels, false); err != nil {
+		return nil, err
 	}
 	if err := contextFailure(ctx, "surface"); err != nil {
 		return nil, err
@@ -104,6 +68,113 @@ func Rasterize(
 		return nil, err
 	}
 	return result, nil
+}
+
+// RasterizeInto is Rasterize writing into caller-owned pixel storage instead of allocating and
+// copying: the caller's slice must have exactly width*height entries, its prior contents are
+// undefined, and the write either fills every entry or fails. Validation is the caller's
+// Commit step (cpucompositor Scratch), which mirrors NewSurfaceFromPixelsWithLimits exactly.
+// Degenerate transforms that rasterize to nothing leave the storage zeroed, matching Rasterize's
+// zero-allocation semantics.
+func RasterizeInto(
+	ctx context.Context,
+	source *cpucompositor.Surface,
+	width int,
+	height int,
+	transform evaluator.Transform,
+	crop evaluator.ExactRect,
+	limits Limits,
+	pixels []cpucompositor.Pixel,
+) error {
+	if ctx == nil {
+		return rasterError(CodeContextInvalid, "context", ErrContextInvalid)
+	}
+	if err := contextFailure(ctx, "context"); err != nil {
+		return err
+	}
+	normalizedLimits, err := normalizeLimits(limits)
+	if err != nil {
+		return err
+	}
+	view, err := source.View()
+	if err != nil {
+		return rasterError(CodeInputInvalid, "source", errors.Join(ErrInputInvalid, err))
+	}
+	shape, err := validateShape(view, width, height, normalizedLimits)
+	if err != nil {
+		return err
+	}
+	if len(pixels) != shape.pixelCount {
+		return rasterError(CodeInputInvalid, "pixels", ErrInputInvalid)
+	}
+	geometry, err := compileGeometry(view.Width(), view.Height(), transform, crop, normalizedLimits.MaxExactBits)
+	if err != nil {
+		return err
+	}
+	if err := contextFailure(ctx, "pixels"); err != nil {
+		return err
+	}
+	return rasterPixels(ctx, view, width, height, geometry, pixels, false)
+}
+
+func rasterPixels(
+	ctx context.Context,
+	view cpucompositor.ReadView,
+	width int,
+	height int,
+	geometry compiledGeometry,
+	pixels []cpucompositor.Pixel,
+	forceExact bool,
+) error {
+	if geometry.isPixelIdentity(view, width, height) {
+		for index := range pixels {
+			if index&63 == 0 {
+				if err := pixelContextFailure(ctx, index); err != nil {
+					return err
+				}
+			}
+			pixel, pixelErr := view.Pixel(index%width, index/width)
+			if pixelErr != nil {
+				return rasterError(CodeSampleFailed, fmt.Sprintf("pixels/%d", index), errors.Join(ErrSampleFailed, pixelErr))
+			}
+			pixels[index] = pixel
+		}
+	} else if geometry.scaleX.Sign() != 0 && geometry.scaleY.Sign() != 0 {
+		exact, samplerErr := newExactSampler(geometry, view.Width(), view.Height())
+		if samplerErr != nil {
+			return samplerErr
+		}
+		sampler := planeSampler(exact)
+		if !forceExact {
+			if fast := newFastSamplerFromExact(exact, view.Width(), view.Height()); fast != nil {
+				sampler = fast
+			}
+		}
+		processed := 0
+		for y := 0; y < height; y++ {
+			sampler.beginRow()
+			for x := 0; x < width; x++ {
+				if processed&63 == 0 {
+					if err := pixelContextFailure(ctx, processed); err != nil {
+						return err
+					}
+				}
+				pixel, sampleErr := sampler.sample(view)
+				if sampleErr != nil {
+					return rasterError(CodeSampleFailed, fmt.Sprintf("pixels/%d", processed), errors.Join(ErrSampleFailed, sampleErr))
+				}
+				pixels[processed] = pixel
+				sampler.advanceColumn()
+				processed++
+			}
+			sampler.advanceRow()
+		}
+	} else {
+		// A degenerate scale rasterizes to nothing; Rasterize's fresh allocation is zeroed, so
+		// the borrowed storage is zeroed explicitly to keep both paths byte-identical.
+		clear(pixels)
+	}
+	return nil
 }
 
 func (geometry compiledGeometry) isPixelIdentity(view cpucompositor.ReadView, width, height int) bool {
@@ -565,3 +636,17 @@ func allocatePixels(count int) (pixels []cpucompositor.Pixel, err error) {
 }
 
 func maxInt() int { return int(^uint(0) >> 1) }
+
+// planeSampler is the per-pixel stepping contract both samplers implement.
+type planeSampler interface {
+	beginRow()
+	advanceColumn()
+	advanceRow()
+	sample(view cpucompositor.ReadView) (cpucompositor.Pixel, error)
+}
+
+// newFastSamplerFromExact admits the fixed-width sampler for an already-constructed exact
+// sampler's planes and crop bounds, using the source view dimensions for the excursion check.
+func newFastSamplerFromExact(exact *exactSampler, width, height int) *fastSampler {
+	return newFastSamplerSized(exact.xPlane, exact.yPlane, width, height, exact.cropMinX, exact.cropMaxX, exact.cropMinY, exact.cropMaxY)
+}

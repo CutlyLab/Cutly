@@ -3,6 +3,7 @@ package cpucompositor
 import (
 	"fmt"
 	"math/big"
+	"math/bits"
 
 	"github.com/CutlyLab/Cutly/core/evaluator"
 )
@@ -48,6 +49,12 @@ func ApplyOpacity(source *Surface, opacity evaluator.ExactRational) (*Surface, e
 	if err != nil {
 		return nil, err
 	}
+	if fast, ok := resolveFastWeight(weight); ok {
+		for index, pixel := range source.pixels {
+			output.pixels[index] = scalePixelFast(pixel, fast)
+		}
+		return output, nil
+	}
 	for index, pixel := range source.pixels {
 		result, pixelErr := scalePixel(pixel, weight)
 		if pixelErr != nil {
@@ -79,6 +86,14 @@ func Dissolve(outgoing, incoming *Surface, outgoingWeight, incomingWeight evalua
 	if err != nil {
 		return nil, err
 	}
+	if fastLeft, okLeft := resolveFastWeight(left); okLeft {
+		if fastRight, okRight := resolveFastWeight(right); okRight {
+			for index := range outgoing.pixels {
+				output.pixels[index] = dissolvePixelFast(outgoing.pixels[index], incoming.pixels[index], fastLeft, fastRight)
+			}
+			return output, nil
+		}
+	}
 	for index := range outgoing.pixels {
 		pixel, pixelErr := dissolvePixel(outgoing.pixels[index], incoming.pixels[index], left, right)
 		if pixelErr != nil {
@@ -87,6 +102,62 @@ func Dissolve(outgoing, incoming *Surface, outgoingWeight, incomingWeight evalua
 		output.pixels[index] = pixel
 	}
 	return output, nil
+}
+
+// dissolvePixelFast combines one pixel under resolved bounded complementary weights using the
+// same 128-bit cross-multiplied numerator and round-half-to-even quotient as
+// weightedSumChannel's bounded path.
+func dissolvePixelFast(outgoing, incoming Pixel, left, right fastWeight) Pixel {
+	return Pixel{
+		R: weightedSumChannelFast(outgoing.R, incoming.R, left, right),
+		G: weightedSumChannelFast(outgoing.G, incoming.G, left, right),
+		B: weightedSumChannelFast(outgoing.B, incoming.B, left, right),
+		A: weightedSumChannelFast(outgoing.A, incoming.A, left, right),
+	}
+}
+
+// weightedSumChannelFast is weightedSumChannel with weights already resolved to uint64 parts;
+// the magnitudes admitted by the fit checks keep every intermediate inside 128 bits.
+func weightedSumChannelFast(left, right uint16, leftWeight, rightWeight fastWeight) uint16 {
+	leftHi, leftLo := bits.Mul64(uint64(left), leftWeight.numerator)
+	if leftHi != 0 {
+		return weightedSumChannelBig(left, right, leftWeight, rightWeight)
+	}
+	leftHi, leftLo = bits.Mul64(leftLo, rightWeight.denominator)
+	if leftHi != 0 {
+		return weightedSumChannelBig(left, right, leftWeight, rightWeight)
+	}
+	rightHi, rightLo := bits.Mul64(uint64(right), rightWeight.numerator)
+	if rightHi != 0 {
+		return weightedSumChannelBig(left, right, leftWeight, rightWeight)
+	}
+	rightHi, rightLo = bits.Mul64(rightLo, leftWeight.denominator)
+	if rightHi != 0 {
+		return weightedSumChannelBig(left, right, leftWeight, rightWeight)
+	}
+	denominatorHi, denominatorLo := bits.Mul64(leftWeight.denominator, rightWeight.denominator)
+	if denominatorHi != 0 {
+		return weightedSumChannelBig(left, right, leftWeight, rightWeight)
+	}
+	lo, carry := bits.Add64(leftLo, rightLo, 0)
+	rounded, _ := roundWideUint16Even(carry, lo, denominatorLo)
+	return rounded
+}
+
+// weightedSumChannelBig is the exact big.Int fallback for a bounded-weight pixel whose
+// intermediates outgrew 128 bits (possible with weights near the uint64 ceiling).
+func weightedSumChannelBig(left, right uint16, leftWeight, rightWeight fastWeight) uint16 {
+	leftTerm := new(big.Int).Mul(new(big.Int).SetUint64(uint64(left)), new(big.Int).SetUint64(leftWeight.numerator))
+	leftTerm.Mul(leftTerm, new(big.Int).SetUint64(rightWeight.denominator))
+	rightTerm := new(big.Int).Mul(new(big.Int).SetUint64(uint64(right)), new(big.Int).SetUint64(rightWeight.numerator))
+	rightTerm.Mul(rightTerm, new(big.Int).SetUint64(leftWeight.denominator))
+	numerator := new(big.Int).Add(leftTerm, rightTerm)
+	denominator := new(big.Int).Mul(new(big.Int).SetUint64(leftWeight.denominator), new(big.Int).SetUint64(rightWeight.denominator))
+	value, err := roundUint16Even(numerator, denominator)
+	if err != nil {
+		return 0
+	}
+	return value
 }
 
 // CompositeOver applies Porter-Duff source-over without mutating destination or source.
@@ -201,12 +272,79 @@ func dissolvePixel(outgoing, incoming Pixel, outgoingWeight, incomingWeight exac
 	return Pixel{R: r, G: g, B: b, A: a}, nil
 }
 
-func weightedChannel(value uint16, weight exactWeight) (uint16, error) {
-	numerator := new(big.Int).Mul(new(big.Int).SetUint64(uint64(value)), &weight.numerator)
-	return roundUint16Even(numerator, &weight.denominator)
+// fastWeight is one exact weight resolved to uint64 parts once per kernel invocation. All
+// per-pixel work then runs on fixed-width arithmetic; weights beyond uint64 keep the big.Int
+// loops.
+type fastWeight struct {
+	numerator   uint64
+	denominator uint64
 }
 
+func resolveFastWeight(weight exactWeight) (fastWeight, bool) {
+	if !weight.numerator.IsUint64() || !weight.denominator.IsUint64() {
+		return fastWeight{}, false
+	}
+	return fastWeight{numerator: weight.numerator.Uint64(), denominator: weight.denominator.Uint64()}, true
+}
+
+// scalePixelFast scales one pixel by a resolved bounded weight: identical arithmetic to
+// scalePixel through roundWideUint16Even.
+func scalePixelFast(value Pixel, weight fastWeight) Pixel {
+	return Pixel{
+		R: scaleChannelFast(value.R, weight),
+		G: scaleChannelFast(value.G, weight),
+		B: scaleChannelFast(value.B, weight),
+		A: scaleChannelFast(value.A, weight),
+	}
+}
+
+func scaleChannelFast(value uint16, weight fastWeight) uint16 {
+	hi, lo := bits.Mul64(uint64(value), weight.numerator)
+	rounded, _ := roundWideUint16Even(hi, lo, weight.denominator)
+	return rounded
+}
+
+// weightedChannel scales one channel by an exact weight. The bounded-arithmetic path below is
+// bit-identical to the historical big.Int expression: readWeight guarantees 0 <= numerator <=
+// denominator, so the quotient never exceeds the channel value, and roundWideUint16Even
+// reproduces roundUint16Even's round-half-to-even quotient rule without any allocation. Weights
+// whose parts do not fit uint64 keep the exact big.Int path.
+func weightedChannel(value uint16, weight exactWeight) (uint16, error) {
+	numerator, denominator, ok := weight.uint64Parts()
+	if ok {
+		hi, lo := bits.Mul64(uint64(value), numerator)
+		return roundWideUint16Even(hi, lo, denominator)
+	}
+	bigNumerator := new(big.Int).Mul(new(big.Int).SetUint64(uint64(value)), &weight.numerator)
+	return roundUint16Even(bigNumerator, &weight.denominator)
+}
+
+// weightedSumChannel combines two channels under complementary exact weights. The bounded path
+// forms the same cross-multiplied numerator and common denominator as the big.Int path using
+// 128-bit intermediates; Dissolve's weights-sum-to-one admission keeps the quotient within
+// uint16, so the wide division is exact and allocation-free.
 func weightedSumChannel(left, right uint16, leftWeight, rightWeight exactWeight) (uint16, error) {
+	leftNumerator, leftDenominator, leftOK := leftWeight.uint64Parts()
+	rightNumerator, rightDenominator, rightOK := rightWeight.uint64Parts()
+	if leftOK && rightOK {
+		leftHi, leftLo := bits.Mul64(uint64(left), leftNumerator)
+		if leftHi == 0 {
+			leftHi, leftLo = bits.Mul64(leftLo, rightDenominator)
+			if leftHi == 0 {
+				rightHi, rightLo := bits.Mul64(uint64(right), rightNumerator)
+				if rightHi == 0 {
+					rightHi, rightLo = bits.Mul64(rightLo, leftDenominator)
+					if rightHi == 0 {
+						denominatorHi, denominatorLo := bits.Mul64(leftDenominator, rightDenominator)
+						if denominatorHi == 0 {
+							lo, carry := bits.Add64(leftLo, rightLo, 0)
+							return roundWideUint16Even(uint64(carry), lo, denominatorLo)
+						}
+					}
+				}
+			}
+		}
+	}
 	leftTerm := new(big.Int).Mul(new(big.Int).SetUint64(uint64(left)), &leftWeight.numerator)
 	leftTerm.Mul(leftTerm, &rightWeight.denominator)
 	rightTerm := new(big.Int).Mul(new(big.Int).SetUint64(uint64(right)), &rightWeight.numerator)
@@ -214,6 +352,38 @@ func weightedSumChannel(left, right uint16, leftWeight, rightWeight exactWeight)
 	numerator := new(big.Int).Add(leftTerm, rightTerm)
 	denominator := new(big.Int).Mul(&leftWeight.denominator, &rightWeight.denominator)
 	return roundUint16Even(numerator, denominator)
+}
+
+// uint64Parts returns the weight as uint64 parts when both fit.
+func (weight exactWeight) uint64Parts() (numerator, denominator uint64, ok bool) {
+	if weight.numerator.IsUint64() && weight.denominator.IsUint64() {
+		return weight.numerator.Uint64(), weight.denominator.Uint64(), true
+	}
+	return 0, 0, false
+}
+
+// roundWideUint16Even returns the round-half-to-even quotient of the 128-bit numerator by the
+// uint64 denominator, failing when the quotient cannot be a channel value. It allocates nothing.
+func roundWideUint16Even(numeratorHi, numeratorLo, denominator uint64) (uint16, error) {
+	if denominator == 0 {
+		return 0, ErrInvalidWeight
+	}
+	if numeratorHi >= denominator {
+		// A quotient at or beyond 2^64 cannot be a channel value; Div64 would also panic on it.
+		return 0, ErrInvalidWeight
+	}
+	quotient, remainder := bits.Div64(numeratorHi, numeratorLo, denominator)
+	// Compare remainder/denominator with one half without forming remainder*2.
+	half := denominator / 2
+	aboveHalf := remainder > half
+	exactHalf := denominator&1 == 0 && remainder == half
+	if aboveHalf || exactHalf && quotient&1 == 1 {
+		quotient++
+	}
+	if quotient > mathMaxUint16 {
+		return 0, ErrInvalidWeight
+	}
+	return uint16(quotient), nil
 }
 
 func roundUint16Even(numerator, denominator *big.Int) (uint16, error) {
@@ -279,4 +449,100 @@ func roundRatioUint16Even(numerator, denominator uint64) (uint16, error) {
 		return 0, ErrInvalidWeight
 	}
 	return uint16(quotient), nil
+}
+
+// WipeLeft produces the wipe transition: the incoming surface reveals from right to left
+// with a hard edge at the given exact progress (0 = all outgoing, 1 = all incoming).
+func WipeLeft(outgoing, incoming *Surface, progress evaluator.ExactRational) (*Surface, error) {
+	if err := matchingSurfaces(outgoing, incoming); err != nil {
+		return nil, err
+	}
+	fraction, err := readWeight(progress, "wipe.progress")
+	if err != nil {
+		return nil, err
+	}
+	output, err := emptyLike(outgoing)
+	if err != nil {
+		return nil, err
+	}
+	width := outgoing.width
+	boundary := int64(width)
+	if fraction.numerator.IsInt64() && fraction.denominator.IsInt64() && fraction.denominator.Int64() > 0 {
+		boundary = int64(width) * fraction.numerator.Int64() / fraction.denominator.Int64()
+	}
+	for index := range outgoing.pixels {
+		x := index % width
+		if int64(x) < boundary {
+			output.pixels[index] = incoming.pixels[index]
+		} else {
+			output.pixels[index] = outgoing.pixels[index]
+		}
+	}
+	return output, nil
+}
+
+// FadeThroughBlack produces the fade transition: outgoing fades to black then incoming
+// fades in, with the exact progress determining the blend (0 = outgoing, 0.5 = black, 1 = incoming).
+func FadeThroughBlack(outgoing, incoming *Surface, progress evaluator.ExactRational) (*Surface, error) {
+	if err := matchingSurfaces(outgoing, incoming); err != nil {
+		return nil, err
+	}
+	fraction, err := readWeight(progress, "fade.progress")
+	if err != nil {
+		return nil, err
+	}
+	output, err := emptyLike(outgoing)
+	if err != nil {
+		return nil, err
+	}
+	black := Pixel{}
+	// Determine which half of the fade we're in
+	half := new(big.Int).Rsh(&fraction.denominator, 1)
+	incomingSide := fraction.numerator.Cmp(half) > 0
+	if !incomingSide {
+		// Fading outgoing to black
+		weight := new(big.Int).Lsh(&fraction.numerator, 1) // 0..denominator
+		scale := exactWeight{numerator: *new(big.Int).Sub(&fraction.denominator, weight), denominator: fraction.denominator}
+		for index := range outgoing.pixels {
+			pixel, err := scalePixel(outgoing.pixels[index], scale)
+			if err != nil {
+				return nil, kernelError(CodeInvalidWeight, fmt.Sprintf("fade/pixels/%d", index), err)
+			}
+			output.pixels[index] = pixel
+		}
+	} else {
+		// Fading in from black
+		weight := new(big.Int).Lsh(&fraction.numerator, 1)
+		weight.Sub(weight, &fraction.denominator) // 0..denominator
+		scale := exactWeight{numerator: *weight, denominator: fraction.denominator}
+		for index := range incoming.pixels {
+			pixel, err := scalePixel(incoming.pixels[index], scale)
+			if err != nil {
+				return nil, kernelError(CodeInvalidWeight, fmt.Sprintf("fade/pixels/%d", index), err)
+			}
+			output.pixels[index] = pixel
+		}
+	}
+	_ = black
+	return output, nil
+}
+
+// WipeLeftInto is WipeLeft in place into target.
+func WipeLeftInto(target, outgoing, incoming *Surface, progress evaluator.ExactRational) error {
+	result, err := WipeLeft(outgoing, incoming, progress)
+	if err != nil {
+		return err
+	}
+	copy(target.pixels, result.pixels)
+	return nil
+}
+
+// FadeThroughBlackInto is FadeThroughBlack in place into target.
+func FadeThroughBlackInto(target, outgoing, incoming *Surface, progress evaluator.ExactRational) error {
+	result, err := FadeThroughBlack(outgoing, incoming, progress)
+	if err != nil {
+		return err
+	}
+	copy(target.pixels, result.pixels)
+	return nil
 }

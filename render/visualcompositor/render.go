@@ -21,6 +21,29 @@ func (program *Program) RenderAt(
 	at documentv2.RationalTime,
 	providers Providers,
 ) (Result, error) {
+	return program.renderAtMode(ctx, timelineID, at, providers, nil)
+}
+
+// RenderAtWithScratch is RenderAt reusing one bounded scratch pool for the frame's intermediate
+// surfaces. Outputs are byte-identical to RenderAt; only the intermediate allocation strategy
+// differs. The promoted result surface escapes the pool and is never recycled by this call.
+func (program *Program) RenderAtWithScratch(
+	ctx context.Context,
+	timelineID documentv2.ID,
+	at documentv2.RationalTime,
+	providers Providers,
+	scratch *cpucompositor.Scratch,
+) (Result, error) {
+	return program.renderAtMode(ctx, timelineID, at, providers, scratch)
+}
+
+func (program *Program) renderAtMode(
+	ctx context.Context,
+	timelineID documentv2.ID,
+	at documentv2.RationalTime,
+	providers Providers,
+	scratch *cpucompositor.Scratch,
+) (Result, error) {
 	resolved, err := program.validateRuntime(ctx, providers)
 	if err != nil {
 		return Result{}, err
@@ -29,7 +52,7 @@ func (program *Program) RenderAt(
 	if err != nil {
 		return Result{}, compositorError(CodeEvaluationFailed, "timeline", errors.Join(ErrEvaluationFailed, err))
 	}
-	return program.renderEvaluation(ctx, evaluated, resolved)
+	return program.renderEvaluation(ctx, evaluated, resolved, scratch)
 }
 
 func (program *Program) RenderFrame(
@@ -47,7 +70,32 @@ func (program *Program) RenderFrame(
 	if err != nil {
 		return FrameResult{}, compositorError(CodeEvaluationFailed, "frame", errors.Join(ErrEvaluationFailed, err))
 	}
-	result, err := program.renderEvaluation(ctx, evaluated.Timeline, resolved)
+	result, err := program.renderEvaluation(ctx, evaluated.Timeline, resolved, nil)
+	if err != nil {
+		return FrameResult{}, err
+	}
+	return FrameResult{CompositionFrameIndex: compositionFrameIndex, Result: result}, nil
+}
+
+// RenderFrameWithScratch is RenderFrame with bounded intermediate-surface reuse; outputs are
+// byte-identical to RenderFrame.
+func (program *Program) RenderFrameWithScratch(
+	ctx context.Context,
+	timelineID documentv2.ID,
+	clock videoedit.FrameClock,
+	compositionFrameIndex int64,
+	providers Providers,
+	scratch *cpucompositor.Scratch,
+) (FrameResult, error) {
+	resolved, err := program.validateRuntime(ctx, providers)
+	if err != nil {
+		return FrameResult{}, err
+	}
+	evaluated, err := program.evaluator.EvaluateVisualFrame(timelineID, clock, compositionFrameIndex)
+	if err != nil {
+		return FrameResult{}, compositorError(CodeEvaluationFailed, "frame", errors.Join(ErrEvaluationFailed, err))
+	}
+	result, err := program.renderEvaluation(ctx, evaluated.Timeline, resolved, scratch)
 	if err != nil {
 		return FrameResult{}, err
 	}
@@ -84,6 +132,7 @@ func (program *Program) renderEvaluation(
 	ctx context.Context,
 	evaluated evaluator.TimelineEvaluation,
 	providers Providers,
+	scratch *cpucompositor.Scratch,
 ) (Result, error) {
 	if evaluated.LayerOrder != LayerOrderProfile {
 		return Result{}, compositorError(CodeUnsupportedLayer, "timeline/layer_order", ErrUnsupportedLayer)
@@ -118,7 +167,7 @@ func (program *Program) renderEvaluation(
 				return Result{}, compositorError(CodeUnsupportedLayer, path, ErrUnsupportedLayer)
 			}
 			var receipt SourceReceipt
-			surface, receipt, err = program.renderClip(ctx, *layer.Clip, providers, nil, path+"/clip")
+			surface, receipt, err = program.renderClip(ctx, *layer.Clip, providers, nil, scratch, path+"/clip")
 			if err == nil {
 				layerReceipts = []SourceReceipt{receipt}
 			}
@@ -128,7 +177,7 @@ func (program *Program) renderEvaluation(
 				layer.Transition.Outgoing.TrackIndex != layer.TrackIndex || layer.Transition.Incoming.TrackIndex != layer.TrackIndex {
 				return Result{}, compositorError(CodeUnsupportedLayer, path, ErrUnsupportedLayer)
 			}
-			surface, layerReceipts, err = program.renderTransition(ctx, *layer.Transition, providers, path+"/transition")
+			surface, layerReceipts, err = program.renderTransition(ctx, *layer.Transition, providers, scratch, path+"/transition")
 		default:
 			return Result{}, compositorError(CodeUnsupportedLayer, path+"/kind", ErrUnsupportedLayer)
 		}
@@ -148,12 +197,24 @@ func (program *Program) renderEvaluation(
 		if err := contextError(ctx, path+"/composite"); err != nil {
 			return Result{}, err
 		}
-		output, err = cpucompositor.CompositeOver(output, surface)
-		if err != nil {
-			if canceled := contextError(ctx, path+"/composite"); canceled != nil {
-				return Result{}, canceled
+		if scratch != nil {
+			// Byte-identical in-place source-over; the consumed layer surface returns to the
+			// pool only after a fully successful composite.
+			if err := cpucompositor.CompositeOverInto(output, surface); err != nil {
+				if canceled := contextError(ctx, path+"/composite"); canceled != nil {
+					return Result{}, canceled
+				}
+				return Result{}, compositorError(CodeKernelFailed, path+"/composite", errors.Join(ErrKernelFailed, err))
 			}
-			return Result{}, compositorError(CodeKernelFailed, path+"/composite", errors.Join(ErrKernelFailed, err))
+			scratch.Recycle(surface)
+		} else {
+			output, err = cpucompositor.CompositeOver(output, surface)
+			if err != nil {
+				if canceled := contextError(ctx, path+"/composite"); canceled != nil {
+					return Result{}, canceled
+				}
+				return Result{}, compositorError(CodeKernelFailed, path+"/composite", errors.Join(ErrKernelFailed, err))
+			}
 		}
 		if err := contextError(ctx, path+"/composite"); err != nil {
 			return Result{}, err
@@ -213,6 +274,7 @@ func (program *Program) renderClip(
 	clip evaluator.ClipEvaluation,
 	providers Providers,
 	transition *transitionSourceContext,
+	scratch *cpucompositor.Scratch,
 	path string,
 ) (*cpucompositor.Surface, SourceReceipt, error) {
 	if err := program.validateVisualProperties(clip, path+"/properties"); err != nil {
@@ -225,29 +287,71 @@ func (program *Program) renderClip(
 	if err := contextError(ctx, path+"/raster"); err != nil {
 		return nil, SourceReceipt{}, err
 	}
-	rasterized, err := cpuraster.Rasterize(ctx, source, program.config.Width, program.config.Height,
-		*clip.Properties.Transform, *clip.Properties.Crop, program.config.Limits.Raster)
-	if err != nil {
-		if canceled := contextError(ctx, path+"/raster"); canceled != nil {
-			return nil, SourceReceipt{}, canceled
+	var rasterized *cpucompositor.Surface
+	if scratch != nil {
+		target, targetErr := scratch.Target(program.config.Width, program.config.Height)
+		if targetErr != nil {
+			return nil, SourceReceipt{}, compositorError(CodeKernelFailed, path+"/raster", errors.Join(ErrKernelFailed, targetErr))
 		}
-		if errors.Is(err, cpuraster.ErrCanceled) || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-			return nil, SourceReceipt{}, compositorError(CodeCanceled, path+"/raster", errors.Join(ErrCanceled, err))
+		if rasterErr := cpuraster.RasterizeInto(ctx, source, program.config.Width, program.config.Height,
+			*clip.Properties.Transform, *clip.Properties.Crop, program.config.Limits.Raster, target.Pixels()); rasterErr != nil {
+			target.Release()
+			if canceled := contextError(ctx, path+"/raster"); canceled != nil {
+				return nil, SourceReceipt{}, canceled
+			}
+			if errors.Is(rasterErr, cpuraster.ErrCanceled) || errors.Is(rasterErr, context.Canceled) || errors.Is(rasterErr, context.DeadlineExceeded) {
+				return nil, SourceReceipt{}, compositorError(CodeCanceled, path+"/raster", errors.Join(ErrCanceled, rasterErr))
+			}
+			if errors.Is(rasterErr, cpuraster.ErrResourceLimit) {
+				return nil, SourceReceipt{}, compositorError(CodeResourceLimit, path+"/raster", errors.Join(ErrResourceLimit, rasterErr))
+			}
+			return nil, SourceReceipt{}, compositorError(CodeRasterFailed, path+"/raster", errors.Join(ErrRasterFailed, rasterErr))
 		}
-		if errors.Is(err, cpuraster.ErrResourceLimit) {
-			return nil, SourceReceipt{}, compositorError(CodeResourceLimit, path+"/raster", errors.Join(ErrResourceLimit, err))
+		committed, commitErr := target.Commit()
+		if commitErr != nil {
+			target.Release()
+			return nil, SourceReceipt{}, compositorError(CodeRasterFailed, path+"/raster", errors.Join(ErrRasterFailed, commitErr))
 		}
-		return nil, SourceReceipt{}, compositorError(CodeRasterFailed, path+"/raster", errors.Join(ErrRasterFailed, err))
+		rasterized = committed
+	} else {
+		var rasterErr error
+		rasterized, rasterErr = cpuraster.Rasterize(ctx, source, program.config.Width, program.config.Height,
+			*clip.Properties.Transform, *clip.Properties.Crop, program.config.Limits.Raster)
+		if rasterErr != nil {
+			err = rasterErr
+			if canceled := contextError(ctx, path+"/raster"); canceled != nil {
+				return nil, SourceReceipt{}, canceled
+			}
+			if errors.Is(err, cpuraster.ErrCanceled) || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				return nil, SourceReceipt{}, compositorError(CodeCanceled, path+"/raster", errors.Join(ErrCanceled, err))
+			}
+			if errors.Is(err, cpuraster.ErrResourceLimit) {
+				return nil, SourceReceipt{}, compositorError(CodeResourceLimit, path+"/raster", errors.Join(ErrResourceLimit, err))
+			}
+			return nil, SourceReceipt{}, compositorError(CodeRasterFailed, path+"/raster", errors.Join(ErrRasterFailed, err))
+		}
 	}
 	if err := contextError(ctx, path+"/opacity"); err != nil {
 		return nil, SourceReceipt{}, err
 	}
-	result, err := cpucompositor.ApplyOpacity(rasterized, *clip.Properties.Opacity)
-	if err != nil {
-		if canceled := contextError(ctx, path+"/opacity"); canceled != nil {
-			return nil, SourceReceipt{}, canceled
+	var result *cpucompositor.Surface
+	if scratch != nil {
+		if opacityErr := cpucompositor.ApplyOpacityInto(rasterized, *clip.Properties.Opacity); opacityErr != nil {
+			if canceled := contextError(ctx, path+"/opacity"); canceled != nil {
+				return nil, SourceReceipt{}, canceled
+			}
+			return nil, SourceReceipt{}, compositorError(CodeKernelFailed, path+"/opacity", errors.Join(ErrKernelFailed, opacityErr))
 		}
-		return nil, SourceReceipt{}, compositorError(CodeKernelFailed, path+"/opacity", errors.Join(ErrKernelFailed, err))
+		result = rasterized
+	} else {
+		var opacityErr error
+		result, opacityErr = cpucompositor.ApplyOpacity(rasterized, *clip.Properties.Opacity)
+		if opacityErr != nil {
+			if canceled := contextError(ctx, path+"/opacity"); canceled != nil {
+				return nil, SourceReceipt{}, canceled
+			}
+			return nil, SourceReceipt{}, compositorError(CodeKernelFailed, path+"/opacity", errors.Join(ErrKernelFailed, opacityErr))
+		}
 	}
 	if err := contextError(ctx, path+"/opacity"); err != nil {
 		return nil, SourceReceipt{}, err
@@ -259,10 +363,15 @@ func (program *Program) renderTransition(
 	ctx context.Context,
 	transition evaluator.TransitionEvaluation,
 	providers Providers,
+	scratch *cpucompositor.Scratch,
 	path string,
 ) (*cpucompositor.Surface, []SourceReceipt, error) {
-	if transition.Profile != documentv2.TransitionDissolveV1 || transition.Phase != documentv2.TransitionPhaseActive ||
-		transition.Outgoing == nil || transition.Incoming == nil || transition.Progress == nil {
+	if transition.Phase != documentv2.TransitionPhaseActive || transition.Outgoing == nil || transition.Incoming == nil || transition.Progress == nil {
+		return nil, nil, compositorError(CodeUnsupportedLayer, path, ErrUnsupportedLayer)
+	}
+	switch transition.Profile {
+	case documentv2.TransitionDissolveV1, documentv2.TransitionWipeV1, documentv2.TransitionFadeV1:
+	default:
 		return nil, nil, compositorError(CodeUnsupportedLayer, path, ErrUnsupportedLayer)
 	}
 	frozen, exists := program.transitions[transitionScopeKey{timeline: transition.TimelineID, transition: transition.TransitionID}]
@@ -281,26 +390,27 @@ func (program *Program) renderTransition(
 		id: transition.TransitionID, index: frozen.index, profile: transition.Profile,
 		role: expressionlayer.TransitionHandleIncoming,
 	}
-	outgoing, outgoingReceipt, err := program.renderClip(ctx, *transition.Outgoing, providers, outgoingContext, path+"/outgoing")
+	outgoing, outgoingReceipt, err := program.renderClip(ctx, *transition.Outgoing, providers, outgoingContext, scratch, path+"/outgoing")
 	if err != nil {
 		return nil, nil, err
 	}
 	if err := contextError(ctx, path+"/incoming"); err != nil {
 		return nil, nil, err
 	}
-	incoming, incomingReceipt, err := program.renderClip(ctx, *transition.Incoming, providers, incomingContext, path+"/incoming")
+	incoming, incomingReceipt, err := program.renderClip(ctx, *transition.Incoming, providers, incomingContext, scratch, path+"/incoming")
 	if err != nil {
 		return nil, nil, err
 	}
 	if err := contextError(ctx, path+"/dissolve"); err != nil {
 		return nil, nil, err
 	}
-	result, err := cpucompositor.Dissolve(outgoing, incoming, transition.OutgoingWeight, transition.IncomingWeight)
-	if err != nil {
-		if canceled := contextError(ctx, path+"/dissolve"); canceled != nil {
+	var result *cpucompositor.Surface
+	kernelErr := applyTransition(ctx, transition, outgoing, incoming, scratch, &result)
+	if kernelErr != nil {
+		if canceled := contextError(ctx, path+"/transition"); canceled != nil {
 			return nil, nil, canceled
 		}
-		return nil, nil, compositorError(CodeKernelFailed, path+"/dissolve", errors.Join(ErrKernelFailed, err))
+		return nil, nil, compositorError(CodeKernelFailed, path+"/transition", errors.Join(ErrKernelFailed, kernelErr))
 	}
 	if err := contextError(ctx, path+"/dissolve"); err != nil {
 		return nil, nil, err
@@ -328,4 +438,60 @@ func (program *Program) validateVisualProperties(clip evaluator.ClipEvaluation, 
 		return compositorError(CodeUnsupportedLayer, path+"/text_fill", ErrUnsupportedLayer)
 	}
 	return nil
+}
+
+// applyTransition dispatches to the correct transition kernel based on the profile.
+func applyTransition(ctx context.Context, transition evaluator.TransitionEvaluation, outgoing, incoming *cpucompositor.Surface, scratch *cpucompositor.Scratch, result **cpucompositor.Surface) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	switch transition.Profile {
+	case documentv2.TransitionDissolveV1:
+		if scratch != nil {
+			if err := cpucompositor.DissolveInto(outgoing, outgoing, incoming, transition.OutgoingWeight, transition.IncomingWeight); err != nil {
+				return err
+			}
+			scratch.Recycle(incoming)
+			*result = outgoing
+			return nil
+		}
+		r, err := cpucompositor.Dissolve(outgoing, incoming, transition.OutgoingWeight, transition.IncomingWeight)
+		if err != nil {
+			return err
+		}
+		*result = r
+		return nil
+	case documentv2.TransitionWipeV1:
+		if scratch != nil {
+			if err := cpucompositor.WipeLeftInto(outgoing, outgoing, incoming, *transition.Progress); err != nil {
+				return err
+			}
+			scratch.Recycle(incoming)
+			*result = outgoing
+			return nil
+		}
+		r, err := cpucompositor.WipeLeft(outgoing, incoming, *transition.Progress)
+		if err != nil {
+			return err
+		}
+		*result = r
+		return nil
+	case documentv2.TransitionFadeV1:
+		if scratch != nil {
+			if err := cpucompositor.FadeThroughBlackInto(outgoing, outgoing, incoming, *transition.Progress); err != nil {
+				return err
+			}
+			scratch.Recycle(incoming)
+			*result = outgoing
+			return nil
+		}
+		r, err := cpucompositor.FadeThroughBlack(outgoing, incoming, *transition.Progress)
+		if err != nil {
+			return err
+		}
+		*result = r
+		return nil
+	default:
+		return fmt.Errorf("unsupported transition profile %q", transition.Profile)
+	}
 }

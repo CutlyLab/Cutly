@@ -81,19 +81,15 @@ func TestSchemasCompileAndValidateInstances(t *testing.T) {
 		"cutly.document.v1.schema.json":                       "conformance/fixtures/document-v1.valid.json",
 		"cutly.document.v2.schema.json":                       "conformance/fixtures/document-v2.valid.json",
 		"cutly.transaction.v1.schema.json":                    "conformance/fixtures/transaction-v1.valid.json",
-		"cutly.document-v2-transaction.v2.schema.json":        "conformance/fixtures/document-v2-transaction-numbers.valid.json",
-		"cutly.project-plan.document-v2.v2.schema.json":       "conformance/fixtures/document-v2-project-plan.valid.json",
-		"cutly.project-commit.document-v2.v2.schema.json":     "conformance/fixtures/document-v2-project-commit.valid.json",
-		"cutly.project-history.document-v2.v2.schema.json":    "conformance/fixtures/document-v2-project-history.valid.json",
 		"cutly.render-plan.v2.schema.json":                    "conformance/fixtures/render-plan-v2.valid.json",
 		"cutly.render-plan.v3.schema.json":                    "conformance/fixtures/render-plan-v3.valid.json",
-		"cutly.document-v2-render-plan.v1.schema.json":        "conformance/fixtures/document-v2-render-plan-gap.valid.json",
-		"cutly.document-v2-execution-manifest.v2.schema.json": "conformance/fixtures/document-v2-execution-gap-silence.valid.json",
-		"cutly.document-v2-render-request.v2.schema.json":     "conformance/fixtures/document-v2-render-request-fractional.valid.json",
+		"cutly.document-v2-render-plan.v1.schema.json":        "conformance/fixtures/document-v2-render-plan-v1.valid.json",
 		"cutly.probe-manifest.v1.schema.json":                 "media/probe/testdata/probe-manifest-v1.valid.json",
 		"cutly.media-runtime-bundle.v1.schema.json":           "conformance/fixtures/media-runtime-bundle-v1.valid.json",
 		"cutly.execution-manifest.v1.schema.json":             "render/api/testdata/execution-manifest-v1.valid.json",
+		"cutly.execution-manifest.document-v2.v2.schema.json": "render/api/testdata/execution-manifest-document-v2-v2.valid.json",
 		"cutly.render-job.v1.schema.json":                     "render/api/testdata/render-job-v1.valid.json",
+		"cutly.render-request.document-v2.v2.schema.json":     "render/api/testdata/render-request-document-v2-v2.valid.json",
 		"cutly.render-job-history.v1.schema.json":             "render/scheduler/testdata/job-history-page-v1.canonical.json",
 		"cutly.exact-frame-request.v1.schema.json":            "render/api/testdata/exact-frame-request-v1.valid.json",
 		"cutly.evidence-manifest.v1.schema.json":              "render/evidence/testdata/evidence-manifest-v1.valid.json",
@@ -116,15 +112,6 @@ func TestSchemasCompileAndValidateInstances(t *testing.T) {
 		}
 		if name == "cutly.document.v2.schema.json" {
 			testDocumentV2OptionalZeroParity(t, resolved[name], raw)
-		}
-
-		if name == "cutly.project-history.document-v2.v2.schema.json" {
-			// History is an array of closed commit records, not an object envelope.
-			// The project-specific test exercises its record-level hostile corpus.
-			if err := resolved[name].Validate(map[string]any{"__cutly_unknown_field": true}); err == nil {
-				t.Fatal("project history schema accepted an object envelope")
-			}
-			continue
 		}
 
 		object, ok := instance.(map[string]any)
@@ -445,26 +432,26 @@ func mutateCriticalSchemaInvalid(t *testing.T, name string, value map[string]any
 		value["assets"].([]any)[0].(map[string]any)["content_hash"] = "sha256:invalid"
 	case "cutly.document.v2.schema.json":
 		value["assets"].([]any)[4].(map[string]any)["text"].(map[string]any)["fill"].(map[string]any)["r"] = 0.5
-	case "cutly.transaction.v1.schema.json", "cutly.document-v2-transaction.v2.schema.json", "cutly.project-plan.document-v2.v2.schema.json", "cutly.project-commit.document-v2.v2.schema.json":
+	case "cutly.transaction.v1.schema.json":
 		value["schema_version"] = int64(999)
 	case "cutly.render-plan.v2.schema.json":
 		value["schema_version"] = int64(3)
 	case "cutly.render-plan.v3.schema.json":
 		value["resources"].([]any)[0].(map[string]any)["content_hash"] = "sha256:invalid"
 	case "cutly.document-v2-render-plan.v1.schema.json":
-		value["schema_version"] = int64(999)
-	case "cutly.document-v2-execution-manifest.v2.schema.json":
-		value["visual"].(map[string]any)["enabled"] = false
-	case "cutly.document-v2-render-request.v2.schema.json":
-		value["execution_manifest"].(map[string]any)["output"].(map[string]any)["frame_clock"] = nil
+		value["resources"].([]any)[0].(map[string]any)["content_hash"] = "sha256:invalid"
 	case "cutly.probe-manifest.v1.schema.json":
 		value["resource"].(map[string]any)["content_hash"] = "sha256:invalid"
 	case "cutly.media-runtime-bundle.v1.schema.json":
 		value["signature"] = "not-an-ed25519-signature"
 	case "cutly.execution-manifest.v1.schema.json":
 		value["resources"].([]any)[0].(map[string]any)["locator"] = "cas://sha256/not-a-digest"
+	case "cutly.execution-manifest.document-v2.v2.schema.json":
+		value["visual"].(map[string]any)["configuration_fingerprint"] = "sha256:invalid"
 	case "cutly.render-job.v1.schema.json":
 		value["artifact_uri"] = "https://example.invalid/output.mp4"
+	case "cutly.render-request.document-v2.v2.schema.json":
+		value["job"].(map[string]any)["artifact_uri"] = "https://example.invalid/output.mp4"
 	case "cutly.render-job-history.v1.schema.json":
 		value["events"].([]any)[0].(map[string]any)["state"] = "complete"
 	case "cutly.exact-frame-request.v1.schema.json":

@@ -1,9 +1,0 @@
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://schemas.cutly.dev/cutly.project-history.document-v2.v2.schema.json",
-  "title": "Cutly Document v2 project history page",
-  "description": "One bounded History result in ascending commit sequence. Sequences may have gaps because planning and discarding also advance state. Ordering, uniqueness and continuity require service verification.",
-  "type": "array",
-  "maxItems": 1024,
-  "items": {"$ref": "cutly.project-commit.document-v2.v2.schema.json"}
-}

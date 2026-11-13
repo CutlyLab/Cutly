@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.cutly.dev/cutly.render-request.document-v2.v2.schema.json",
+  "title": "Cutly Document v2 RenderRequest v2",
+  "description": "A scheduler job, Document v2 semantic plan and ExecutionManifest v2 that must be rebound to the authoritative Document before execution.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["job", "plan", "execution_manifest"],
+  "properties": {
+    "job": {"$ref": "https://schemas.cutly.dev/render-job/v1"},
+    "plan": {"$ref": "https://schemas.cutly.dev/document-v2-render-plan/v1"},
+    "execution_manifest": {"$ref": "https://schemas.cutly.dev/cutly.execution-manifest.document-v2.v2.schema.json"}
+  }
+}

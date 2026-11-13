@@ -79,6 +79,26 @@ type Adapter struct {
 	fingerprint       string
 	identity          BuildIdentity
 	options           Options
+
+	// verifyMu guards verifiedStat, the stat tuple of the executable at its last successful
+	// full-content verification. verifyExecutable re-hashes only when the tuple changes.
+	verifyMu     sync.Mutex
+	verifiedStat verifiedTuple
+	verified     bool
+}
+
+// verifiedTuple is the cheap observable identity of the executable: same file (device+inode),
+// size and modification time. A binary replacement that preserves all three while changing
+// content is outside what the per-frame re-verification can observe without re-hashing.
+type verifiedTuple struct {
+	size   int64
+	modSec int64
+	modNsc int64
+}
+
+func tupleFor(info os.FileInfo) verifiedTuple {
+	mod := info.ModTime()
+	return verifiedTuple{size: info.Size(), modSec: mod.Unix(), modNsc: int64(mod.Nanosecond())}
 }
 
 // Source owns one immutable, unlinked, descriptor-bound input snapshot.
@@ -645,7 +665,22 @@ func (adapter *Adapter) verifyExecutable(ctx context.Context) error {
 	if adapter == nil || adapter.executableInfo == nil {
 		return fmt.Errorf("%w: missing frozen executable identity", ErrExecutable)
 	}
-	return verifyExecutableIdentity(ctx, adapter.executable, adapter.executableInfo, adapter.binaryFingerprint)
+	info, statErr := os.Stat(adapter.executable)
+	adapter.verifyMu.Lock()
+	if statErr == nil && adapter.verified && os.SameFile(adapter.executableInfo, info) && tupleFor(info) == adapter.verifiedStat {
+		adapter.verifyMu.Unlock()
+		return nil
+	}
+	adapter.verifyMu.Unlock()
+	if err := verifyExecutableIdentity(ctx, adapter.executable, adapter.executableInfo, adapter.binaryFingerprint); err != nil {
+		return err
+	}
+	if info, statErr := os.Stat(adapter.executable); statErr == nil && os.SameFile(adapter.executableInfo, info) {
+		adapter.verifyMu.Lock()
+		adapter.verifiedStat, adapter.verified = tupleFor(info), true
+		adapter.verifyMu.Unlock()
+	}
+	return nil
 }
 
 func verifyExecutableIdentity(ctx context.Context, path string, frozen os.FileInfo, expectedFingerprint string) error {

@@ -2,29 +2,13 @@
 
 Status: handoff-ready execution plan
 
-Updated: 2026-11-07
+Updated: 2026-11-11
 
 Implementation branch: `codex/video-sdk-core`
 
-Original handoff base commit: `0a19a82` (`feat: expose host-bound reference surfaces`)
+Handoff base commit: `0a19a82` (`feat: expose host-bound reference surfaces`)
 
-### Standalone execution baseline (2026-11-07)
-
-Implementation continues in Go; the proposed Rust rewrite is deferred. The active standalone
-branch is `codex/video-sdk-core`, starting at `f9f891a`. The original handoff SHA `0a19a82` is not
-present in this repository's history. Commit `cabbfbb` has the surface-bridge implementation and
-subject; this identifies the local code baseline, not a proof of commit equivalence or a rerun of
-the historical audit below.
-
-The owner has deferred Manyfy integration work. Execute and validate within standalone Cutly only:
-do not edit the sibling consumer, create replacement module files, or run its consumer tests in this
-execution scope. Existing Cutly legacy compatibility gates remain mandatory. Manyfy acceptance is
-explicitly deferred, not passed, and must be tracked separately from standalone SDK readiness.
-
-Begin with S1 and preserve the stage dependency gates. Save independently reviewable, tested
-boundaries as local commits; no push, package publication, tag, or daemon default switch is implied.
-S1 acceptance evidence is recorded in `DOCUMENT_V2_S1_EVIDENCE.md`; the active S2 ledger is
-`DOCUMENT_V2_S2_EVIDENCE.md`.
+Render-pipeline design companion: [`RENDER_PIPELINE_ENHANCEMENT_PLAN.md`](RENDER_PIPELINE_ENHANCEMENT_PLAN.md)
 
 The independent release-evidence runner is implemented and its three P2 audit findings were
 independently closed at `0f08c2e`; post-repair smoke and full repository gates passed. A real long
@@ -73,9 +57,11 @@ and all of its v1/v3 protocols remain supported while the Document v2 path is ad
 
 ### 2.2 Important gaps that remain
 
-- `core/videoedit.RenderPlan` v3 represents the legacy video/audio model, not the full Document v2
-  image/vector/text/transition/AudioBus semantics.
-- `render/api.ExecutionManifest` v1 cannot identity-bind a Document v2 visual/audio program.
+- `core/renderplanv2` now freezes the full range-scoped Document v2 semantic closure, but production
+  prepare/execution still consumes the legacy `core/videoedit.RenderPlan` v3 path until S3-S6.
+- additive `render/api.ExecutionManifestV2` and `RenderRequestV2` now identity-bind the exact
+  Document v2 resource closure, visual/audio programs, pipeline/transport and output profiles, but
+  production preparation/execution does not consume their document-bound handles until S3-S6.
 - `render/prepared.Environment` v1 cannot reconstruct a Document v2 program after restart.
 - production `cutlyd` does not wire real Document v2 Surface/PCM providers or a chunk assembler.
 - the current reference visual native source path does not yet provide temporal video decode.
@@ -169,6 +155,23 @@ Do not broaden this package into a persistence layer. S1-S3 own durable identity
 
 ## 6. Stage S1 — freeze the Document v2 semantic RenderPlan
 
+Status: **complete; independent audit P0/P1/P2=0** at `f26766f` + `a1da432` + `06706de` +
+`d5f493b` + `f34f388`, hardened by `a80444b`, `1fd3909` and `d8312bd`.
+
+Implemented evidence:
+
+- additive `core/renderplanv2` profile, model, Resolve and strict canonical codec, with separate
+  immutable wire-verified and Document-bound handles; neither grants host execution authority;
+- exact ordinary clip intersections plus separately frozen transition-handle source ranges;
+- range-scoped capabilities and external resource closure, including indirect pinned fonts;
+- Draft 2020-12 schema plus mixed, transition, empty-gap, invalid and canonical fixtures;
+- portable target bounds, document/node/canonical-byte admission limits and bounded cancellation
+  checkpoints before retained plan construction;
+- hostile coverage for noncanonical member order, duplicate resources/capabilities, recomputed
+  Document/font/capability omission, range overflow, legacy-plan confusion, oversized input,
+  ownership and concurrent immutable reads;
+- focused race/vet, full Cutly Go suite, and linux/windows/darwin/freebsd cross-build gates pass.
+
 ### 6.1 Objective
 
 Create a deterministic, backend-neutral plan that says exactly what part of one Document v2 will
@@ -227,7 +230,7 @@ Resolve(ctx, document, requestedRange, target) (Plan, []documentv2.Diagnostic)
 Canonical(plan Plan) ([]byte, error)
 Decode(raw []byte) (Plan, error)
 Verify(plan Plan) (VerifiedPlan, error)
-VerifyAgainstDocument(ctx, plan, document) error
+VerifyAgainstDocument(ctx, plan, document) (DocumentBoundPlan, error)
 ```
 
 ### 6.3 Semantic rules
@@ -273,14 +276,34 @@ concurrent read safety.
 
 - focused package, race and vet tests pass;
 - all existing Document v1/v2 and RenderPlan v3 fixtures remain byte-identical;
-- independent audit has no P0/P1/P2.
+- independent audit must report no P0/P1/P2 before the next persistence stage begins.
 
 ## 7. Stage S2 — freeze ExecutionManifest and RenderRequest v2
 
+Status: **complete; independent audit P0/P1/P2=0** at commits `6b4bc4b`, `53ed1b6`, `0fd282c`,
+`ea5567a`, `a80444b`, `1fd3909` and `d8312bd`.
+
+Implemented evidence:
+
+- only `DocumentBoundPlan` can freeze a verified Manifest v2, and
+  `BindRenderRequestV2` with the authoritative Document produces an immutable integrity handle;
+  neither handle is host execution authority, which is deliberately deferred to S3 reconstruction;
+- exact resource closure, probe/inspection separation, backend capabilities, provider/runtime
+  builds, pipeline/transport pairing, RGBA16/PCM16LE intermediate profiles, explicit visual/audio
+  programs and bounded canonical configuration are fingerprinted and reverified;
+- strict canonical codecs, unique Draft 2020-12 schemas and fixed valid/invalid/canonical fixtures
+  are registered in offline conformance;
+- ownership, cancellation, concurrency, nested tamper, recomputed omission, range derivation,
+  locator, capability, profile, configuration, oversize and v1 compatibility tests pass;
+- focused race, full vet, full Go suite and linux/windows/darwin-amd64/darwin-arm64/freebsd compile
+  gates pass.
+
 ### 7.1 Objective
 
-Freeze how one verified S1 plan will execute, including authorized resources and exact
-visual/audio program selection. Keep ExecutionManifest v1 and RenderRequest v1 unchanged.
+Freeze the declared inputs for how one verified S1 plan is intended to execute, including exact
+resource and visual/audio program identities. S2 proves canonical/document integrity only; S3
+must reconstruct and authorize every resource and executable identity. Keep ExecutionManifest v1
+and RenderRequest v1 unchanged.
 
 ### 7.2 Proposed types
 
@@ -377,17 +400,18 @@ while `Decoded*Profile` continues to describe the final artifact after decode.
   format-specific inspection fingerprint and must omit the FFprobe fingerprint. Inline vector/text
   resources are not materialized entries. Any other kind needs an explicit versioned rule or stable
   rejection.
-- Locator scheme and locator pass the existing secure materialization rules; no traversal, NUL,
-  symlink substitution or caller-selected host roots.
+- Locator scheme and locator have portable canonical wire spelling (`cas://sha256/...` or a
+  hostless absolute `file:///...` URI). A locator remains untrusted at S2; S3 must resolve it under
+  a host-owned root with no-follow semantics, verify ownership/size and rehash the opened bytes.
 - Plan fingerprint, semantic profile and Document hash agree at every level.
 - For each enabled Visual/Audio selection, profile, descriptor, config and source-manifest
   fingerprints are mandatory and enter the manifest fingerprint; a disabled selection must omit
   all of them.
 - Backend capability sets are sorted unique and satisfy every S1 requirement.
-- `ProviderBuild` is a host-owned canonical executable digest. It enters the manifest fingerprint;
-  `ChunkAssemblyRequestV2.ProviderExecutableDigest` and every provider/worker receipt must equal it
-  exactly. `CompilerBuild` and `EvaluatorBuild` remain separate identities rather than accepting a
-  caller-selected free-form provider string.
+- `ProviderBuild`, `CompilerBuild`, `EvaluatorBuild` and runtime digests are declared expected
+  identities and enter the manifest fingerprint, but do not authorize themselves. S3 must obtain
+  the actual identities from host-owned factories and require exact equality before it emits an
+  executable handle. Later provider/worker receipts must equal that host-attested identity.
 - RenderJob range is a valid subrange and its frame/sample ranges are re-derived exactly.
 - The selected intermediate video profile is canonical RGBA16, while final decoded video remains
   RGBA8; neither field may masquerade as the other.
@@ -509,7 +533,7 @@ subset.
 
 ### 9.3 Audio provider work
 
-- build sources only from manifest-authorized probe/decoder identities;
+- build sources only from probe/decoder identities attested by S3 host authorization;
 - map exact source ranges into AudioGraph;
 - apply channel matrix, automation, buses, gain/pan and limiter under frozen profiles;
 - render canonical stereo PCM16LE blocks for arbitrary sample ranges;
@@ -721,7 +745,7 @@ root, symlink/integrity rejection, exclusive lock, revision/hash CAS, journaled 
 publication, idempotent replay, crash recovery, immutable history and persisted inverse. Reuse
 hardened primitives where appropriate, but do not alias v1 records whose wire semantics differ.
 
-Add `schemas/cutly.document-v2-transaction.v2.schema.json` and any versioned project
+Add `schemas/cutly.transaction.document-v2.v2.schema.json` and any versioned project
 plan/commit/history schemas with unique `$id` values. Register valid instances offline and freeze
 valid, invalid and canonical fixtures plus hashes. Test every operation and inverse, multi-operation
 atomicity, stable IDs, stale revision, duplicate ID/idempotency conflict, invalid property type,
@@ -968,28 +992,23 @@ Deferred capabilities must produce stable preflight rejection. They must not be 
 
 ## 18. Next-agent start instructions
 
-1. Confirm branch `codex/video-sdk-core` and inspect staged/unstaged files; preserve unrelated work.
-   Use the standalone baseline above rather than requiring the absent historical `0a19a82`.
-2. Read this document, the current stage evidence and existing protocol patterns before editing.
-   Manyfy work and consumer tests remain deferred by the owner.
-3. S1 is complete; continue S2 additively in `render/api`. Preserve legacy manifest/request/job,
-   output/evidence contracts and all existing canonical fixtures.
-4. Freeze concrete profiles/types, strict codecs, schemas and minimal canonical fixtures together;
-   separate structural identity verification from host-owned execution authorization.
-5. Run the full S2 exit gate and obtain independent read-only audit closure before S3.
-6. Update the status table below after each stage, including commit IDs and evidence paths.
+1. Confirm the branch contains `d8312bd` and the worktree has no unexpected staged files.
+2. Read this document, the owner complete plan and the existing protocol patterns before editing.
+3. Start S3 additively in `render/prepared`; do not alter Prepared v1 bytes or behavior.
+4. Freeze the Environment v2 record/schema/fixture before wiring reconstruction factories.
+5. Update the status table below after each stage, including commit IDs and evidence paths.
 
 ## 19. Handoff status table
 
 | Stage | Status | Evidence / next action |
 | --- | --- | --- |
 | S0 Surface bridge | Complete | `0a19a82`; P0/P1/P2=0 |
-| S1 Document v2 plan | Complete | `74edd28`, `9db5e5f`, `5e64a65`; final gates passed with documented wasm subset; independent P0/P1/P2 closure in `DOCUMENT_V2_S1_EVIDENCE.md` |
-| S2 Manifest/request v2 | Implemented; independent audit blocked | `5bb222d`, `8cb6172`, `66a0b0b`, `0951ad3`; full Go/target gates passed; reviewer service terminated before final closure; see `DOCUMENT_V2_S2_EVIDENCE.md`; do not enter S3 |
-| S3 Prepared v2 | Not started | Depends on verified S1/S2 |
+| S1 Document v2 plan | Complete; independent audit P0/P1/P2=0 | `a80444b` adds protocol/runtime parity; `1fd3909` adds conservative pre-encode admission; `d8312bd` closes RawMessage byte/value/depth/cancellation coverage; all gates pass |
+| S2 Manifest/request v2 | Complete; independent audit P0/P1/P2=0 | S2 handles are integrity-only; portable locator syntax, aggregate budgets and complete struct admission pass independent re-audit; S3 remains the mandatory host-authorization boundary |
+| S3 Prepared v2 | Complete; independent audit P0=0 P1=0 (one documented P2 design note) | `render/prepared` PutV2/ResolveV2 with the full six-step reverification, complete hostile-path matrix (fault injection, cross-process, late-target, cancellation, on-disk corruption) and pinned canonical fixture; `RebuildReferenceVisual` factory binding descriptor, configuration and source-manifest identities; independent audit findings fixed and closed in `docs/S3_PREPARED_V2_AUDIT.md`; v1 bytes and tests unchanged |
 | S4 Provider bundle | Not started | Depends on restart-safe S3 |
 | S5 Assembler/Evidence v2 | Not started | Depends on real S4 providers |
 | S6 Production runtime/cache | Not started | Depends on S3-S5 |
-| S7a Mutation/project core | Complete | `ea396d3`: typed core, durable store, schemas/fixtures, final full/race/vet/cross-target gates and independent reviews; see `DOCUMENT_V2_S7A_EVIDENCE.md`; S2 remains blocked |
+| S7a Mutation/project core | Not started | May run beside S1-S6; required before public edit APIs |
 | S7 Public SDK/CLI/Agent | Not started | Depends on S6 and audited S7a |
 | S8 Player/UI/release | Not started | Depends on S6/S7 and parallel release lane |

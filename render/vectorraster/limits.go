@@ -45,7 +45,10 @@ type Limits struct {
 	MaxWorkingBytes         uint64 `json:"max_working_bytes"`
 	MaxRetainedBytes        uint64 `json:"max_retained_bytes"`
 	MaxWorkUnits            uint64 `json:"max_work_units"`
+	MaxCubicSegments        int    `json:"max_cubic_segments"`
 }
+
+const DefaultMaxCubicSegments = 64
 
 func DefaultLimits() Limits {
 	return Limits{
@@ -53,7 +56,7 @@ func DefaultLimits() Limits {
 		MaxPaths: DefaultMaxPaths, MaxCommands: DefaultMaxCommands, MaxEdges: DefaultMaxEdges,
 		MaxExactBits: DefaultMaxExactBits, MaxCanonicalSourceBytes: DefaultMaxCanonicalSourceBytes,
 		MaxWorkingBytes: DefaultMaxWorkingBytes, MaxRetainedBytes: DefaultMaxRetainedBytes,
-		MaxWorkUnits: DefaultMaxWorkUnits,
+		MaxWorkUnits: DefaultMaxWorkUnits, MaxCubicSegments: DefaultMaxCubicSegments,
 	}
 }
 

@@ -4,29 +4,6 @@ This document records the release boundary for Cutly `0.1.0-rc.1`. It is an
 acceptance checklist for the restricted native hard-cut SDK, not a claim that
 Cutly is already a general nonlinear editor.
 
-## Broad Document v2 M4 tracking
-
-The active broad M4 implementation is tracked in
-[`DOCUMENT_V2_NATIVE_SDK_ROADMAP.md`](DOCUMENT_V2_NATIVE_SDK_ROADMAP.md), not by the
-restricted RC matrix below. As of 2026-11-07, S1 is accepted, S2 implementation has
-passed local gates but lacks final independent audit closure, and the independent
-S7a mutation/project prerequisite is complete and independently reviewed at `ea396d3`
-(see `DOCUMENT_V2_S7A_EVIDENCE.md`). S3–S8 broad runtime/product acceptance
-is not complete. Manyfy integration remains explicitly deferred by the owner.
-
-Release automation in source is not execution evidence. The signed-runtime
-verifier and build-owned trust policy already exist, but tagged workflow builds
-remain development builds until approved media bundles and trust pins are supplied.
-The checked-in dependency notices/SBOM cover source dependencies, not an approved
-FFmpeg binary-distribution closure. Production signing keys, license approval,
-actual multi-platform runs and one-hour/nightly soak evidence cannot be fabricated
-from unit-test names or cross-compilation. Push, tag, publication and daemon-default
-changes still require explicit owner authorization.
-
-The independent restricted-RC evidence runner and its measured synthetic streaming/RSS baseline
-are tracked in [`RELEASE_EVIDENCE_RUNNER.md`](RELEASE_EVIDENCE_RUNNER.md). They are release-test
-infrastructure, not broad Document v2 runtime acceptance or a signed media-bundle claim.
-
 ## Completion matrix
 
 | M4 surface | Source status | Implemented acceptance boundary | Evidence |
@@ -53,7 +30,7 @@ go mod tidy -diff
 go vet ./...
 go test -race -count=1 ./...
 npm --prefix sdk/typescript test
-npm --prefix sdk/typescript run pack:check
+npm --prefix sdk/typescript pack --dry-run
 ```
 
 The full race suite includes the production HTTP mux and public Go SDK path:

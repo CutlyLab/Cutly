@@ -14,21 +14,15 @@ violates a stronger v2 invariant receives stable diagnostics and no partial resu
 for example, URI-only fonts that cannot satisfy v2 font pinning and track/asset combinations that
 v1 did not constrain. Representable unknown properties use a digest-bound legacy envelope and
 remain capability-gated rather than being silently dropped.
-- `cutly.transaction.v1.schema.json` describes the seven legacy typed operations.
-- `cutly.document-v2-transaction.v2.schema.json` describes the additive 32-kind typed editing
-  union in `core/transactionv2`. Its `cutly.transaction.document-v2.number-preserving.v2` profile
-  preserves authored JSON number tokens in metadata, annotations and extensions; do not run it
-  through the integer-only canonicalizer. Decode accepts exact canonical bytes only. Typed
-  inverses carry target-postimage predicates; revision/hash CAS and final Document validation
-  remain core checks, not schema claims.
-- `cutly.project-plan.document-v2.v2.schema.json`, `cutly.project-commit.document-v2.v2.schema.json`
-  and `cutly.project-history.document-v2.v2.schema.json` describe additive local v2 project records
-  and a bounded history page. Record codecs verify intrinsic bindings; the project service must
-  additionally recompute candidates/inverses and verify the persisted history chain. These records
-  do not authorize actions merely because their hashes match. The independent S7a audit remains
-  required before public SDK/Agent edit integration.
+- `cutly.transaction.v1.schema.json` describes the seven currently implemented typed operations.
 - `cutly.render-plan.v3.schema.json` describes the current backend-neutral semantic plan, including
   composition clocks, compiled tick ranges, required capabilities and URI-free resources.
+- `cutly.document-v2-render-plan.v1.schema.json` additively freezes the exact selected closure of a
+  committed Document v2: ordinary visual/audio intersections, explicit transition-handle source
+  ranges, indirect pinned-font resources, composition clocks and range-scoped semantic
+  capabilities. Its strict decoder accepts only canonical `cutly.json.canonical-integer.v1` bytes;
+  execution must additionally rebind it to the committed Document through
+  `renderplanv2.VerifyAgainstDocument`.
 - `cutly.render-plan.v2.schema.json` is retained only as a legacy wire reference. Execution code
   rejects v2 and rebuilds a v3 plan from the committed Document instead of guessing a migration.
 - `cutly.probe-manifest.v1.schema.json` describes immutable resource identity, pinned probe identity,
@@ -39,8 +33,18 @@ remain capability-gated rather than being silently dropped.
   before it returns executable paths.
 - `cutly.execution-manifest.v1.schema.json` freezes backend/runtime/output choices plus controlled
   worker locators and versioned decoded-evidence byte profiles for one semantic plan.
+- `cutly.execution-manifest.document-v2.v2.schema.json` additively freezes the exact Document v2
+  resource closure, native visual/audio program identities and canonical configuration, provider
+  build, restartable/streaming pipeline and transport choice, RGBA16/PCM16LE intermediate profiles,
+  backend capabilities and final evidence profiles. Execution additionally requires rebinding the
+  value to a `renderplanv2.DocumentBoundPlan`; a valid standalone fingerprint is not authorization.
 - `cutly.render-job.v1.schema.json` binds an idempotent full-plan or chunk range to both the semantic
   plan and execution-manifest fingerprints.
+- `cutly.render-request.document-v2.v2.schema.json` carries one scheduler job, Document v2 semantic
+  plan and ExecutionManifest v2. Its standalone decoder proves canonical wire integrity and nested
+  identity consistency; `BindRenderRequestV2` with the authoritative Document produces an opaque
+  integrity handle for persistence and S3 reconstruction, not execution authority. Only a later
+  host-authorized handle may enter execution.
 - `cutly.render-job-history.v1.schema.json` describes a bounded cursor page from the durable
   scheduler lifecycle journal, with strict submitted/start/cancel/terminal unions and an atomic
   current snapshot. It is deliberately named `history`: structured stage progress remains a

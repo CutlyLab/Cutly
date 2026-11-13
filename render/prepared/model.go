@@ -25,6 +25,11 @@ type Options struct {
 	MaxEntries        int
 	MaxScratchEntries int
 	MaxRecordBytes    int
+	// MaxRecordBytesV2 bounds one complete Document v2 environment record. Zero selects
+	// DefaultMaxRecordBytesV2. The v1 and v2 namespaces each admit up to MaxEntries entries
+	// and MaxScratchEntries scratch directories, so one root can hold twice the per-namespace
+	// budget across both namespaces combined.
+	MaxRecordBytesV2 int
 }
 
 // Key is the complete immutable identity of one prepared environment.

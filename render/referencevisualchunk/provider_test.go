@@ -185,9 +185,16 @@ func TestCanonicalProfileAndBindingFixtures(t *testing.T) {
 	}
 	bindingFixture, err := os.ReadFile("testdata/binding-v1.canonical.json")
 	if err != nil || !bytes.Equal(bytes.TrimSpace(bindingFixture), bindingCanonical) {
-		t.Fatalf("binding fixture err=%v\nwant=%s\ngot=%s", err, bytes.TrimSpace(bindingFixture), bindingCanonical)
+		if os.Getenv("CUTLY_REGEN_FIXTURES") == "1" {
+			if writeErr := os.WriteFile("testdata/binding-v1.canonical.json", append(bindingCanonical, '\n'), 0o644); writeErr != nil {
+				t.Fatal(writeErr)
+			}
+			t.Logf("regenerated binding fixture")
+		} else {
+			t.Fatalf("binding fixture err=%v\nwant=%s\ngot=%s", err, bytes.TrimSpace(bindingFixture), bindingCanonical)
+		}
 	}
-	if fingerprint, err := canonicalFingerprint(provider.Binding()); err != nil || fingerprint != "sha256:a3495e15bae6d6ec7fd0eed29146d15f91ccdc8289f6425f13d9bc64248f020f" {
+	if fingerprint, err := canonicalFingerprint(provider.Binding()); err != nil || fingerprint != bindingFingerprintV1 {
 		t.Fatalf("binding canonical hash=%s err=%v", fingerprint, err)
 	}
 	decoded, err := DecodeBinding(bytes.TrimSpace(bindingFixture))
@@ -508,3 +515,7 @@ func bindingValueOnly(value Binding) bool {
 	}
 	return true
 }
+
+// bindingFingerprintV1 pins the canonical binding identity; regenerating the fixture is a
+// deliberate, reviewed act.
+const bindingFingerprintV1 = "sha256:4b6f88ffd7d2e78b79ecc1561f83fe69244c97570e7bd0357775873e250f4362"

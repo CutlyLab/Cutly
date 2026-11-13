@@ -17,6 +17,7 @@ import (
 	"github.com/CutlyLab/Cutly/render/cpuraster"
 	"github.com/CutlyLab/Cutly/render/expressionlayer"
 	"github.com/CutlyLab/Cutly/render/nativepngsource"
+	"github.com/CutlyLab/Cutly/render/nativevideo"
 	"github.com/CutlyLab/Cutly/render/pngencode"
 	"github.com/CutlyLab/Cutly/render/rastercompositor"
 	"github.com/CutlyLab/Cutly/render/textassembly"
@@ -63,6 +64,7 @@ type Config struct {
 	ExpressionLimits expressionlayer.Limits  `json:"expression_limits"`
 	TextConfig       *textlayer.Config       `json:"text_config,omitempty"`
 	CompositorLimits visualcompositor.Limits `json:"compositor_limits"`
+	VideoLimits      nativevideo.Limits      `json:"video_limits"`
 	OutputLimits     color.OutputLimits      `json:"output_limits"`
 	PNGLimits        pngencode.Limits        `json:"png_limits"`
 	PipelineLimits   PipelineLimits          `json:"pipeline_limits"`
@@ -89,6 +91,7 @@ func DefaultConfig(width, height int) Config {
 	return Config{
 		Width: width, Height: height,
 		NativeLimits: nativepngsource.DefaultLimits(), ExpressionLimits: expressionlayer.DefaultLimits(),
+		VideoLimits:      nativevideo.DefaultLimits(),
 		CompositorLimits: visualcompositor.DefaultLimits(), OutputLimits: color.DefaultOutputLimits(),
 		PNGLimits: pngencode.DefaultLimits(), PipelineLimits: DefaultPipelineLimits(),
 	}
@@ -98,6 +101,7 @@ func DefaultConfig(width, height int) Config {
 // v1 native image/vector/output default. DefaultConfig intentionally remains Text-free.
 func DefaultConfigV2(width, height int) Config {
 	result := DefaultConfig(width, height)
+	result.VideoLimits = nativevideo.DefaultLimits()
 	textConfig := defaultTextConfigV2()
 	result.TextConfig = &textConfig
 	result.PipelineLimits = defaultPipelineLimitsV2()
@@ -133,13 +137,14 @@ type Program struct {
 	native       *nativepngsource.Provider
 	expression   *expressionlayer.Provider
 	text         *textlayer.Provider
+	video        *nativevideo.Provider
 	v2           bool
 	manifest     SourceManifest
 	diagnostics  []documentv2.Diagnostic
 }
 
 func Compile(ctx context.Context, document documentv2.Document, bindings []Binding, config Config) (*Program, []documentv2.Diagnostic, error) {
-	return compile(ctx, document, bindings, nil, config, false)
+	return compile(ctx, document, bindings, nil, nil, config, false, false)
 }
 
 // CompileV2 adds the pinned-font static Text path. Font bindings remain explicit document-scoped
@@ -151,7 +156,22 @@ func CompileV2(
 	fontBindings []textlayer.FontBinding,
 	config Config,
 ) (*Program, []documentv2.Diagnostic, error) {
-	return compile(ctx, document, pngBindings, fontBindings, config, true)
+	return compile(ctx, document, pngBindings, fontBindings, nil, config, true, false)
+}
+
+// CompileV2Video is the additive host-bound temporal-video mode: v2 semantics plus
+// nativevideo sources for video assets. Video bindings are host-authorized decoder sources
+// whose identity must pin each video asset's declared content hash; the wrapper never opens
+// media itself.
+func CompileV2Video(
+	ctx context.Context,
+	document documentv2.Document,
+	pngBindings []Binding,
+	fontBindings []textlayer.FontBinding,
+	videoBindings []nativevideo.Binding,
+	config Config,
+) (*Program, []documentv2.Diagnostic, error) {
+	return compile(ctx, document, pngBindings, fontBindings, videoBindings, config, true, true)
 }
 
 func compile(
@@ -159,8 +179,10 @@ func compile(
 	document documentv2.Document,
 	bindings []Binding,
 	fontBindings []textlayer.FontBinding,
+	videoBindings []nativevideo.Binding,
 	config Config,
 	v2 bool,
+	video bool,
 ) (*Program, []documentv2.Diagnostic, error) {
 	if ctx == nil {
 		return nil, nil, pipelineError(CodeContextInvalid, "context", ErrContextInvalid)
@@ -171,6 +193,13 @@ func compile(
 	normalized, visualConfig, err := normalizeConfigMode(config, v2)
 	if err != nil {
 		return nil, nil, err
+	}
+	if video {
+		// The temporal-video capability is additive on the v2 surface: the compositor
+		// advertises video sources and the decoder's semantic profiles, and the native video
+		// provider enforces binding completeness and identity separately.
+		visualConfig.Source.Video = true
+		visualConfig.NativeProfiles.Video = nativevideo.Profiles()
 	}
 	if err := preflightBindings(ctx, bindings, normalized.NativeLimits); err != nil {
 		return nil, nil, err
@@ -239,6 +268,16 @@ func compile(
 	if err != nil {
 		return nil, diagnostics, classifyExpressionCompile(err)
 	}
+	var videoProvider *nativevideo.Provider
+	if video {
+		videoProvider, err = nativevideo.Compile(ctx, frozen, videoBindings, normalized.VideoLimits)
+		if err != nil {
+			return nil, diagnostics, pipelineError(CodeStageMismatch, "compile/video", errors.Join(ErrStageMismatch, err))
+		}
+		if videoProvider.DocumentHash() != documentHash {
+			return nil, diagnostics, pipelineError(CodeStageMismatch, "compile/video", ErrStageMismatch)
+		}
+	}
 	var text *textlayer.Provider
 	if v2 {
 		text, err = textlayer.Compile(ctx, frozen, fontBindings, *normalized.TextConfig)
@@ -260,6 +299,7 @@ func compile(
 	}
 	manifestsValid := native.DocumentHash() == documentHash && expression.DocumentHash() == documentHash &&
 		nativeConfig.Limits == normalized.NativeLimits && expressionConfig.Limits == normalized.ExpressionLimits &&
+		(videoProvider == nil || videoProvider.DocumentHash() == documentHash) &&
 		validNativeManifest(ctx, nativeManifest, frozen, normalized.NativeLimits) &&
 		validExpressionManifest(ctx, expressionManifest, frozen, normalized.ExpressionLimits)
 	if v2 {
@@ -310,7 +350,7 @@ func compile(
 	}
 	program := &Program{
 		documentHash: documentHash, config: normalized, visual: visual, native: native, expression: expression,
-		text: text, v2: v2, manifest: cloneSourceManifest(manifest), diagnostics: cloneDiagnostics(diagnostics),
+		text: text, video: videoProvider, v2: v2, manifest: cloneSourceManifest(manifest), diagnostics: cloneDiagnostics(diagnostics),
 	}
 	if err := contextError(ctx, "compile/publish"); err != nil {
 		return nil, diagnostics, err
@@ -336,6 +376,9 @@ func normalizeConfigMode(value Config, v2 bool) (Config, visualcompositor.Config
 		result.ExpressionLimits = expressionlayer.DefaultLimits()
 	} else {
 		result.ExpressionLimits = fillExpressionDefaults(result.ExpressionLimits)
+	}
+	if result.VideoLimits == (nativevideo.Limits{}) {
+		result.VideoLimits = nativevideo.DefaultLimits()
 	}
 	if v2 {
 		textConfig := defaultTextConfigV2()
@@ -840,6 +883,18 @@ func (program *Program) SourceManifest() SourceManifest {
 		return SourceManifest{}
 	}
 	return cloneSourceManifest(program.manifest)
+}
+
+// CompiledPipeline returns the immutable compositor program and provider bindings this
+// reference program compiled with. The values are shared read-only handles for production
+// session layers that drive the same pixels through visualcompositor directly; mutating or
+// re-binding them is outside every profile contract. RenderAt/RenderFrame on this Program
+// remain the authoritative validated export path.
+func (program *Program) CompiledPipeline() (*visualcompositor.Program, visualcompositor.Providers) {
+	if program == nil || program.visual == nil {
+		return nil, visualcompositor.Providers{}
+	}
+	return program.visual, program.providers()
 }
 
 func cloneSourceManifest(value SourceManifest) SourceManifest {
