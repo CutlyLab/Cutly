@@ -77,6 +77,10 @@ func Rasterize(ctx context.Context, source documentv2.VectorSource, limits Limit
 	if err != nil {
 		return nil, Receipt{}, err
 	}
+	rasterProfile, receiptProfile, err := profilesForSource(source.Profile)
+	if err != nil {
+		return nil, Receipt{}, err
+	}
 
 	canonicalSource, err := videoedit.CanonicalJSON(source)
 	if err != nil {
@@ -147,7 +151,7 @@ func Rasterize(ctx context.Context, source documentv2.VectorSource, limits Limit
 	}
 
 	resultReceipt := Receipt{
-		SchemaVersion: ReceiptSchemaVersion, Profile: ReceiptProfileV1, RasterProfile: ProfileV1,
+		SchemaVersion: ReceiptSchemaVersion, Profile: receiptProfile, RasterProfile: rasterProfile,
 		SourceProfile: source.Profile, SourceHashProfile: SourceHashProfileV1,
 		SourceSemanticHash: sourceHash, PaintProfile: color.ProfileRGBA16SRGBPaintV1,
 		KernelProfile: cpucompositor.KernelProfileV1, SurfaceProfile: cpucompositor.SurfaceProfileV1,
@@ -159,6 +163,17 @@ func Rasterize(ctx context.Context, source documentv2.VectorSource, limits Limit
 		RetainedBytes: measure.retainedBytes,
 	}
 	return result, resultReceipt, nil
+}
+
+func profilesForSource(sourceProfile string) (rasterProfile, receiptProfile string, err error) {
+	switch sourceProfile {
+	case documentv2.VectorProfilePathViewportPXV2:
+		return ProfileV1, ReceiptProfileV1, nil
+	case documentv2.VectorProfilePathViewportPXV3:
+		return ProfileV2, ReceiptProfileV2, nil
+	default:
+		return "", "", rasterError(CodeProfileUnsupported, "source/profile", ErrProfileUnsupported)
+	}
 }
 
 func surfaceConstructionError(err error) error {
@@ -339,6 +354,41 @@ func buildGeometry(
 					effective++
 				}
 				current = clonePoint(mapped)
+			case documentv2.VectorCubicTo:
+				controls := [3]ratPoint{}
+				for pointIndex := range controls {
+					mapped, err := transform.point(command.Points[pointIndex], fmt.Sprintf("%s/points/%d", commandPath, pointIndex))
+					if err != nil {
+						return nil, 0, err
+					}
+					controls[pointIndex] = mapped
+				}
+				previous := clonePoint(current)
+				for segment := uint64(1); segment <= CubicFlatteningSegmentsV3; segment++ {
+					visits++
+					if visits&15 == 0 {
+						if err := contextFailure(ctx, "raster/geometry/cubic"); err != nil {
+							return nil, 0, err
+						}
+					}
+					point := controls[2]
+					if segment != CubicFlatteningSegmentsV3 {
+						evaluated, err := cubicPoint(exact, current, controls[0], controls[1], controls[2], segment, commandPath)
+						if err != nil {
+							return nil, 0, err
+						}
+						point = evaluated
+					}
+					added, err := appendRasterEdge(exact, &path.edges, previous, point, sampleRows, fmt.Sprintf("%s/segments/%d", commandPath, segment-1))
+					if err != nil {
+						return nil, 0, err
+					}
+					if added {
+						effective++
+					}
+					previous = clonePoint(point)
+				}
+				current = clonePoint(controls[2])
 			case documentv2.VectorClose:
 				added, err := appendRasterEdge(exact, &path.edges, current, start, sampleRows, commandPath)
 				if err != nil {
@@ -361,6 +411,63 @@ func buildGeometry(
 		}
 	}
 	return paths, effective, contextFailure(ctx, "raster/geometry")
+}
+
+func cubicPoint(
+	exact exactContext,
+	start, control1, control2, end ratPoint,
+	numerator uint64,
+	path string,
+) (ratPoint, error) {
+	t, err := exact.fraction(numerator, CubicFlatteningSegmentsV3, path+"/t")
+	if err != nil {
+		return ratPoint{}, err
+	}
+	a, err := lerpPoint(exact, start, control1, &t, path+"/level1/0")
+	if err != nil {
+		return ratPoint{}, err
+	}
+	b, err := lerpPoint(exact, control1, control2, &t, path+"/level1/1")
+	if err != nil {
+		return ratPoint{}, err
+	}
+	c, err := lerpPoint(exact, control2, end, &t, path+"/level1/2")
+	if err != nil {
+		return ratPoint{}, err
+	}
+	d, err := lerpPoint(exact, a, b, &t, path+"/level2/0")
+	if err != nil {
+		return ratPoint{}, err
+	}
+	e, err := lerpPoint(exact, b, c, &t, path+"/level2/1")
+	if err != nil {
+		return ratPoint{}, err
+	}
+	return lerpPoint(exact, d, e, &t, path+"/level3/0")
+}
+
+func lerpPoint(exact exactContext, first, second ratPoint, t *big.Rat, path string) (ratPoint, error) {
+	x, err := lerpRat(exact, &first.x, &second.x, t, path+"/x")
+	if err != nil {
+		return ratPoint{}, err
+	}
+	y, err := lerpRat(exact, &first.y, &second.y, t, path+"/y")
+	if err != nil {
+		return ratPoint{}, err
+	}
+	return ratPoint{x: x, y: y}, nil
+}
+
+func lerpRat(exact exactContext, first, second, t *big.Rat, path string) (big.Rat, error) {
+	delta, err := exact.sub(second, first, path+"/delta")
+	if err != nil {
+		return big.Rat{}, err
+	}
+	scaled, err := exact.mul(&delta, t, path+"/scaled")
+	if err != nil {
+		return big.Rat{}, err
+	}
+	return exact.add(first, &scaled, path)
 }
 
 func clonePoint(value ratPoint) ratPoint {

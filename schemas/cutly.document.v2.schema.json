@@ -202,6 +202,17 @@
         "fill": {"$ref": "#/$defs/color"}
       }
     },
+    "vectorPathFillCubic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "commands", "fill_rule", "fill"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "commands": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/vectorCommand"}},
+        "fill_rule": {"enum": ["nonzero", "evenodd"]},
+        "fill": {"$ref": "#/$defs/color"}
+      }
+    },
     "rasterViewport": {
       "$comment": "Top-down square-pixel edge coordinates with no physical-size or host-DPI meaning.",
       "type": "object",
@@ -234,10 +245,23 @@
         "paths": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/vectorPathFillLinear"}}
       }
     },
+    "vectorSourceViewportPXV3": {
+      "$comment": "V2 viewport semantics plus cubic_to flattened to exactly 128 equal-parameter exact-rational chords; fill-only.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "view_box", "viewport", "paths"],
+      "properties": {
+        "profile": {"const": "cutly.vector.path-viewport-px.v3"},
+        "view_box": {"$ref": "#/$defs/rect"},
+        "viewport": {"$ref": "#/$defs/rasterViewport"},
+        "paths": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/vectorPathFillCubic"}}
+      }
+    },
     "vectorSource": {
       "oneOf": [
         {"$ref": "#/$defs/vectorSourceV1"},
-        {"$ref": "#/$defs/vectorSourceViewportPXV2"}
+        {"$ref": "#/$defs/vectorSourceViewportPXV2"},
+        {"$ref": "#/$defs/vectorSourceViewportPXV3"}
       ]
     },
     "asset": {

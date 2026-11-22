@@ -26,6 +26,7 @@ const (
 	CapabilityInterpolationCubicV1       videoedit.CapabilityID = "cutly.interpolation.cubic-bezier.v1"
 	CapabilityVectorPathV1               videoedit.CapabilityID = videoedit.CapabilityID(VectorProfilePathV1)
 	CapabilityVectorPathViewportPXV2     videoedit.CapabilityID = videoedit.CapabilityID(VectorProfilePathViewportPXV2)
+	CapabilityVectorPathViewportPXV3     videoedit.CapabilityID = videoedit.CapabilityID(VectorProfilePathViewportPXV3)
 	CapabilityVectorTransitionScopeV1    videoedit.CapabilityID = videoedit.CapabilityID(VectorTransitionScopeProfileV1)
 	CapabilityTextTransitionScopeV1      videoedit.CapabilityID = videoedit.CapabilityID(TextTransitionScopeProfileV1)
 )

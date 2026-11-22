@@ -34,7 +34,8 @@ func contextFailure(ctx context.Context, path string) error {
 }
 
 func validateAndMeasure(ctx context.Context, source documentv2.VectorSource, limits Limits) (sourceMeasure, error) {
-	if source.Profile != documentv2.VectorProfilePathViewportPXV2 {
+	if source.Profile != documentv2.VectorProfilePathViewportPXV2 &&
+		source.Profile != documentv2.VectorProfilePathViewportPXV3 {
 		return sourceMeasure{}, rasterError(CodeProfileUnsupported, "source/profile", ErrProfileUnsupported)
 	}
 	if source.Viewport == nil {
@@ -153,7 +154,12 @@ func validateAndMeasure(ctx context.Context, source documentv2.VectorSource, lim
 				}
 				open = false
 			case documentv2.VectorCubicTo:
-				return sourceMeasure{}, rasterError(CodeSourceInvalid, commandPrefix+"/op", ErrSourceInvalid)
+				if source.Profile != documentv2.VectorProfilePathViewportPXV3 || len(command.Points) != 3 || !open {
+					return sourceMeasure{}, rasterError(CodeSourceInvalid, commandPrefix+"/op", ErrSourceInvalid)
+				}
+				if err := addConceptualEdges(&measure, limits, CubicFlatteningSegmentsV3, commandPrefix); err != nil {
+					return sourceMeasure{}, err
+				}
 			default:
 				return sourceMeasure{}, rasterError(CodeSourceInvalid, commandPrefix+"/op", ErrSourceInvalid)
 			}
@@ -276,8 +282,12 @@ func validateUniquePathIDs(ctx context.Context, paths []documentv2.VectorPath) e
 }
 
 func addConceptualEdge(measure *sourceMeasure, limits Limits, path string) error {
+	return addConceptualEdges(measure, limits, 1, path)
+}
+
+func addConceptualEdges(measure *sourceMeasure, limits Limits, count uint64, path string) error {
 	var ok bool
-	measure.conceptualEdges, ok = checkedAdd(measure.conceptualEdges, 1)
+	measure.conceptualEdges, ok = checkedAdd(measure.conceptualEdges, count)
 	if !ok || measure.conceptualEdges > limits.MaxEdges {
 		return rasterError(CodeResourceLimit, path+"/edges", ErrResourceLimit)
 	}
