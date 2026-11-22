@@ -234,12 +234,12 @@ func (validator *documentValidator) validateVector(value VectorSource, path stri
 		if value.Viewport != nil {
 			validator.add(CodeAssetInvalid, path+"/viewport", fmt.Sprintf("viewport must be omitted for vector profile %q", VectorProfilePathV1))
 		}
-	case VectorProfilePathViewportPXV2:
+	case VectorProfilePathViewportPXV2, VectorProfilePathViewportPXV3:
 		if value.Viewport == nil {
-			validator.add(CodeAssetInvalid, path+"/viewport", fmt.Sprintf("viewport is required for vector profile %q", VectorProfilePathViewportPXV2))
+			validator.add(CodeAssetInvalid, path+"/viewport", fmt.Sprintf("viewport is required for vector profile %q", value.Profile))
 		}
 	default:
-		validator.add(CodeAssetInvalid, path+"/profile", fmt.Sprintf("vector profile must be %q or %q", VectorProfilePathV1, VectorProfilePathViewportPXV2))
+		validator.add(CodeAssetInvalid, path+"/profile", fmt.Sprintf("vector profile must be %q, %q, or %q", VectorProfilePathV1, VectorProfilePathViewportPXV2, VectorProfilePathViewportPXV3))
 	}
 	if value.Viewport != nil {
 		validator.validateRasterViewport(*value.Viewport, path+"/viewport")
@@ -261,7 +261,7 @@ func (validator *documentValidator) validateVector(value VectorSource, path stri
 		if vectorPath.Fill == nil && vectorPath.Stroke == nil {
 			validator.add(CodeAssetInvalid, itemPath, "vector path requires fill or stroke")
 		}
-		if value.Profile == VectorProfilePathViewportPXV2 {
+		if value.Profile == VectorProfilePathViewportPXV2 || value.Profile == VectorProfilePathViewportPXV3 {
 			if vectorPath.Fill == nil {
 				validator.add(CodeAssetInvalid, itemPath+"/fill", "viewport-px vector paths require an explicit fill")
 			}
@@ -307,7 +307,7 @@ func (validator *documentValidator) validateVector(value VectorSource, path stri
 			case VectorCubicTo:
 				want = 3
 				if value.Profile == VectorProfilePathViewportPXV2 {
-					validator.add(CodeAssetInvalid, commandPath+"/op", "viewport-px vector paths do not support cubic_to")
+					validator.add(CodeAssetInvalid, commandPath+"/op", "viewport-px v2 vector paths do not support cubic_to")
 				}
 				if !subpathOpen {
 					validator.add(CodeAssetInvalid, commandPath+"/op", "cubic_to requires an open subpath beginning with move_to")
@@ -1147,6 +1147,12 @@ func reservedSemanticToken(value string) bool {
 			textV2.OutlineProfile, textV2.RasterProfile, textV2.PaintProfile, textV2.CoverageHashProfile,
 			textV2.SemanticHashProfile, textV2.LayoutInputHashProfile, textV2.RunInputProfile,
 			textV2.UnicodeValidationProfile, textV2.UnicodeValidationHashProfile,
+		} {
+			add(token)
+		}
+		vectorV3 := VectorPathViewportDescriptorV3()
+		for _, token := range []string{
+			vectorV3.Profile, vectorV3.EvaluatorProfile, string(vectorV3.RequiredCapability),
 		} {
 			add(token)
 		}

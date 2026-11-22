@@ -11,6 +11,7 @@ const (
 	EvaluatorTextPinnedFontViewportPXV2 = "cutly.evaluator.text-pinned-font-viewport-px.v2"
 	EvaluatorVectorPathV1               = "cutly.evaluator.vector-path.v1"
 	EvaluatorVectorPathViewportPXV2     = "cutly.evaluator.vector-path-viewport-px.v2"
+	EvaluatorVectorPathViewportPXV3     = "cutly.evaluator.vector-path-viewport-px.v3"
 )
 
 const (
@@ -130,6 +131,15 @@ var textPinnedFontViewportDescriptorV2 = SourceDescriptor{
 	ExcludedResponsibilities:     "This T0 descriptor does not select or attest a GSUB/GPOS algorithm or software dependency; a T2 shape-provider profile and pinned dependency digest must close that boundary before a backend offers this capability. Automatic wrapping, bidi inference or mixed-direction runs, Unicode normalization, font fallback, TTC/OTC, WOFF/WOFF2, CFF/CFF2, variable fonts, color fonts, SVG glyphs, hinting, LCD/subpixel rendering, host DPI, rich text, HTML/CSS and text transitions are outside this profile.",
 }
 
+var vectorPathViewportDescriptorV3 = SourceDescriptor{
+	Profile: VectorProfilePathViewportPXV3, AssetKind: AssetKindVector, ValueType: "vector_source",
+	EvaluatorProfile: EvaluatorVectorPathViewportPXV3, RequiredCapability: CapabilityVectorPathViewportPXV3,
+	ValueSemantics:           "Rasterize into the declared RasterViewport using the exact xMidYMid meet, fill, sampling, paint-order and source-over rules of cutly.vector.path-viewport-px.v2. In addition to move_to, line_to and close, cubic_to is accepted and converted to exactly 128 straight chords over equal parameter intervals t=i/128 using exact rational De Casteljau evaluation after viewport mapping. Every cubic is charged as 128 conceptual edges before allocation; there is no adaptive tolerance, host vector API or platform-dependent curve approximation. Paths remain fill-only and immutable at every mapped source time.",
+	AgentDescription:         "Deterministic viewport-bound fill paths with fixed exact cubic flattening; requires a backend that explicitly advertises the v3 capability, with no SVG/XML/CSS, external references, stroke or host curve fallback.",
+	FailureSemantics:         "Unsupported commands, strokes, malformed rationals, resource overflow, exact-bit overflow, cancellation and profile mismatches fail closed without a partial surface or receipt.",
+	ExcludedResponsibilities: "Quadratic and arc commands, strokes, masks, filters, SVG/XML/CSS, external references, host DPI, animation, encoding and publication are outside this profile.",
+}
+
 // SourceDescriptors returns a profile-sorted defensive copy.
 func SourceDescriptors() []SourceDescriptor {
 	result := make([]SourceDescriptor, len(sourceDescriptorRegistry))
@@ -145,6 +155,12 @@ func TextPinnedFontViewportDescriptor() SourceDescriptor {
 	return cloneSourceDescriptor(textPinnedFontViewportDescriptorV2)
 }
 
+// VectorPathViewportDescriptorV3 returns the additive cubic-capable vector contract without
+// changing the frozen SourceDescriptors/SemanticDescriptors canonical surfaces.
+func VectorPathViewportDescriptorV3() SourceDescriptor {
+	return cloneSourceDescriptor(vectorPathViewportDescriptorV3)
+}
+
 // SourceDescriptorsWithTextV2 returns a profile-sorted defensive union of the frozen base source
 // registry and the additive Text v2 descriptor.
 func SourceDescriptorsWithTextV2() []SourceDescriptor {
@@ -158,6 +174,9 @@ func SourceDescriptorsWithTextV2() []SourceDescriptor {
 func LookupSourceDescriptor(profile string) (SourceDescriptor, bool) {
 	if profile == TextProfilePinnedFontViewportPXV2 {
 		return TextPinnedFontViewportDescriptor(), true
+	}
+	if profile == VectorProfilePathViewportPXV3 {
+		return VectorPathViewportDescriptorV3(), true
 	}
 	for _, descriptor := range sourceDescriptorRegistry {
 		if descriptor.Profile == profile {

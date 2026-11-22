@@ -152,6 +152,7 @@ const (
 const (
 	VectorProfilePathV1           = "cutly.vector.path.v1"
 	VectorProfilePathViewportPXV2 = "cutly.vector.path-viewport-px.v2"
+	VectorProfilePathViewportPXV3 = "cutly.vector.path-viewport-px.v3"
 
 	// RasterViewportMaxDimension is a schema hard gate, not an allocation promise. Renderers may
 	// advertise smaller limits, but no conforming Document v2 viewport exceeds this value.

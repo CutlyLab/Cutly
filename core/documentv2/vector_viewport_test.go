@@ -154,6 +154,59 @@ func TestVectorViewportCapabilityIsProfileSpecificAndPreflighted(t *testing.T) {
 	}
 }
 
+func TestVectorViewportV3AcceptsCubicAndNegotiatesIndependently(t *testing.T) {
+	document := vectorViewportDocument()
+	document.Assets[0].Vector.Profile = VectorProfilePathViewportPXV3
+	document.Assets[0].Vector.Paths[0].Commands[1] = VectorCommand{
+		Op: VectorCubicTo,
+		Points: []Point{
+			{X: Rational{Numerator: 30, Denominator: 1}, Y: Rational{Numerator: -20, Denominator: 1}},
+			{X: Rational{Numerator: 80, Denominator: 1}, Y: Rational{Numerator: -20, Denominator: 1}},
+			{X: Rational{Numerator: 110, Denominator: 1}, Y: Rational{Numerator: -20, Denominator: 1}},
+		},
+	}
+	assertNoDiagnostics(t, Validate(document))
+	canonical, err := CanonicalJSON(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Decode(canonical); err != nil {
+		t.Fatalf("valid v3 cubic document rejected: %v", err)
+	}
+
+	required, diagnostics := RequiredCapabilities(document)
+	if HasErrorDiagnostics(diagnostics) {
+		t.Fatalf("requirements diagnostics: %+v", diagnostics)
+	}
+	if !slices.Equal(required.Features, []videoedit.CapabilityID{CapabilityVectorPathViewportPXV3}) {
+		t.Fatalf("requirements = %+v", required)
+	}
+	offered := videoedit.BackendCapabilities{
+		BackendID:  "vector-viewport-v2-only",
+		TrackKinds: []videoedit.TrackKind{videoedit.TrackKind(TrackKindVector)},
+		AssetKinds: []videoedit.AssetKind{videoedit.AssetKind(AssetKindVector)},
+		Features:   []videoedit.CapabilityID{CapabilityVectorPathViewportPXV2},
+	}
+	if rejected := PreflightCapabilities(document, offered); len(rejected) != 1 ||
+		rejected[0].Code != CodeCapabilityFeature ||
+		!strings.Contains(rejected[0].Message, string(CapabilityVectorPathViewportPXV3)) {
+		t.Fatalf("v2-only backend did not fail closed: %+v", rejected)
+	}
+	offered.BackendID = "vector-viewport-v3"
+	offered.Features = []videoedit.CapabilityID{CapabilityVectorPathViewportPXV3}
+	if diagnostics := PreflightCapabilities(document, offered); HasErrorDiagnostics(diagnostics) {
+		t.Fatalf("matching v3 backend rejected: %+v", diagnostics)
+	}
+
+	descriptor, ok := LookupSourceDescriptor(VectorProfilePathViewportPXV3)
+	if !ok || descriptor.EvaluatorProfile != EvaluatorVectorPathViewportPXV3 ||
+		descriptor.RequiredCapability != CapabilityVectorPathViewportPXV3 ||
+		!reservedSemanticToken(VectorProfilePathViewportPXV3) ||
+		!reservedSemanticToken(EvaluatorVectorPathViewportPXV3) {
+		t.Fatalf("v3 descriptor = %+v, found=%v", descriptor, ok)
+	}
+}
+
 func vectorViewportDocument() Document {
 	zero := rationalZero()
 	return Document{

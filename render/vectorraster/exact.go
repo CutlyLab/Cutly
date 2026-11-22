@@ -28,6 +28,18 @@ func (exact exactContext) integer(value uint64, path string) (big.Rat, error) {
 	return result, nil
 }
 
+func (exact exactContext) fraction(numerator, denominator uint64, path string) (big.Rat, error) {
+	if denominator == 0 {
+		return big.Rat{}, rasterError(CodeSourceInvalid, path, ErrSourceInvalid)
+	}
+	var result big.Rat
+	result.SetFrac(new(big.Int).SetUint64(numerator), new(big.Int).SetUint64(denominator))
+	if err := exact.check(&result, path); err != nil {
+		return big.Rat{}, err
+	}
+	return result, nil
+}
+
 func (exact exactContext) add(left, right *big.Rat, path string) (big.Rat, error) {
 	var result big.Rat
 	result.Add(left, right)

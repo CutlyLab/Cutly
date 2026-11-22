@@ -9,9 +9,15 @@ import (
 const (
 	ProfileSchemaVersion = 1
 	ProfileV1            = "cutly.raster.vector-path-viewport-px-supersample8x8.v1"
+	ProfileV2            = "cutly.raster.vector-path-viewport-px-cubic128-supersample8x8.v2"
 	ReceiptSchemaVersion = 1
 	ReceiptProfileV1     = "cutly.raster.vector-path-viewport-px-supersample8x8.receipt.v1"
+	ReceiptProfileV2     = "cutly.raster.vector-path-viewport-px-cubic128-supersample8x8.receipt.v2"
 	SourceHashProfileV1  = "cutly.hash.vector-source-canonical-json.v1"
+
+	// CubicFlatteningSegmentsV3 is semantic profile state, not a quality knob. Changing it
+	// requires a new source and raster profile.
+	CubicFlatteningSegmentsV3 uint64 = 128
 )
 
 // ProfileDescriptor is the complete discovery contract. Changing any pixel rule requires a new
@@ -21,6 +27,7 @@ type ProfileDescriptor struct {
 	Profile                  string `json:"profile"`
 	InputProfile             string `json:"input_profile"`
 	GeometryMapping          string `json:"geometry_mapping"`
+	CurveFlattening          string `json:"curve_flattening,omitempty"`
 	ViewportCoordinates      string `json:"viewport_coordinates"`
 	Sampling                 string `json:"sampling"`
 	PointInFill              string `json:"point_in_fill"`
@@ -66,7 +73,37 @@ var descriptorV1 = ProfileDescriptor{
 	DefaultLimits:            DefaultLimits(),
 }
 
+var descriptorV2 = ProfileDescriptor{
+	SchemaVersion:            ProfileSchemaVersion,
+	Profile:                  ProfileV2,
+	InputProfile:             documentv2.VectorProfilePathViewportPXV3,
+	GeometryMapping:          descriptorV1.GeometryMapping,
+	CurveFlattening:          "Map every cubic start, two controls and endpoint into viewport coordinates first, then evaluate exact rational De Casteljau points at t=i/128 for i in [1,128]. Emit one straight chord from the previous point to each result, with the final point exactly equal to the authored endpoint. The fixed 128 intervals are not adaptive and use no float, tolerance, host vector API or platform state.",
+	ViewportCoordinates:      descriptorV1.ViewportCoordinates,
+	Sampling:                 descriptorV1.Sampling,
+	PointInFill:              descriptorV1.PointInFill,
+	SubpathClosure:           descriptorV1.SubpathClosure,
+	FillRules:                descriptorV1.FillRules,
+	PaintProfile:             descriptorV1.PaintProfile,
+	CoverageQuantization:     descriptorV1.CoverageQuantization,
+	Composition:              descriptorV1.Composition,
+	KernelProfile:            descriptorV1.KernelProfile,
+	SurfaceProfile:           descriptorV1.SurfaceProfile,
+	SourceHashProfile:        descriptorV1.SourceHashProfile,
+	SourceHashSemantics:      descriptorV1.SourceHashSemantics,
+	ResourceSemantics:        "Before output allocation, perform the v1 admission checks and charge every cubic command as exactly 128 conceptual edges for edge limits, logical geometry bytes and conservative work units. Limits may reject work but never reduce the segment count or select another approximation.",
+	CancellationSemantics:    descriptorV1.CancellationSemantics,
+	OwnershipSemantics:       descriptorV1.OwnershipSemantics,
+	FailureSemantics:         "Unsupported profiles, strokes, malformed commands or canonical rationals, resource overflow, exact-bit overflow, allocation failure and cancellation fail closed with a nil Surface and zero Receipt. There is no partial, adaptive or lower-quality result.",
+	ExcludedResponsibilities: "Document/timeline identity, asset lookup, clip timing, transforms, opacity, transitions, text shaping, quadratic and arc commands, strokes, masks, SVG/XML/CSS, external references, host DPI, output transfer conversion, encoding, persistence and publication are outside this package.",
+	DefaultLimits:            DefaultLimits(),
+}
+
 func Descriptor() ProfileDescriptor { return descriptorV1 }
+
+// DescriptorV2 returns the additive cubic-capable raster contract. Descriptor remains the frozen
+// v1 contract so existing discovery and canonical fixtures do not drift.
+func DescriptorV2() ProfileDescriptor { return descriptorV2 }
 
 // Receipt binds the complete successful raster result and the resource facts used to admit it.
 // It is JSON-serializable and contains no slices, pointers or maps.

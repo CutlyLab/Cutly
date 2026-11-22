@@ -74,6 +74,75 @@ func TestRasterizeMeetLetterboxAndViewportClip(t *testing.T) {
 	}
 }
 
+func TestRasterizeV3CollinearCubicMatchesLineAndVersionsReceipt(t *testing.T) {
+	fill := testColor(65_535, 12_345, 4_321, 65_535)
+	linear := testSource(3, 2, documentv2.VectorPath{
+		ID: "linear", FillRule: documentv2.VectorFillNonZero, Fill: fill,
+		Commands: []documentv2.VectorCommand{
+			move(q(0, 1), q(0, 1)), line(q(3, 1), q(0, 1)),
+			line(q(3, 1), q(2, 1)), line(q(0, 1), q(2, 1)), closeCommand(),
+		},
+	})
+	cubicSource := cloneSource(linear)
+	cubicSource.Profile = documentv2.VectorProfilePathViewportPXV3
+	cubicSource.Paths[0].ID = "cubic"
+	cubicSource.Paths[0].Commands[1] = cubic(
+		q(1, 1), q(0, 1), q(2, 1), q(0, 1), q(3, 1), q(0, 1),
+	)
+
+	linearSurface, _, err := Rasterize(context.Background(), linear, DefaultLimits())
+	if err != nil {
+		t.Fatal(err)
+	}
+	cubicSurface, receipt, err := Rasterize(context.Background(), cubicSource, DefaultLimits())
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertSurfaceEqual(t, linearSurface, cubicSurface)
+	if receipt.Profile != ReceiptProfileV2 || receipt.RasterProfile != ProfileV2 ||
+		receipt.SourceProfile != documentv2.VectorProfilePathViewportPXV3 ||
+		receipt.CommandCount != 5 || receipt.ConceptualEdgeCount != CubicFlatteningSegmentsV3+3 ||
+		receipt.EffectiveEdgeCount != 2 {
+		t.Fatalf("v3 receipt = %+v", receipt)
+	}
+}
+
+func TestRasterizeV3CurvedCubicIsDeterministicAndResourceAccounted(t *testing.T) {
+	source := testSource(8, 8, documentv2.VectorPath{
+		ID: "arch", FillRule: documentv2.VectorFillNonZero,
+		Fill: testColor(0, 50_000, 65_535, 65_535),
+		Commands: []documentv2.VectorCommand{
+			move(q(0, 1), q(8, 1)),
+			cubic(q(0, 1), q(0, 1), q(8, 1), q(0, 1), q(8, 1), q(8, 1)),
+			closeCommand(),
+		},
+	})
+	source.Profile = documentv2.VectorProfilePathViewportPXV3
+	first, firstReceipt, err := Rasterize(context.Background(), source, DefaultLimits())
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, secondReceipt, err := Rasterize(context.Background(), source, DefaultLimits())
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertSurfaceEqual(t, first, second)
+	if firstReceipt != secondReceipt || firstReceipt.ConceptualEdgeCount != CubicFlatteningSegmentsV3+1 ||
+		firstReceipt.EffectiveEdgeCount == 0 || firstReceipt.PixelHash == "" {
+		t.Fatalf("curved receipts = first %+v second %+v", firstReceipt, secondReceipt)
+	}
+	if mustPixel(t, first, 4, 7).A == 0 || mustPixel(t, first, 0, 0).A != 0 {
+		t.Fatalf("unexpected curved coverage: top-left=%+v bottom-center=%+v", mustPixel(t, first, 0, 0), mustPixel(t, first, 4, 7))
+	}
+
+	limits := DefaultLimits()
+	limits.MaxEdges = CubicFlatteningSegmentsV3
+	surface, receipt, err := Rasterize(context.Background(), source, limits)
+	if !errors.Is(err, ErrResourceLimit) || surface != nil || receipt != (Receipt{}) {
+		t.Fatalf("cubic edge budget = surface %v receipt %+v err %v", surface, receipt, err)
+	}
+}
+
 func TestRasterizeMeetWithFractionalNonzeroViewBoxOriginMatchesOracle(t *testing.T) {
 	source := testSource(4, 4, testRectPath(
 		"fractional-viewbox", q(10, 3), q(-7, 5), q(4, 1), q(-16, 15),
@@ -496,6 +565,12 @@ func move(x, y documentv2.Rational) documentv2.VectorCommand {
 
 func line(x, y documentv2.Rational) documentv2.VectorCommand {
 	return documentv2.VectorCommand{Op: documentv2.VectorLineTo, Points: []documentv2.Point{{X: x, Y: y}}}
+}
+
+func cubic(c1x, c1y, c2x, c2y, x, y documentv2.Rational) documentv2.VectorCommand {
+	return documentv2.VectorCommand{Op: documentv2.VectorCubicTo, Points: []documentv2.Point{
+		{X: c1x, Y: c1y}, {X: c2x, Y: c2y}, {X: x, Y: y},
+	}}
 }
 
 func closeCommand() documentv2.VectorCommand {

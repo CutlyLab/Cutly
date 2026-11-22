@@ -93,3 +93,38 @@ func TestRasterGoldenHashes(t *testing.T) {
 		t.Fatalf("golden fixture drift\nwant %s\n got %s", fixture, canonical)
 	}
 }
+
+func TestRasterV2GoldenHashes(t *testing.T) {
+	source := testSource(8, 8, documentv2.VectorPath{
+		ID: "arch", FillRule: documentv2.VectorFillNonZero,
+		Fill: testColor(0, 50_000, 65_535, 65_535),
+		Commands: []documentv2.VectorCommand{
+			move(q(0, 1), q(8, 1)),
+			cubic(q(0, 1), q(0, 1), q(8, 1), q(0, 1), q(8, 1), q(8, 1)),
+			closeCommand(),
+		},
+	})
+	source.Profile = documentv2.VectorProfilePathViewportPXV3
+	_, receipt, err := Rasterize(context.Background(), source, DefaultLimits())
+	if err != nil {
+		t.Fatal(err)
+	}
+	vectors := goldenVectors{SchemaVersion: 1, Profile: ProfileV2, Vectors: []goldenVector{{
+		Name: "cubic-arch-8x8", SourceSemanticHash: receipt.SourceSemanticHash, PixelHash: receipt.PixelHash,
+		WidthPixels: receipt.WidthPixels, HeightPixels: receipt.HeightPixels,
+		PathCount: receipt.PathCount, CommandCount: receipt.CommandCount,
+		ConceptualEdges: receipt.ConceptualEdgeCount, EffectiveEdges: receipt.EffectiveEdgeCount,
+	}}}
+	canonical, err := videoedit.CanonicalJSON(vectors)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixture, err := os.ReadFile(filepath.Join("testdata", "raster-v2.vectors.canonical.json"))
+	if err != nil {
+		t.Fatalf("read v2 golden fixture: %v\ncanonical: %s", err, canonical)
+	}
+	fixture = bytes.TrimSpace(fixture)
+	if !bytes.Equal(canonical, fixture) {
+		t.Fatalf("v2 golden fixture drift\nwant %s\n got %s", fixture, canonical)
+	}
+}
