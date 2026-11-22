@@ -1,0 +1,56 @@
+core/documentv2/validate.go
+  s_b4d7d514d5fad8::t_037dad52f85d16 237,239,242,264,310,1153-1155
+  s_b4d7d514d5fad8::t_4941e2d40c40f8 1156-1158
+render/vectorraster/testdata/profile-v2.canonical.json
+  s_b4d7d514d5fad8::t_ad10726471658c 1
+render/vectorraster/exact.go
+  s_b4d7d514d5fad8::t_e1ebb3397e69cd 31-42
+render/vectorraster/testdata/raster-v2.vectors.canonical.json
+  s_b4d7d514d5fad8::t_ad10726471658c 1
+core/documentv2/source_descriptors.go
+  s_b4d7d514d5fad8::t_037dad52f85d16 14,134-142,158-163,178-179
+  s_b4d7d514d5fad8::t_d90a00f5d05f93 180
+core/documentv2/model.go
+  s_b4d7d514d5fad8::t_037dad52f85d16 155
+render/vectorraster/rasterize_test.go
+  s_b4d7d514d5fad8::t_70ca67c1af8736 77-145,570-574
+  s_b4d7d514d5fad8::t_6760f2a8a2daa2 575
+core/documentv2/capabilities.go
+  s_b4d7d514d5fad8::t_037dad52f85d16 29
+render/vectorraster/profile.go
+  s_b4d7d514d5fad8::t_e1ebb3397e69cd 12,15,17-20,30,76-101,104-106
+  s_b4d7d514d5fad8::t_9041bf51c959d4 107
+render/vectorraster/rasterize.go
+  s_b4d7d514d5fad8::t_e1ebb3397e69cd 80-83,154,168-178,357-375,377-379,381-391,416-471
+  s_b4d7d514d5fad8::t_32b2a8ba9fb5d5 376,380
+  s_b4d7d514d5fad8::t_7b1a1d869e37e7 472
+render/vectorraster/golden_test.go
+  s_b4d7d514d5fad8::t_b85214d4a2eff8 96-130
+render/vectorraster/validate.go
+  s_b4d7d514d5fad8::t_e1ebb3397e69cd 37-38,157-162,285-288,290
+render/vectorraster/profile_test.go
+  s_b4d7d514d5fad8::t_b85214d4a2eff8 55-76
+  s_b4d7d514d5fad8::t_70ca67c1af8736 7,34-44,46-50
+  s_b4d7d514d5fad8::t_703d155f50d9da 52-54
+schemas/cutly.document.v2.schema.json
+  s_b4d7d514d5fad8::t_037dad52f85d16 205-215,248-259,263-264
+core/documentv2/vector_viewport_test.go
+  s_b4d7d514d5fad8::t_70ca67c1af8736 157-184,186-209
+  s_b4d7d514d5fad8::t_d2671efd60e794 185
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "4d16d05aff6dc0b17b14563a9040dd94b444b7a5",
+  "prompts": {},
+  "sessions": {
+    "s_b4d7d514d5fad8": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1d537-d683-76a1-aaf8-c6c94fe01c14",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "versojust-cloud <versojust-cloud@users.noreply.github.com>"
+    }
+  }
+}
